@@ -16,11 +16,12 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 import torch
 from efm3d.aria.pose import PoseTW
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
@@ -351,16 +352,45 @@ class CounterfactualPoseGeneratorConfig(TargetConfig["CounterfactualPoseGenerato
     horizon: int = Field(default=3, ge=1)
     branch_factor: int = Field(default=2, ge=1)
     beam_width: int | None = Field(default=None, ge=1)
+    branch_factor_schedule: list[int] | None = None
+    stochastic_branch_factors: list[int] | None = None
+    stochastic_branch_probabilities: list[float] | None = None
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY
     selection_temperature: float = Field(default=1.0, gt=0.0)
     branch_schedule_id: str | None = None
     min_history_distance_m: float = Field(default=0.0, ge=0.0)
     min_sibling_distance_m: float = Field(default=0.0, ge=0.0)
     seed: int | None = Field(default=0, ge=0)
+    log_timing: bool = False
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
     is_debug: bool = False
 
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
+
+    @model_validator(mode="after")
+    def _validate_branch_controls(self) -> "CounterfactualPoseGeneratorConfig":
+        if self.branch_factor_schedule is not None and self.stochastic_branch_factors is not None:
+            raise ValueError("Use either branch_factor_schedule or stochastic_branch_factors, not both.")
+        if self.branch_factor_schedule is not None:
+            if not self.branch_factor_schedule:
+                raise ValueError("branch_factor_schedule must be non-empty when set.")
+            if any(int(value) < 1 for value in self.branch_factor_schedule):
+                raise ValueError("branch_factor_schedule entries must be >= 1.")
+        if self.stochastic_branch_factors is not None:
+            if not self.stochastic_branch_factors:
+                raise ValueError("stochastic_branch_factors must be non-empty when set.")
+            if any(int(value) < 1 for value in self.stochastic_branch_factors):
+                raise ValueError("stochastic_branch_factors entries must be >= 1.")
+        if self.stochastic_branch_probabilities is not None:
+            if self.stochastic_branch_factors is None:
+                raise ValueError("stochastic_branch_probabilities require stochastic_branch_factors.")
+            if len(self.stochastic_branch_probabilities) != len(self.stochastic_branch_factors):
+                raise ValueError("stochastic_branch_probabilities must match stochastic_branch_factors length.")
+            if any(float(value) < 0.0 for value in self.stochastic_branch_probabilities):
+                raise ValueError("stochastic_branch_probabilities entries must be >= 0.")
+            if sum(float(value) for value in self.stochastic_branch_probabilities) <= 0.0:
+                raise ValueError("stochastic_branch_probabilities must have positive total mass.")
+        return self
 
 
 class CounterfactualOracleRriScorerConfig(TargetConfig["CounterfactualOracleRriScorer"]):
@@ -508,13 +538,20 @@ class CounterfactualPoseGenerator:
         root_pose_world = self._canonicalize_pose(reference_pose)
         frontier = [CounterfactualTrajectory(root_pose_world=root_pose_world)]
         score_label = self.config.selection_policy.value
+        candidate_total_s = 0.0
+        evaluate_total_s = 0.0
+        select_total_s = 0.0
+        expanded_nodes = 0
+        scored_valid_candidates = 0
 
         for step_index in range(self.config.horizon):
             self.console.dbg(
                 f"Expanding counterfactual rollout step {step_index + 1}/{self.config.horizon}.",
             )
             next_frontier: list[CounterfactualTrajectory] = []
-            for trajectory in frontier:
+            for frontier_index, trajectory in enumerate(frontier):
+                node_start_s = perf_counter()
+                candidate_start_s = perf_counter()
                 candidates = self._candidate_generator.generate(
                     reference_pose=self._generator_input_pose(trajectory.final_pose_world()),
                     gt_mesh=gt_mesh,
@@ -524,22 +561,46 @@ class CounterfactualPoseGenerator:
                     occupancy_extent=occupancy_extent,
                     runtime_context=candidate_runtime_context,
                 )
+                candidate_s = perf_counter() - candidate_start_s
+                candidate_total_s += candidate_s
                 valid_count = int(candidates.mask_valid.sum().item())
+                expanded_nodes += 1
+                scored_valid_candidates += valid_count
                 if valid_count <= 0:
+                    self._log_timing(
+                        "Rollout timing "
+                        f"step={step_index} frontier={frontier_index} valid=0 "
+                        f"candidate_s={candidate_s:.3f} node_s={perf_counter() - node_start_s:.3f}",
+                    )
                     next_frontier.append(trajectory.mark_terminated())
                     continue
 
+                evaluate_start_s = perf_counter()
                 evaluation = self._evaluate_valid_candidates(
                     result=candidates,
                     trajectory=trajectory,
                     step_index=step_index,
                     score_candidates=score_candidates,
                 )
+                evaluate_s = perf_counter() - evaluate_start_s
+                evaluate_total_s += evaluate_s
                 score_label = evaluation.score_label
+                select_start_s = perf_counter()
+                branch_count = self._branch_factor_for_step(step_index)
                 selection_records = self._select_valid_candidates(
                     scores=evaluation.scores,
                     valid_poses=candidates.poses_world_cam(),
                     trajectory=trajectory,
+                    branch_count=branch_count,
+                )
+                select_s = perf_counter() - select_start_s
+                select_total_s += select_s
+                self._log_timing(
+                    "Rollout timing "
+                    f"step={step_index} frontier={frontier_index} valid={valid_count} "
+                    f"branch_count={branch_count} selected={len(selection_records)} "
+                    f"candidate_s={candidate_s:.3f} evaluate_s={evaluate_s:.3f} "
+                    f"select_s={select_s:.3f} node_s={perf_counter() - node_start_s:.3f}",
                 )
                 if not selection_records:
                     next_frontier.append(trajectory.mark_terminated())
@@ -586,6 +647,12 @@ class CounterfactualPoseGenerator:
                 frontier = [CounterfactualTrajectory(root_pose_world=root_pose_world, terminated_early=True)]
                 break
 
+        self._log_timing(
+            "Rollout timing summary "
+            f"expanded_nodes={expanded_nodes} scored_valid_candidates={scored_valid_candidates} "
+            f"candidate_s={candidate_total_s:.3f} evaluate_s={evaluate_total_s:.3f} "
+            f"select_s={select_total_s:.3f}",
+        )
         return CounterfactualRolloutResult(
             root_pose_world=root_pose_world,
             trajectories=frontier,
@@ -654,14 +721,25 @@ class CounterfactualPoseGenerator:
         scores: torch.Tensor,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
+        branch_count: int,
     ) -> list[CounterfactualSelectionRecord]:
         if self.config.selection_policy in (
             CounterfactualSelectionPolicy.RANDOM,
             CounterfactualSelectionPolicy.RANDOM_VALID,
             CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
         ):
-            return self._sample_valid_candidates(scores=scores, valid_poses=valid_poses, trajectory=trajectory)
-        return self._greedy_valid_candidates(scores=scores, valid_poses=valid_poses, trajectory=trajectory)
+            return self._sample_valid_candidates(
+                scores=scores,
+                valid_poses=valid_poses,
+                trajectory=trajectory,
+                branch_count=branch_count,
+            )
+        return self._greedy_valid_candidates(
+            scores=scores,
+            valid_poses=valid_poses,
+            trajectory=trajectory,
+            branch_count=branch_count,
+        )
 
     def _greedy_valid_candidates(
         self,
@@ -669,6 +747,7 @@ class CounterfactualPoseGenerator:
         scores: torch.Tensor,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
+        branch_count: int,
     ) -> list[CounterfactualSelectionRecord]:
         order = torch.argsort(scores, descending=True)
         centers = valid_poses.t.reshape(-1, 3)
@@ -683,7 +762,7 @@ class CounterfactualPoseGenerator:
                 continue
             selected.append(index)
             selected_centers.append(center)
-            if len(selected) >= self.config.branch_factor:
+            if len(selected) >= branch_count:
                 break
 
         if not selected and order.numel() > 0:
@@ -696,6 +775,7 @@ class CounterfactualPoseGenerator:
         scores: torch.Tensor,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
+        branch_count: int,
     ) -> list[CounterfactualSelectionRecord]:
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
@@ -703,7 +783,7 @@ class CounterfactualPoseGenerator:
         selected_centers: list[torch.Tensor] = []
         records: list[CounterfactualSelectionRecord] = []
 
-        for _draw_index in range(self.config.branch_factor):
+        for _draw_index in range(branch_count):
             if not bool(remaining.any().item()):
                 break
             eligible = remaining & self._distance_guard_mask(
@@ -765,6 +845,30 @@ class CounterfactualPoseGenerator:
             entropy=0.0,
             selected_log_probability=0.0,
         )
+
+    def _branch_factor_for_step(self, step_index: int) -> int:
+        if self.config.stochastic_branch_factors is not None:
+            choices = torch.tensor(self.config.stochastic_branch_factors, dtype=torch.long)
+            if self.config.stochastic_branch_probabilities is None:
+                probabilities = torch.ones(len(choices), dtype=torch.float32) / float(len(choices))
+            else:
+                probabilities = torch.tensor(self.config.stochastic_branch_probabilities, dtype=torch.float32)
+                probabilities = probabilities / probabilities.sum()
+            sampled = torch.multinomial(
+                probabilities,
+                num_samples=1,
+                replacement=True,
+                generator=self._selection_generator,
+            )
+            return int(choices[int(sampled.item())].item())
+        if self.config.branch_factor_schedule is not None:
+            schedule_index = min(step_index, len(self.config.branch_factor_schedule) - 1)
+            return int(self.config.branch_factor_schedule[schedule_index])
+        return int(self.config.branch_factor)
+
+    def _log_timing(self, message: str) -> None:
+        if self.config.log_timing:
+            self.console.log(message)
 
     def _masked_softmax(
         self,

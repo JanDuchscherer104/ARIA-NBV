@@ -314,6 +314,9 @@ def _make_rollout_config(
     horizon: int = 3,
     branch_factor: int = 1,
     beam_width: int | None = None,
+    branch_factor_schedule: list[int] | None = None,
+    stochastic_branch_factors: list[int] | None = None,
+    stochastic_branch_probabilities: list[float] | None = None,
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
     selection_temperature: float = 1.0,
 ) -> CounterfactualPoseGeneratorConfig:
@@ -336,6 +339,9 @@ def _make_rollout_config(
         horizon=horizon,
         branch_factor=branch_factor,
         beam_width=beam_width,
+        branch_factor_schedule=branch_factor_schedule,
+        stochastic_branch_factors=stochastic_branch_factors,
+        stochastic_branch_probabilities=stochastic_branch_probabilities,
         selection_policy=selection_policy,
         selection_temperature=selection_temperature,
         verbosity=0,
@@ -347,6 +353,9 @@ def _run_rollouts(
     horizon: int = 3,
     branch_factor: int = 1,
     beam_width: int | None = None,
+    branch_factor_schedule: list[int] | None = None,
+    stochastic_branch_factors: list[int] | None = None,
+    stochastic_branch_probabilities: list[float] | None = None,
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
     selection_temperature: float = 1.0,
     score_candidates=None,
@@ -355,6 +364,9 @@ def _run_rollouts(
         horizon=horizon,
         branch_factor=branch_factor,
         beam_width=beam_width,
+        branch_factor_schedule=branch_factor_schedule,
+        stochastic_branch_factors=stochastic_branch_factors,
+        stochastic_branch_probabilities=stochastic_branch_probabilities,
         selection_policy=selection_policy,
         selection_temperature=selection_temperature,
     )
@@ -405,6 +417,47 @@ def test_counterfactual_rollout_beam_width_caps_frontier() -> None:
     rollouts = _run_rollouts(horizon=2, branch_factor=3, beam_width=2)
     assert len(rollouts.trajectories) == 2
     assert all(len(traj.steps) == 2 for traj in rollouts.trajectories)
+
+
+def test_counterfactual_branch_factor_schedule_controls_expansion_per_step() -> None:
+    rollouts = _run_rollouts(
+        horizon=2,
+        branch_factor=3,
+        branch_factor_schedule=[2, 1],
+        beam_width=3,
+        score_candidates=_fake_rri_evaluator,
+    )
+
+    assert len(rollouts.trajectories) == 2
+    assert all(len(traj.steps) == 2 for traj in rollouts.trajectories)
+
+
+def test_counterfactual_stochastic_branch_factor_is_seeded_and_overrides_fixed_branch_count() -> None:
+    rollouts_a = _run_rollouts(
+        horizon=1,
+        branch_factor=3,
+        stochastic_branch_factors=[1, 2],
+        stochastic_branch_probabilities=[0.0, 1.0],
+        score_candidates=_fake_rri_evaluator,
+    )
+    rollouts_b = _run_rollouts(
+        horizon=1,
+        branch_factor=3,
+        stochastic_branch_factors=[1, 2],
+        stochastic_branch_probabilities=[0.0, 1.0],
+        score_candidates=_fake_rri_evaluator,
+    )
+
+    selected_a = [trajectory.steps[0].selected_shell_index for trajectory in rollouts_a.trajectories]
+    selected_b = [trajectory.steps[0].selected_shell_index for trajectory in rollouts_b.trajectories]
+
+    assert len(selected_a) == 2
+    assert selected_a == selected_b
+
+
+def test_counterfactual_branch_controls_reject_ambiguous_schedule() -> None:
+    with pytest.raises(ValueError, match="either branch_factor_schedule or stochastic_branch_factors"):
+        _make_rollout_config(branch_factor_schedule=[1], stochastic_branch_factors=[1])
 
 
 def test_counterfactual_simple_plots_return_figures() -> None:

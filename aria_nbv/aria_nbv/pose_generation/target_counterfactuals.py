@@ -12,6 +12,7 @@ but it must not replace target RRI labels in thesis-core rollout stores.
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 import torch
@@ -84,6 +85,9 @@ class CounterfactualTargetOracleRriScorerConfig(TargetConfig["CounterfactualTarg
     is_debug: bool = False
     """Enable debug logging in scorer dependencies."""
 
+    log_timing: bool = False
+    """Emit per-call timing diagnostics for rollout evidence generation."""
+
     _coerce_verbosity = field_validator("verbosity", mode="before")(BaseConfig._coerce_verbosity)
 
     @field_validator("target_crop_policy")
@@ -145,12 +149,18 @@ class CounterfactualTargetOracleRriScorer:
         if self.sample.mesh_verts is None or self.sample.mesh_faces is None:
             raise ValueError("CounterfactualTargetOracleRriScorer requires sample.mesh_verts and sample.mesh_faces.")
 
+        call_start_s = perf_counter()
+        render_start_s = perf_counter()
         depths = self._depth_renderer.render(self.sample, candidates)
+        render_s = perf_counter() - render_start_s
+        backproject_start_s = perf_counter()
         point_clouds = build_candidate_pointclouds(
             self.sample,
             depths,
             stride=self.config.backprojection_stride,
         )
+        backproject_s = perf_counter() - backproject_start_s
+        crop_start_s = perf_counter()
         device = point_clouds.points.device
         dtype = point_clouds.points.dtype
         target_obb = self._target_obb_world.to(device=device, dtype=dtype)
@@ -183,7 +193,9 @@ class CounterfactualTargetOracleRriScorer:
             target_obb,
             margin_m=self.config.target_crop_margin_m,
         )
+        crop_s = perf_counter() - crop_start_s
 
+        target_oracle_start_s = perf_counter()
         target_rri = self._oracle.score(
             points_t=target_points_t,
             points_q=target_points_q,
@@ -192,6 +204,7 @@ class CounterfactualTargetOracleRriScorer:
             gt_faces=target_mesh_faces,
             extend=target_extent,
         )
+        target_oracle_s = perf_counter() - target_oracle_start_s
         metrics = CounterfactualMetricBundle(
             rri=target_rri.rri,
             target_rri=target_rri.rri,
@@ -205,7 +218,9 @@ class CounterfactualTargetOracleRriScorer:
             target_current_support=torch.full_like(target_rri.rri, float(target_points_t.shape[0])),
         )
 
+        scene_oracle_s = 0.0
         if self.config.include_scene_rri:
+            scene_oracle_start_s = perf_counter()
             scene_rri = self._oracle.score(
                 points_t=points_t,
                 points_q=point_clouds.points,
@@ -214,6 +229,7 @@ class CounterfactualTargetOracleRriScorer:
                 gt_faces=mesh_faces,
                 extend=point_clouds.occupancy_bounds,
             )
+            scene_oracle_s = perf_counter() - scene_oracle_start_s
             metrics.scene_rri = scene_rri.rri
             metrics.scene_pm_dist_before = scene_rri.pm_dist_before
             metrics.scene_pm_dist_after = scene_rri.pm_dist_after
@@ -221,6 +237,15 @@ class CounterfactualTargetOracleRriScorer:
             metrics.scene_pm_comp_before = scene_rri.pm_comp_before
             metrics.scene_pm_acc_after = scene_rri.pm_acc_after
             metrics.scene_pm_comp_after = scene_rri.pm_comp_after
+
+        if self.config.log_timing:
+            self.console.log(
+                "Target scorer timing "
+                f"valid={int(candidates.mask_valid.sum().item())} "
+                f"render_s={render_s:.3f} backproject_s={backproject_s:.3f} crop_s={crop_s:.3f} "
+                f"target_oracle_s={target_oracle_s:.3f} scene_oracle_s={scene_oracle_s:.3f} "
+                f"total_s={perf_counter() - call_start_s:.3f}",
+            )
 
         return CounterfactualCandidateEvaluation(
             scores=target_rri.rri,

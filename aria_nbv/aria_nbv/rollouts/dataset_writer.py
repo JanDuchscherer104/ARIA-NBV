@@ -95,6 +95,15 @@ class RolloutRecipeConfig(BaseConfig):
     beam_width: int | None = Field(default=None, ge=1)
     """Retained beam width; ``None`` keeps the generator default."""
 
+    branch_factor_schedule: list[int] | None = None
+    """Optional deterministic per-step branch counts; last entry repeats."""
+
+    stochastic_branch_factors: list[int] | None = None
+    """Optional seeded branch-count choices sampled per expanded rollout node."""
+
+    stochastic_branch_probabilities: list[float] | None = None
+    """Optional probabilities aligned with ``stochastic_branch_factors``."""
+
     selection_temperature: float = Field(default=1.0, gt=0.0)
     """Softmax temperature for stochastic selection policies."""
 
@@ -193,6 +202,12 @@ class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
 
     max_samples: int | None = Field(default=None, ge=1)
     """Optional local smoke cap on source samples."""
+
+    max_targets_per_sample: int | None = Field(default=None, ge=1)
+    """Optional local smoke cap on selected targets rolled out per source sample."""
+
+    log_timing: bool = False
+    """Emit generation/scoring timing diagnostics for local evidence builds."""
 
     require_label_valid: bool = True
     """Skip selected targets without valid GT/evaluation labels when true."""
@@ -345,20 +360,27 @@ class RolloutDatasetWriter:
                     f"source={target_result.source} warnings={target_result.warnings}",
                 )
                 continue
+            rolled_targets_for_sample = 0
             for target_rank, target in enumerate(target_result.selected_rows):
                 self.stats.targets_selected += 1
+                if self.config.max_targets_per_sample is not None and rolled_targets_for_sample >= int(
+                    self.config.max_targets_per_sample
+                ):
+                    self.stats.skip("max_targets_per_sample")
+                    continue
                 if self.config.require_label_valid and not target.gt_label_valid:
                     self.stats.targets_label_invalid += 1
                     self.stats.skip(str(target.gt_match_status))
                     continue
-                records.extend(
-                    self._rollout_target(
-                        sample=sample,
-                        target=target,
-                        target_rank=target_rank,
-                        source_lineage=source_lineage,
-                    )
+                target_records = self._rollout_target(
+                    sample=sample,
+                    target=target,
+                    target_rank=target_rank,
+                    source_lineage=source_lineage,
                 )
+                if target_records:
+                    rolled_targets_for_sample += 1
+                    records.extend(target_records)
 
         if not records:
             raise RuntimeError(f"No rollout records were generated; skipped={self.stats.skipped_reasons}")
@@ -419,10 +441,14 @@ class RolloutDatasetWriter:
                 horizon=recipe.horizon,
                 branch_factor=recipe.branch_factor,
                 beam_width=recipe.beam_width,
+                branch_factor_schedule=recipe.branch_factor_schedule,
+                stochastic_branch_factors=recipe.stochastic_branch_factors,
+                stochastic_branch_probabilities=recipe.stochastic_branch_probabilities,
                 selection_policy=recipe.selection_policy,
                 selection_temperature=recipe.selection_temperature,
                 branch_schedule_id=recipe.name,
                 seed=recipe.seed,
+                log_timing=self.config.log_timing,
                 verbosity=self.config.verbosity,
                 is_debug=self.config.is_debug,
             )

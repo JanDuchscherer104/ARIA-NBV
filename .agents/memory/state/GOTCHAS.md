@@ -1,6 +1,6 @@
 ---
 id: gotchas
-updated: 2026-05-12
+updated: 2026-05-13
 scope: repo
 owner: jan
 status: active
@@ -14,6 +14,7 @@ tags: [workflow, training, cache, frames]
 - Assume the environment is working unless the user indicates otherwise, but verify the exact interpreter before concluding a dependency problem.
 - `make context` refreshes the lightweight routing artifacts only; use targeted search on `source_index.md`, `literature_index.md`, and `data_contracts.md` instead of loading broad dumps.
 - `make context-heavy` and the `context-uml`, `context-docstrings`, or `context-tree` targets are explicit fallback tools for architecture or refactor tasks.
+- Local CUDA visibility does not imply PyTorch3D CUDA support. On 2026-05-13 the workstation saw an RTX 3080 Ti, but PyTorch3D rasterization and point-mesh distance raised `RuntimeError: Not compiled with GPU support`; rollout microset configs therefore used CPU until a CUDA-enabled PyTorch3D build/container is verified.
 
 ## Training and Validation
 - Validation is disabled by default unless `trainer_config.enable_validation=true`; otherwise Lightning forces `limit_val_batches=0` and `check_val_every_n_epoch=0`.
@@ -34,6 +35,7 @@ tags: [workflow, training, cache, frames]
 ## EVL / OBB
 - EVL OBB outputs are not batch-collatable yet; entity-aware runs may need `batch_size=None` or OBB outputs disabled.
 - Candidate validity heuristics and semidense visibility proxies are conservative; do not assume they are equivalent to training masks unless the training loop explicitly applies them.
+- Full-scene RRI during target-rollout generation is much more expensive than target-cropped RRI on the current CPU-only PyTorch3D path. Keep scene RRI as an explicit audit option until a downsampled or GPU-backed path is verified; target RRI remains the thesis-core label.
 
 ## Config and Pydantic
 - `Field(default=<callable>)` stores the callable itself; use `Field(default_factory=...)` for computed defaults.
