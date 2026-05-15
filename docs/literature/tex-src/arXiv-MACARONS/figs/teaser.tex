@@ -1,0 +1,32 @@
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=\linewidth]{teaser_res.png}
+%     \includegraphics[width=\linewidth]{teaser_mini.png}
+%     \caption{This is a great teaser!}
+%     \label{fig:teaser}
+% \end{figure}
+
+\begin{center}
+    \captionsetup{type=figure}
+    \begin{subfigure}[t]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{images/pisa_scone.png}%
+        \vspace{.5em}
+        \includegraphics[width=\linewidth]{teaser_a.png}%
+        \vspace{.1em}
+        \caption{NBV methods with a depth sensor (\eg,~\cite{guedon-nips22-scone-surface-coverage})}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\linewidth}
+        \includegraphics[width=\linewidth]{images/pisa_macarons.png}%
+        \vspace{.5em}
+        \includegraphics[width=\linewidth]{teaser_b.png}%
+        \vspace{.1em}
+        \caption{Our approach MACARONS with an RGB sensor}
+    \end{subfigure}
+\end{center}
+
+\vspace{-1.5em}
+% \captionof{subfigure}{This is a great teaser!}
+\addtocounter{figure}{-1}
+\captionof{figure}{\textbf{Mapping and Coverage Anticipation with RGB Online Self-Supervision. (a)} NBV methods such as \cite{guedon-nips22-scone-surface-coverage} rely on a depth sensor to perform path planning (bottom) and scan the environment (top). They need to be trained with explicit 3D supervision, generally on small-scale meshes. \textbf{(b)} Our approach MACARONS instead simultaneously learns to efficiently explore the scene and to reconstruct it (top) using an RGB sensor only. Its self-supervised, online learning process scales to large-scale and complex scenes.}
+\label{fig:teaser}

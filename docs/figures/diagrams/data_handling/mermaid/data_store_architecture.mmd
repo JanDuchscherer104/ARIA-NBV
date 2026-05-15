@@ -1,0 +1,72 @@
+---
+config:
+  theme: base
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 24
+    rankSpacing: 38
+    curve: basis
+  layout: elk
+  themeVariables:
+    background: "#ffffff"
+    fontFamily: "Inter, DejaVu Sans, Arial, sans-serif"
+    fontSize: "18px"
+    primaryTextColor: "#1f2937"
+    lineColor: "#64748b"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart LR
+  subgraph Assets["Source assets"]
+    Raw["$$\\begin{array}{c}\\textbf{ASE / ATEK / EFM}\\\\\\text{RGB, calibration, trajectory}\\\\\\boldsymbol{\\mathcal{P}}^{\\mathrm{semi}},\\ \\boldsymbol{\\mathcal{M}}_{\\mathrm{GT}}\\end{array}$$"]
+  end
+
+  subgraph Offline["Immutable one-step substrate"]
+    Writer["$$\\begin{array}{c}\\textbf{\\texttt{VinOfflineWriter}}\\\\\\text{cache expensive blocks}\\end{array}$$"]
+    Store["$$\\begin{array}{c}\\textbf{\\texttt{vin\\_offline}}\\\\\\text{manifest + indexed shards}\\end{array}$$"]
+    Dataset["$$\\begin{array}{c}\\textbf{\\texttt{VinOfflineDataset}}\\\\\\texttt{VinOfflineSample}\\ \\text{or}\\ \\texttt{VinOracleBatch}\\end{array}$$"]
+  end
+
+  subgraph Generation["Target-conditioned rollout generation"]
+    Select["$$\\begin{array}{c}\\textbf{Target Selection}\\\\ e,\\ z_e\\\\\\text{actor-visible first}\\end{array}$$"]
+    Candidate["$$\\begin{array}{c}\\textbf{Candidate Mixture}\\\\\\boldsymbol{\\mathcal{Q}}_t=\\{q_{t,i}\\}_{i=1}^{N_q}\\\\ m_{t,i},\\ \\rho_{t,i}\\end{array}$$"]
+    Oracle["$$\\begin{array}{c}\\textbf{Target RRI Oracle}\\\\ r_t^e(q_{t,i})\\\\\\text{GT crop is evaluation only}\\end{array}$$"]
+    Policy["$$\\begin{array}{c}\\textbf{Rollout Policy}\\\\\\pi,\\ H,\\ \\texttt{chain\\_id}\\end{array}$$"]
+  end
+
+  subgraph Replay["Derived multi-step replay"]
+    RolloutStore["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr}}\\\\\\text{manifest-backed factual tables}\\\\ G_0^{(H)},\\ Q_H\\ \\text{view}\\end{array}$$"]
+  end
+
+  subgraph Consumers["Consumers"]
+    Joined["$$\\begin{array}{c}\\textbf{Joined Training View}\\\\\\text{source refs + rollout rows}\\\\\\text{no backbone duplication}\\end{array}$$"]
+    Inspect["$$\\begin{array}{c}\\textbf{Inspection}\\\\\\text{Streamlit + Rerun}\\\\\\text{manifest + selected rows}\\end{array}$$"]
+  end
+
+  Raw --> Writer --> Store --> Dataset
+  Raw -. "live snippet and mesh refs" .-> Dataset
+  Dataset --> Select --> Candidate --> Oracle --> Policy --> RolloutStore
+  Dataset --> Oracle
+  Dataset --> Joined
+  RolloutStore --> Joined
+  RolloutStore --> Inspect
+  Dataset --> Inspect
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Raw input;
+  class Writer,Select,Candidate,Oracle,Policy compute;
+  class Store,Dataset,RolloutStore data;
+  class Joined,Inspect output;
+
+  style Assets fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style Offline fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Generation fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style Replay fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Consumers fill:#ffffff,stroke:#cbd5e1,stroke-width:1.5px,rx:12,ry:12

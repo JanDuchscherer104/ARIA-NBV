@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
 
 import numpy as np
@@ -15,6 +15,7 @@ from efm3d.aria.tensor_wrapper import TensorWrapper
 from pytorch3d.transforms import matrix_to_quaternion
 from torch import Tensor
 
+from ..utils.semantic_names import semantic_class_name
 from ._colors import obb_semantic_rgba
 from ._metadata import OfflineVisualInventory, build_sample_metadata_document
 
@@ -40,6 +41,9 @@ class RerunModule(Protocol):
     AnyValues: RerunEntityFactory
     TextDocument: RerunEntityFactory
     Scalar: RerunEntityFactory
+    Scalars: RerunEntityFactory
+    SeriesLines: RerunEntityFactory
+    SeriesPoints: RerunEntityFactory
     Transform3D: RerunEntityFactory
     Mesh3D: RerunEntityFactory
     Image: RerunEntityFactory
@@ -62,6 +66,9 @@ class RerunModule(Protocol):
 
     def log(self, entity_path: str, entity: object, *args: object, **kwargs: object) -> None:
         """Log one entity."""
+
+    def set_time(self, timeline: str, *, sequence: int | None = None, **kwargs: object) -> None:
+        """Set a timeline for subsequent logs."""
 
     def set_time_sequence(self, timeline: str, sequence: int, **kwargs: object) -> None:
         """Set an integer timeline for subsequent logs."""
@@ -145,21 +152,18 @@ def log_default_inspector_blueprint(rr_module: RerunModule) -> None:
             rrb.Horizontal(
                 rrb.Spatial3DView(
                     name="World",
-                    origin="world",
-                    contents=["world/**"],
+                    origin="/world",
+                    contents=["/world/**"],
                 ),
                 rrb.Vertical(
-                    rrb.TimeSeriesView(
-                        name="Rollout Scalars",
-                        origin="plots/rollout",
-                        contents=["plots/rollout/**"],
-                    ),
+                    rrb.TimeSeriesView(name="Rollout RRI", origin="/plots/rollout/rri"),
+                    rrb.TimeSeriesView(name="Rollout Diagnostics", origin="/plots/rollout/diagnostics"),
                     rrb.TextDocumentView(
                         name="Metadata",
-                        origin="metadata",
-                        contents=["metadata/**"],
+                        origin="/metadata",
+                        contents=["/metadata/**"],
                     ),
-                    row_shares=[2, 1],
+                    row_shares=[2, 1, 1],
                 ),
                 column_shares=[3, 1],
             ),
@@ -653,23 +657,11 @@ def _obb_line_strips(obbs: Tensor | ObbTW, *, t_world_snippet: PoseTW) -> list[l
     return strips
 
 
-def _semantic_class_name(sem_id: float, sem_id_to_name: Sequence[str] | None) -> str:
-    """Return a display class name for one semantic id."""
-
-    if sem_id_to_name is None:
-        return "<unknown>"
-    index = int(sem_id)
-    if index < 0 or index >= len(sem_id_to_name):
-        return "<unknown>"
-    name = str(sem_id_to_name[index])
-    return name if name else "<unknown>"
-
-
 def _obb_boxes(
     obbs: Tensor | ObbTW,
     *,
     t_world_snippet: PoseTW,
-    sem_id_to_name: Sequence[str] | None = None,
+    sem_id_to_name: Mapping[int, str] | Sequence[str] | None = None,
 ) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any], list[str], NDArray[Any], NDArray[Any]]:
     """Convert EFM snippet-frame OBB tensors into native Rerun box fields.
 
@@ -708,7 +700,7 @@ def _obb_boxes(
     prob = valid_obbs.prob.detach().cpu().numpy().reshape(-1)
     labels = [
         (
-            f"class={_semantic_class_name(float(sem), sem_id_to_name)} | "
+            f"class={semantic_class_name(float(sem), sem_id_to_name)} | "
             f"sem_id={int(sem)} | inst_id={int(inst)} | prob={float(score):.3f}"
         )
         for sem, inst, score in zip(sem_id, inst_id, prob, strict=False)
@@ -784,14 +776,14 @@ def _structured_target_value(target_hint: str, *, key: str) -> int | None:
     return None if match is None else int(match.group(1))
 
 
-def _gt_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
+def _gt_obb_semantic_names(sample: VinOfflineSample) -> Mapping[int, str] | Sequence[str] | None:
     """Return GT OBB semantic names when the offline payload exposes them."""
 
     gt_obbs = getattr(sample, "gt_obbs", None)
     return getattr(gt_obbs, "sem_id_to_name", None)
 
 
-def _detected_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | None:
+def _detected_obb_semantic_names(sample: VinOfflineSample) -> Mapping[int, str] | Sequence[str] | None:
     """Return detected OBB semantic names from compact or backbone payloads."""
 
     detected_obbs = getattr(sample, "detected_obbs", None)
@@ -804,15 +796,30 @@ def _detected_obb_semantic_names(sample: VinOfflineSample) -> Sequence[str] | No
     return getattr(backbone, "obb_pred_sem_id_to_name", None)
 
 
-def _voxel_extent_box_fields(voxel_extent: Tensor) -> tuple[NDArray[Any], NDArray[Any]]:
-    """Convert ``[x_min, x_max, y_min, y_max, z_min, z_max]`` to box fields."""
+def _voxel_extent_bounds(voxel_extent: Tensor) -> tuple[NDArray[Any], NDArray[Any]]:
+    """Return voxel-frame min/max XYZ bounds from EVL extent metadata."""
 
     extent = _to_numpy(voxel_extent).reshape(-1, 6)[0].astype(np.float32)
     mins = np.asarray([extent[0], extent[2], extent[4]], dtype=np.float32)
     maxs = np.asarray([extent[1], extent[3], extent[5]], dtype=np.float32)
-    center = 0.5 * (mins + maxs)
+    return mins, maxs
+
+
+def _voxel_extent_world_box_fields(
+    voxel_extent: Tensor,
+    *,
+    t_world_voxel: PoseTW,
+) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any]]:
+    """Return world-space oriented Rerun box fields for the EVL voxel extent."""
+
+    mins, maxs = _voxel_extent_bounds(voxel_extent)
+    center_voxel = 0.5 * (mins + maxs)
     half_size = 0.5 * (maxs - mins)
-    return center.reshape(1, 3), half_size.reshape(1, 3)
+    r, t = _pose_rt(t_world_voxel, [0])
+    center_world = (r[0] @ center_voxel.reshape(3, 1)).reshape(1, 3) + t[0].reshape(1, 3)
+    quat_wxyz = matrix_to_quaternion(torch.as_tensor(r, dtype=torch.float32)).numpy().reshape(-1, 4)
+    quats_xyzw = quat_wxyz[:, [1, 2, 3, 0]]
+    return center_world.astype(np.float32), half_size.reshape(1, 3).astype(np.float32), quats_xyzw.astype(np.float32)
 
 
 def _trajectory_points(sample: VinOfflineSample) -> NDArray[Any]:
@@ -909,10 +916,14 @@ def _field_voxel_centers_world(
 
     d, h, w = values.shape
     extent = voxel_extent.detach().cpu().float().reshape(-1, 6)[0]
-    mins = torch.tensor([extent[0], extent[2], extent[4]], dtype=torch.float32)
-    maxs = torch.tensor([extent[1], extent[3], extent[5]], dtype=torch.float32)
-    dims = torch.tensor([d, h, w], dtype=torch.float32)
-    centers_voxel = mins + (indices.to(dtype=torch.float32) + 0.5) * ((maxs - mins) / dims)
+    x_min, x_max, y_min, y_max, z_min, z_max = extent.tolist()
+    z_idx = indices[:, 0].to(dtype=torch.float32)
+    y_idx = indices[:, 1].to(dtype=torch.float32)
+    x_idx = indices[:, 2].to(dtype=torch.float32)
+    x = float(x_min) + (x_idx + 0.5) * ((float(x_max) - float(x_min)) / float(w))
+    y = float(y_min) + (y_idx + 0.5) * ((float(y_max) - float(y_min)) / float(h))
+    z = float(z_min) + (z_idx + 0.5) * ((float(z_max) - float(z_min)) / float(d))
+    centers_voxel = torch.stack([x, y, z], dim=-1)
 
     pose = t_world_voxel
     if pose.ndim != 1:
@@ -1201,7 +1212,7 @@ class RerunOfflineLogger:
         entity_path: str,
         obbs: Tensor | ObbTW | None,
         palette: str,
-        sem_id_to_name: Sequence[str] | None,
+        sem_id_to_name: Mapping[int, str] | Sequence[str] | None,
         show_scene_labels: bool,
     ) -> None:
         if obbs is None:
@@ -1414,18 +1425,16 @@ class RerunOfflineLogger:
         if t_world_voxel is None or voxel_extent is None:
             self._warn_metadata(f"{ENTITY_EFM_VOXEL_EXTENT} skipped: missing voxel pose or extent.")
             return
-        centers, half_sizes = _voxel_extent_box_fields(voxel_extent)
-        r, t = _pose_rt(t_world_voxel, [0])
+        centers, half_sizes, quaternions = _voxel_extent_world_box_fields(
+            voxel_extent,
+            t_world_voxel=t_world_voxel,
+        )
         self.rr.log(
             ENTITY_EFM_VOXEL_EXTENT,
-            self.rr.Transform3D(
-                translation=t[0].tolist(),
-                mat3x3=r[0].tolist(),
-                relation=self.rr.TransformRelation.ParentFromChild,
-            ),
             self.rr.Boxes3D(
                 centers=centers,
                 half_sizes=half_sizes,
+                quaternions=quaternions,
                 colors=[[255, 255, 255, 80]],
                 labels=["EFM voxel extent"],
             ),

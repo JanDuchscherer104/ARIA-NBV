@@ -1,0 +1,37 @@
+\begin{table}
+  \centering
+  %\footnotesize
+  \begin{tabular}{@{} p{0.5in} p{0.85in} cccccc@{}}
+  %\begin{tabular}{@{} p{0.25in} p{0.6in} cccccc@{}}
+      \toprule
+      & & \multicolumn{2}{c}{Gibson} & \multicolumn{2}{c}{MP3D}\\
+      \cmidrule(l){3-4} \cmidrule(l){5-6}
+      Sensors & Baseline & SPL & Succ & SPL & Succ \\
+      \midrule
+      %\cmidrule{1-8}
+      \multirow{4}{*}{\blind}
+      & Random & $0.02$ & $0.03$ & $0.01$ & $0.01$ \\
+      & Forward only & $0.00$ & $0.00$ & $0.00$ & $0.00$ \\
+      & Goal follower & $0.23$ & $0.23$ & $0.12$ & $0.12$ \\
+      & RL (PPO) & $0.42$ & $0.62$ & $0.25$ & $0.35$ \\
+      \midrule
+      %\cmidrule{2-8}
+      \multirow{1}{*}{\rgb}
+      & RL (PPO) & $0.46$ & $0.64$ & $0.30$ & $0.42$ \\
+      \midrule
+      %\cmidrule{2-8}
+      \multirow{1}{*}{\depth}
+      & RL (PPO) & $\textbf{0.79}$ & $\textbf{0.89}$ & $\textbf{0.54}$ & $\textbf{0.69}$ \\
+      \midrule
+      %\cmidrule{2-8}
+      \multirow{2}{*}{\rgbd}
+      & RL (PPO) & $0.70$ & $0.80$ & $0.42$ & $0.53$ \\
+      & SLAM~\cite{mishkin2019benchmarking} & $0.51$ & $0.62$ & $0.39$ & $0.47$ \\
+      \bottomrule
+  \end{tabular}
+  %\vspace{-2mm}
+  \caption{Performance of baseline methods on the PointGoal task~\cite{Anderson2018-Evaluation} tested on the Gibson~\cite{Xia2018} and MP3D~\cite{Chang2017} test sets under multiple sensor configurations. RL models have been trained for $75$ million steps. We report average rate of episode success and SPL~\cite{Anderson2018-Evaluation}.
+  }
+  \label{tab:baselines}
+  %\vspace{\captionReduceBot}
+\end{table}

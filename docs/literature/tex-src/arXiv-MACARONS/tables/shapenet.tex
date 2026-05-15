@@ -1,0 +1,41 @@
+\begin{table*}
+  \centering
+  %\begin{subtable}{0.7\linewidth}
+  {\scriptsize
+    \addtolength{\tabcolsep}{-2pt}
+  % \resizebox{0.8\width}{!}{
+  \scalebox{0.93}{
+
+  
+\begin{tabular}{@{}lccccccccccccccccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{8}{c}{Categories seen during training} & \multicolumn{8}{c}{Categories not seen during training}\\
+    \cmidrule(r){2-9} \cmidrule(r){10-17}
+     Method & Airplane & Cabinet & Car & Chair & Lamp & Sofa & Table & Vessel & Bus & Bed & Bookshelf & Bench & Guitar & Motorbike & Skateboard & Pistol & Mean \\
+    \midrule
+    Random & 0.745 & 0.545 & 0.542 & 0.724 & 0.770 & 0.589 & 0.710 & 0.674 
+    & 0.609 & 0.619 & 0.695 & 0.795 & 0.795 & 0.672 & 0.768 & 0.614 & 0.679 \\
+    Proximity Count~\cite{delmerico-18-acomparison} & 0.800 & 0.596 & 0.591 & 0.772 & 0.803 & 0.629 & 0.753 & 0.706 
+    & 0.646 & 0.645 & 0.749 & 0.829 & 0.854 & 0.705 & 0.828 & 0.660 & 0.723 \\
+    Area Factor~\cite{vasquez-14-volumetric-nbv} & 0.797 & 0.585 & 0.587 & 0.751 & 0.801 & 0.627 & 0.725 & 0.714 
+    & 0.629 & 0.631 & 0.742 & 0.827 & 0.852 & 0.718 & 0.799 & 0.660 & 0.715 \\
+    NBV-Net~\cite{mendoza-prl2020} & 0.778 & 0.576 & 0.596 & 0.743 & 0.791 & 0.599 & 0.693 & 0.667 
+    & 0.654 & 0.628 & 0.729 & 0.824 & 0.834 & 0.710 & 0.825 & 0.645 & 0.706 \\
+    PC-NBV~\cite{zeng-icirs20-pcnbv} & 0.799 & 0.612 & \textbf{0.612} & \textbf{0.782} & 0.800 & 0.640 & 0.760 & 0.719 
+    & 0.667 & 0.662 & 0.740 & \textbf{0.845} & 0.849 & 0.728 & 0.840 & 0.672 & 0.733 \\
+    SCONE~\cite{guedon-nips22-scone-surface-coverage} & 0.827 & 0.625 & 0.591 & \textbf{0.782} & 0.819 & \textbf{0.662} & 0.792 & 0.734 
+    & 0.694 & 0.689 & 0.746 & 0.832 & \textbf{0.860} & 0.728 & 0.845 & 0.717 & 0.746 \\
+    MACARONS-NBV & \textbf{0.830} & \textbf{0.639} & 0.595 & 0.771 & \textbf{0.826} & \textbf{0.662} & \textbf{0.810} & \textbf{0.741} 
+    & \textbf{0.702} & \textbf{0.690} & \textbf{0.758} & 0.829 & 0.852 & \textbf{0.734} & \textbf{0.848} & \textbf{0.732} & \textbf{0.751}\\
+    \bottomrule
+  \end{tabular}
+  }
+  }
+  %\end{subtable}
+  %\hfill
+  %\begin{subtable}{0.23\linewidth}
+  %  \includegraphics[width=\linewidth]{images/coverage_curves/all_path_planning_curve_macarons.png}
+  %\end{subtable}
+  \caption{{\bf AUCs of surface coverage for several NBV selection methods for single object reconstruction, as computed on the ShapeNet test dataset following the protocol of~\cite{zeng-icirs20-pcnbv,guedon-nips22-scone-surface-coverage}.} MACARONS-NBV is trained with 3D supervision on the ShapeNet dataset using the new loss we introduced. Even if our loss is designed for large environments, it still maintains state of the art performance for the specific case of isolated, single object reconstruction.}
+  \label{tab:coverage_auc_shapenet}
+\end{table*}

@@ -1,0 +1,217 @@
+\newpage
+\appendix 
+\section{Equivariance Proof} \label{sec:appendix_equiv_proof}
+
+In this section we prove that our model is translation equivariant on $\rmx$ for any translation vector $g \in \mathbb{R}^n$ and it is rotation and reflection equivariant on $\rmx$ for any orthogonal matrix $Q \in \mathbb{R}^{n \times n}$. More formally, we will prove the model satisfies:
+
+$$Q\rmx^{l+1} + g, \rmh^{l+1}  = \mathrm{EGCL}(Q\rmx^l + g, \rmh^l)$$
+
+We will analyze how a translation and rotation of the input coordinates propagates through our model. We start assuming $\rmh^0$ is invariant to $\En$ transformations on $\rmx$, in other words, we do not encode any information about the absolute position or orientation of $\rmx^0$ into $\rmh^0$. Then, the output $\rmm_{ij}$ of Equation \ref{eq:method_edge} will be invariant too since the distance between two particles is invariant to translations $\|\rmx_{i}^{l} +g - [\rmx_{j}^{l} + g]\|^{2} = \|\rmx_{i}^{l} -\rmx_{j}^{l}\|^{2}$, and it is invariant to rotations and reflections $\|Q\rmx_{i}^{l} - Q\rmx_{j}^{l}\|^{2} = (\rmx_i^l- \rmx_j^l)^\top Q^\top Q (\rmx_{i}^{l} -\rmx_{j}^{l}) = (\rmx_i^l- \rmx_j^l)^\top \mathbf{I} (\rmx_{i}^{l} -\rmx_{j}^{l}) = \|\rmx_{i}^{l} -\rmx_{j}^{l}\|^{2}$ such that the edge operation becomes invariant:
+
+$$\rmm_{i, j} =\phi_{e}\left(\rmh_{i}^{l}, \rmh_{j}^{l},\left\|Q\rmx_{i}^{l} + g- [Q\rmx_{j}^{l} + g]\right\|^{2}, a_{i j}\right) = \phi_{e}\left(\rmh_{i}^{l}, \rmh_{j}^{l},\left\|\rmx_{i}^{l} - \rmx_{j}^{l} \right\|^{2}, a_{i j}\right)$$
+
+The second equation of our model (eq. \ref{eq:method_coords}) that updates the coordinates $\rmx$ is $\En$ equivariant. Following, we prove its equivariance by showing that an $\En$ transformation of the input leads to the same transformation of the output. Notice $\rmm_{ij}$ is already invariant as proven above. We want to show:
+$$Q\rmx_{i}^{l+1} + g  = Q\rmx_{i}^{l} + g +C\sum_{j \neq i}\left(Q\rmx_{i}^{l} + g - [Q\rmx_{j}^{l} + g]\right) \phi_{x}\left(\rmm_{i, j}\right)$$
+
+\textit{Derivation.}
+\begin{align*}
+    Q\rmx_{i}^{l} + g +C\sum_{j \neq i}\left(Q\rmx_{i}^{l} + g - Q\rmx_{j}^{l} - g\right) \phi_{x}\left(\rmm_{i, j}\right)
+    &= Q\rmx_{i}^{l} + g +QC\sum_{j \neq i}\left(\rmx_{i}^{l} - \rmx_{j}^{l}\right) \phi_{x}\left(\rmm_{i, j}\right)\\
+    &= Q\left(\rmx_{i}^{l} +C\sum_{j \neq i}\left(\rmx_{i}^{l} - \rmx_{j}^{l}\right) \phi_{x}\left(\rmm_{i, j}\right) \right) + g\\
+    &= Q\rmx_{i}^{l+1} + g
+\end{align*}
+
+Therefore, we have proven that rotating and translating $\rmx^l$ results in the same rotation and translation on $\rmx^{l+1}$ at the output of Equation \ref{eq:method_coords}.
+
+Furthermore equations \ref{eq:method_agg} and \ref{eq:method_node} only depend on $\rmm_{ij}$ and $\rmh^l$ which as saw at the beginning of this proof, are $\En$ invariant, therefore the output of Equation \ref{eq:method_node} $\rmh^{l+1}$ will be invariant too. Thus concluding that a transformation $Q\rmx^l +g$ on $\rmx^l$ will result in the same transformation on $\rmx^{l+1}$ while $\rmh^{l+1}$ will remain invariant to it such that $Q\rmx^{l+1} + g, \rmh^{l+1}  = \mathrm{EGCL}(Q\rmx^l + g, \rmh^l)$ is satisfied.
+
+\section{Re-formulation for velocity type inputs} \label{sec:appendix:method_velocity}
+
+In this section we write down the EGNN transformation layer $\rmh^{l+1}, \rmx^{l+1}, \rmv^{l+1} = \text{EGCL}[\rmh^{l}, \rmx^{l}, \rmv^{\text{init}}, \mathcal{E}]$ that can take in velocity input and output channels. We also prove it remains $\En$ equivariant. %
+\begin{align*}
+\rmm_{i j} &=\phi_{e}\left(\rmh_{i}^{l}, \rmh_{j}^{l},\left\|\rmx_{i}^{l}-\rmx_{j}^{l}\right\|^{2}, a_{i j}\right) \\ 
+ \rmv_{i}^{l+1}&= \phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^{\text{init}} +C\sum_{j \neq i}\left(\rmx_{i}^{l}-\rmx_{j}^{l}\right) \phi_{x}\left(\rmm_{i j}\right) \\
+\rmx_{i}^{l+1} &=\mathbf{x}_{i}^{l}+ \mathbf{v}_i^{l+1} \\
+\rmm_{i} &=\sum_{j \neq i} \rmm_{i j} \\
+\rmh_{i}^{l+1} &=\phi_{h}\left(\rmh_{i}^l, \rmm_{i}\right)
+\end{align*}
+%
+\subsection{Equivariance proof for velocity type inputs} \label{sec:appendix_equiv_proof_velocity}
+In this subsection we prove that the velocity types input formulation of our model is also $\En$ equivariant on $\rmx$. More formally, for any translation vector $g \in \mathbb{R}^n$ and for any orthogonal matrix $Q \in \mathbb{R}^{n \times n}$, the model should satisfy:
+$$\rmh^{l+1}, Q\rmx^{l+1} + g, Q\rmv^{l+1} = \text{EGCL}[\rmh^{l}, Q\rmx^{l} + g, Q\rmv^{\text{init}}, \mathcal{E}]$$
+
+In Appendix \ref{sec:appendix_equiv_proof} we already proved the equivariance of our EGNN (Section \ref{sec:method_main}) when not including vector type inputs. In its velocity type inputs variant we only replaced its coordinate updates (eq. \ref{eq:method_coords}) by Equation \ref{eq:egnn_velocity} that includes velocity. Since this is the only modification we will only prove that Equation \ref{eq:egnn_velocity} re-written below is equivariant.
+\begin{align*}
+     \rmv_{i}^{l+1}&= \phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^{\text{init}} +C\sum_{j \neq i}\left(\rmx_{i}^{l}-\rmx_{j}^{l}\right) \phi_{x}\left(\rmm_{i j}\right) \\
+\rmx_{i}^{l+1} &=\mathbf{x}_{i}^{l}+ \mathbf{v}_i^{l+1} \\
+\end{align*}
+%
+First, we prove the first line preserves equivariance, that is we want to show: $$Q\rmv_{i}^{l+1} = \phi_{v}\left(\rmh_{i}^l\right)Q\rmv_{i}^{\text{init}} +C\sum_{j \neq i}\left(Q\rmx_{i}^{l} + g - [Q\rmx_{j}^{l} + g]\right) \phi_{x}\left(\rmm_{i j}\right)$$
+\textit{Derivation.}
+\begin{align}
+    \phi_{v}\left(\rmh_{i}^l\right)Q\rmv_{i}^{\text{init}} +C\sum_{j \neq i}\left(Q\rmx_{i}^{l} + g - [Q\rmx_{j}^{l} + g]\right) \phi_{x}\left(\rmm_{i j}\right)
+    &= Q\phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^{\text{init}} +QC\sum_{j \neq i}\left(\rmx_{i}^{l} - \rmx_{j}^{l}  \right) \phi_{x}\left(\rmm_{i j}\right) \\
+        &= Q\left(\phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^{\text{init}} +C\sum_{j \neq i}\left(\rmx_{i}^{l} - \rmx_{j}^{l}  \right) \phi_{x}\left(\rmm_{i j}\right)\right) \\
+        &= Q\rmv_{i}^{l+1}
+\end{align}
+Finally, it is straightforward to show the second equation is also equivariant, that is we want to show $Q\rmx_{i}^{l+1} + g = Q\mathbf{x}_{i}^{l}+ g + Q\mathbf{v}_i^{l+1}$
+
+\textit{Derivation.}
+\begin{align*}
+    Q\mathbf{x}_{i}^{l}+ g + Q\mathbf{v}_i^{l+1} &= Q\left (\mathbf{x}_{i}^{l} +\mathbf{v}_i^{l+1} \right ) +g \\
+    &= Q\rmx_{i}^{l+1} + g
+\end{align*}
+Concluding we showed that an $\En$ transformation on the input set of points results in the same transformation on the output set of points such that $\rmh^{l+1}, Q\rmx^{l+1} + g, Q\rmv^{l+1} = \text{EGCL}[\rmh^{l}, Q\rmx^{l} + g, Q\rmv^{\text{init}}, \mathcal{E}]$ is satisfied.
+
+
+
+
+
+\section{Implementation details} \label{sec:appendix_implementation}
+In this Appendix section we describe the implementation details of the experiments.
+First, we describe those parts of our model that are the same across all experiments. Our EGNN model from Section \ref{sec:method_main} contains the following three main learnable functions.
+
+\begin{itemize}
+    \item \textbf{The edge function} $\phi_e$ (eq. \ref{eq:method_edge}) is a two layers MLP with two Swish non-linearities: Input $\xrightarrow{}$ \{LinearLayer() $\xrightarrow{}$ Swish() $\xrightarrow{}$ LinearLayer() $\xrightarrow{}$ Swish() \} $\xrightarrow{}$ Output. 
+    \item \textbf{The coordinate function} $\phi_x$ (eq. \ref{eq:method_coords}) consists of a two layers MLP with one non-linearity:  $\rmm_{ij}$ $\xrightarrow{}$ \{LinearLayer() $\xrightarrow{}$ Swish() $\xrightarrow{}$ LinearLayer() \} $\xrightarrow{}$ Output
+    \item \textbf{The node function} $\phi_h$ (eq. \ref{eq:method_node}) consists of a two layers MLP with one non-linearity and a residual connection:
+    
+    [$\rmh_i^{l}$, $\rmm_i$] $\xrightarrow{}$ \{LinearLayer() $\xrightarrow{}$ Swish() $\xrightarrow{}$ LinearLayer() $\xrightarrow{}$ Addition($\rmh^l_i$) \} $\xrightarrow{}$ $\mathbf{h}^{l+1}_i$ 
+\end{itemize}
+
+These functions are used in our EGNN across all experiments. Notice the GNN (eq. \ref{eq:gnn}) also contains and edge operation and a node operation $\phi_e$ and $\phi_h$ respectively. We use the same functions described above for both the GNN and the EGNN such that comparisons are as fair as possible.
+
+\subsection{Implementation details for Dynamical Systems}
+\label{sec:appendix_implementation_dynamical}
+\textbf{Dataset}
+
+In the dynamical systems experiment we used a modification of the Charged Particle's N-body (N=5) system  from \cite{kipf2018neural}. Similarly to \cite{fuchs2020se}, we extended it from 2 to 3 dimensions customizing the original code from  \hyperlink{https://github.com/ethanfetaya/NRI}{(https://github.com/ethanfetaya/NRI)} and we removed the virtual boxes that bound the particle's positions. The sampled dataset consists of 3.000 training trajectories, 2.000 for validation and 2.000 for testing. Each trajectory has a duration of 1.000 timesteps. To move away from the transient phase, we actually generated trajectories of 5.000 time steps and sliced them from timestep $3.000$ to timestep $4.000$ (1.000 time steps into the future) such that the initial conditions are more realistic than the Gaussian Noise initialization from which they are initialized. 
+
+In our second experiment, we sweep from 100 to 50.000 training samples, for this we just created a new training partition following the same procedure as before but now generating 50.000 trajectories instead. The validation and test partition remain the same from last experiment.
+
+\textbf{Models}
+
+All models are composed of 4 layers, the details for each model are the following.
+\begin{itemize}
+    \item \textbf{EGNN}: For the EGNN we use its variation that considers vector type inputs from Section \ref{sec:method_velocity}. This variation adds the function $\phi_v$ to the model which is composed of two linear layers with one non-linearity: Input $\xrightarrow{}$ \{LinearLayer() $\xrightarrow{}$ Swish() $\xrightarrow{}$ LinearLayer() \} $\xrightarrow{}$ Output. Functions $\phi_e$, $\phi_x$ and $\phi_h$ that define our EGNN are the same than for all experiments and are described at the beginning of this Appendix \ref{sec:appendix_implementation}.
+    \item \textbf{GNN}: The GNN is also composed of 4 layers, its learnable functions edge operation $\phi_e$ and node operation $\phi_h$ from Equation \ref{eq:gnn} are exactly the same as $\phi_e$ and $\phi_h$ from our EGNN introduced in Appendix \ref{sec:appendix_implementation}. We chose the same functions for both models to ensure a fair comparison. In the GNN case, the initial position $\rmp^0$ and velocity $\rmv^0$ from the particles is passed through a linear layer and inputted into the GNN first layer $\rmh^0$. The particle's charges are inputted as edge attributes $a_{ij} = c_i c_j$. The output of the GNN $\rmh^L$ is passed through a two layers MLP that maps it to the estimated position.
+    
+    \item \textbf{Radial Field}: The Radial Field algorithm is described in the Related Work \ref{sec:related_work}, its only parameters are contained in its edge operation $\phi_{\mathrm{rf}}()$ which in our case is a two layers MLP with two non linearities Input $\xrightarrow{}$ \{LinearLayer() $\xrightarrow{}$ Swish() $\xrightarrow{}$ LinearLayer() $\xrightarrow{}$ Tanh \} $\xrightarrow{}$ Output. Notice we introduced a Tanh at the end of the MLP which fixes some instability issues that were causing this model to diverge in the dynamical system experiment. We also augmented the Radial Field algorithm with the vector type inputs modifications introduced in Section \ref{sec:method_velocity}. In addition to the norms between pairs of points, $\phi_{\mathrm{rf}}()$ also takes as input the particle charges $c_i c_j$.
+    
+    \item \textbf{Tensor Field Network:} We used the Pytorch implementation from  \hyperlink{https://github.com/FabianFuchsML/se3-transformer-public}{https://github.com/FabianFuchsML/se3-transformer-public}. We swept over different hyper paramters, degree $\in$ \{2, 3, 4\}, number of features $\in$ \{12, 24, 32, 64, 128\}. We got the best performance in our dataset for degree 2 and number of features 32. We used the Relu activation layer instead of the Swish for this model since it provided better performance.
+    
+    \item \textbf{SE(3) Transformers:} For the SE(3)-Transformer we used code from \hyperlink{https://github.com/FabianFuchsML/se3-transformer-public}{https://github.com/FabianFuchsML/se3-transformer-public}. Notice this implementation has only been validated in the QM9 dataset but it is the only available implementation of this model. We swept over different hyperparamters degree $\in$ \{1, 2, 3, 4\}, number of features $\in$ 16, 32, 64 and divergence $\in$ \{1, 2\}, along with the learning rate. We obtained the best performance for degree 3, number of features 64 and divergence 1. As in Tensor Field Networks we obtained better results by using the Relu activation layer instead of the Swish.
+\end{itemize}
+
+\textbf{Other implementation details}
+
+In Table \ref{table:n_body} all models were trained for 10.000 epochs, batch size 100, Adam optimizer, the learning rate was fixed and independently chosen for each model. All models are 4 layers deep and the number of training samples was set to 3.000.
+
+\subsection{Implementation details for Graph Autoneoders}
+\label{sec:appendix_implementation_graph_autoencoders}
+
+\textbf{Dataset}
+
+In this experiment we worked with Community Small \cite{you2018graphrnn} and Erdos\&Renyi \cite{bollobas2001random} generated datasets.
+
+\begin{itemize}
+    \item Community Small: We used the original code from \cite{you2018graphrnn} (\hyperlink{https://github.com/JiaxuanYou/graph-generation}{https://github.com/JiaxuanYou/graph-generation}) to generate a Community Small dataset. We sampled 5.000 training graphs, 500 for validation and 500 for testing.
+    \item Erdos\&Renyi is one of the most famous graph generative algorithms. We used the "gnp\_random\_graph($M$, $p$)" function from (\hyperlink{https://networkx.org/}{https://networkx.org/}) that generates random graphs when povided with the number of nodes $M$ and the edge probability $p$ following the Erdos\&Renyi model. Again we generated 5.000 graphs for training, 500 for validation and 500 for testing. We set the edge probability (or sparsity value) to $p=0.25$ and the number of nodes $M$ ranging from 7 to 16 deterministically uniformly  distributed. Notice that edges are generated stochastically with probability $p$, therefore, there is a chance that some nodes are left disconnected from the graph, "gnp\_random\_graph($M$, $p$)" function discards these disconnected nodes such that even if we generate graphs setting parameters to $7 \leq M \leq 16$ and $p=0.25$ the generated graphs may have less number of nodes. \end{itemize}
+    
+Finally, in the graph autoencoding experiment we also overfitted in a small partition of 100 samples (Figure \ref{table:autoencoder_results}) for the Erdos\&Renyi graphs described above. We reported results for different $p$ values ranging from $0.1$ to $0.9$. For each $p$ value we generated a partition of 100 graphs with initial number of nodes between $7 \leq M \leq 16$ using the Erdos\&Renyi generative model.
+
+\textbf{Models}
+
+All models consist of 4 layers, 64 features for the hidden layers and the Swish activation function as a non linearity. The EGNN is defined as explained in Section \ref{sec:method_main} without any additional modules (i.e. no velocity type features or inferring edges). The functions $\phi_e$, $\phi_x$ and $\phi_h$ are defined at the beginning of this Appendix \ref{sec:appendix_implementation}. The GNN (eq. \ref{eq:gnn}) mimics the EGNN in terms that it uses the same $\phi_h$ and $\phi_e$ than the EGNN for its edge and node updates. The Noise-GNN is exactly the same as the GNN but inputting noise into the $\rmh_0$ features. Finally the Radial Field was defined in the Related Related work Section \ref{sec:related_work} which edge's operation $\phi_{\mathrm{rf}}$ consists of a two layers MLP: Input $\xrightarrow{}$ \{ Linear() $\xrightarrow{}$ Swish() $\xrightarrow{}$ Linear() \} $\xrightarrow{}$ Output.
+
+\textbf{Other implementation details}
+
+All experiments have been trained with learning rate $10^{-4}$, batch size 1, Adam optimizer,  weight decay $10^{-16}$, 100 training epochs for the 5.000 samples sized datasets performing early stopping for the minimum Binary Cross Entropy loss in the validation partition. The overfitting experiments were trained for 10.000 epochs on the 100 samples subsets.
+
+\subsection{Implementation details for QM9}
+\label{sec:appendix_implementation_qm9_dataset}
+For QM9 \cite{ramakrishnan2014quantum} we used the dataset partitions from \cite{anderson2019cormorant}. We imported the dataloader from his code repository (\hyperlink{https://github.com/risilab/cormorant}{https://github.com/risilab/cormorant}) which includes his data-preprocessing. Additionally all properties have been normalized by substracting the mean and dividing by the Mean Absolute Deviation.
+
+Our EGNN consists of 7 layers. Functions $\phi_e$ and $\phi_h$ are defined at the beginning of this Appendix \ref{sec:appendix_implementation}. Additionally, we use the module $\phi_{inf}$ presented in Section \ref{sec:edges_inference} that infers the edges . This function $\phi_{inf}$ is defined as a linear layer followed by a sigmoid: Input $\xrightarrow{}$ \{Linear() $\xrightarrow{}$ sigmoid()\} $\xrightarrow{}$ Output. Finally, the output of our EGNN $\rmh^L$ is forwarded through a two layers MLP that acts node-wise, a sum pooling operation and another two layers MLP that maps the averaged embedding to the predicted property value, more formally: $\rmh^L$ $\xrightarrow{}$ \{Linear() $\xrightarrow{}$ Swish() $\xrightarrow{}$ Linear() $\xrightarrow{}$ Sum-Pooling() $\xrightarrow{}$ Linear() $\xrightarrow{}$ Swish() $\xrightarrow{}$ Linear\} $\xrightarrow{}$ Property. The number of hidden features for all model hidden layers is 128.
+
+We trained each property individually for a total of 1.000 epochs, we used Adam optimizer, batch size 96, weight decay $10^{-16}$, and cosine decay for the learning rate starting at at a lr=$5\cdot10^{-4}$ except for the Homo, Lumo and Gap properties where its initial value was set to $10^{-3}$.
+
+\section{Further experiments}
+\subsection{Graph Autoencoder}  \label{sec:appendix_graph_autoencoder}
+In this section we present an extension of the Graph Autoencoder experiment \ref{sec:expriment_autoencoder}. In Table \ref{tab:appendix_graph_autoencoder} we report the approximation error of the reconstructed graphs as the embedding dimensionality $n$ is reduced $n \in \{4, 6, 8 \}$ in the Community Small and Erdos\&Renyi datasets for the GNN, Noise-GNN and EGNN models. For small embedding sizes ($n=4$) all methods perform poorly, but as the embedding size grows our EGNN significantly outperforms the others.
+
+
+
+\begin{table}[]
+\renewcommand{\arraystretch}{0.5}
+\begin{center} \small
+\begin{tabular}{l | cc | cc | cc | cc | cc | cc  } 
+    \toprule
+     & \multicolumn{6}{|c}{Community Small} &   \multicolumn{6}{|c}{Erdos\&Renyi}\\
+     \midrule
+     & \multicolumn{2}{|c|}{n=4} &  \multicolumn{2}{|c|}{n=6} & \multicolumn{2}{|c|}{n=8} &
+      \multicolumn{2}{|c|}{n=4} &  \multicolumn{2}{|c|}{n=6} & \multicolumn{2}{|c}{n=8} \\
+     \midrule
+      & \% Err. & F1  & \% Err. & F1 & \% Err. & F1 & \% Err. & F1 & \% Err. & F1 & \% Err. & F1 \\
+    \midrule
+    GNN & \textbf{1.45} & \textbf{0.977} & 1.29 & 0.9800 & 1.29 & 0.980 & 7.92 & 0.844 & 5.22 & 0.894 & 4.62 & 0.907   \\
+    Noise-GNN & 1.94 & 0.970 & 0.44 & 0.9931 & 0.44 & 0.993 & 3.80 & 0.925 & 2.66 & 0.947 & 1.25 & 0.975   \\
+    %Noise-GNN*  & - & 0.57  & - & 3.25\\
+    EGNN & 2.19 & 0.966 & \textbf{0.42} & \textbf{0.9934} & \textbf{0.06} & \textbf{0.999} & \textbf{3.09} & \textbf{0.939} & \textbf{0.58} & \textbf{0.988} & \textbf{0.11} & \textbf{0.998}   \\
+    \bottomrule
+\end{tabular}
+\caption{Analysis of the \% of wrong edges and F1 score for different $n$ embedding sizes \{2, 4, 8 \} for the GNN, Noise-GNN and EGNN in Community Small and Erdos\&Renyi datasets.}
+\label{tab:appendix_graph_autoencoder} 
+\end{center}
+\end{table}
+
+\newpage
+\section{Sometimes invariant features are all you need.} \label{appendix:invariant_features} 
+Perhaps surprisingly we find our EGNNs outperform other equivariant networks that consider higher-order representations. In this section we prove that when only positional information is given (i.e. no velocity-type features) then the geometry is completely defined by the invariant distance norms in-between points, without loss of relevant information. As a consequence, it is not necessary to consider higher-order representation types of the relative distances, not even the relative differences as vectors. To be precise, note that these invariant features still need to be \textit{permutation} equivariant, they are only $\En$ invariant.
+
+To be specific, we want to show that for a collection of points $\{\rmx_i\}_{i=1}^M$ the norm of in-between distances $\ell_2(\rmx_i, \rmx_j)$ are a \textit{unique} identifier of the geometry, where collections separated by an $\En$ transformations are considered to be identical. We want to show \textit{invariance} of the norms under $\En$ transformations and \textit{uniqueness}: two point collections are identical (up to $\En$ transform) when they have the same distance norms.
+
+\textbf{\textit{Invariance}}. Let $\{\rmx_i\}$ be a collection of $M$ points where $\rmx_i \in \mathbb{R}^n$ and the $\ell_2$ distances are $\ell_2(\rmx_i, \rmx_j)$. We want to show that all $\ell_2(\rmx_i, \rmx_j)$ are unaffected by $\En$ transformations.
+
+\textit{Proof}. Consider an arbitrary $\En$ transformation $\mathbb{R}^n \to \mathbb{R}^n : \rmx \mapsto Q\rmx + t$ where $Q$ is orthogonal and $t \in \mathbb{R}^n$ is a translation. Then for all $i, j$: \vspace{-.2cm}
+\small\begin{align*}
+    \ell_2(Q\rmx_i + t, Q\rmx_j + t) &= \sqrt{} (Q\rmx_i + t - [Q\rmx_j + t])^T(Q\rmx_i + t - [Q\rmx_j + t]) = \sqrt{} (Q\rmx_i - Q\rmx_j)^T(Q\rmx_i - Q\rmx_j) \\
+    &= \sqrt{} (\rmx_i - \rmx_j)^T Q^T Q (\rmx_i - \rmx_j) = \sqrt{} (\rmx_i - \rmx_j)^T (\rmx_i - \rmx_j) = \ell_2(\rmx_i, \rmx_j)
+\end{align*}
+\normalsize
+This proves that the $\ell_2$ distances are invariant under $\En$ transforms.
+
+\textbf{\textit{Uniqueness}}. Let $\{\rmx_i\}$ and $\{\rmy_i\}$ be two collection of $M$ points each where all in-between distance norms are identical, meaning $\ell_2(\rmx_i, \rmx_j) = \ell_2(\rmy_i, \rmy_j)$. We want to show that $\rmx_i = Q \rmy_i + t$ for some orthogonal $Q$ and translation $t$, for all $i$.
+
+\textit{Proof.} Subtract $\rmx_0$ from all $\{\rmx_i\}$ and $\rmy_0$ from all $\{\rmy_i\}$, so $\tilde{\rmx}_i = \rmx_i - \rmx_0$ and $\tilde{\rmy}_i = \rmy_i - \rmy_0$. As proven above, since translation is an $\En$ transformation the distance norms are unaffected and:
+\small
+\begin{equation*}
+    \ell_2(\tilde{\rmx}_i, \tilde{\rmx}_j) = \ell_2(\rmx_i, \rmx_j) = \ell_2(\rmy_i, \rmy_j) = \ell_2(\tilde{\rmy}_i, \tilde{\rmy}_j).
+\end{equation*}\normalsize
+So without loss of generality, we may assume that $\rmx_0 = \rmy_0 = \mathbf{0}$. As a direct consequence $||\rmx_i||_2 = ||\rmy_i||_2$. Now writing out the square:
+\small
+\begin{equation*}
+    \rmx_i^T\rmx_i - 2 \rmx_i^T\rmx_j + \rmx_j^T\rmx_j = ||\rmx_i - \rmx_j||_2^2 = ||\rmy_i - \rmy_j||_2^2 = \rmy_i^T\rmy_i - 2 \rmy_i^T\rmy_j + \rmy_j^T\rmy_j
+\end{equation*} \normalsize
+And since $||\rmx_i||_2 = ||\rmy_i||_2$, it follows that $\rmx_i^T\rmx_j = \rmy_i^T\rmy_j$ or equivalently written as dot product $\langle \rmx_i, \rmx_j\rangle = \langle \rmy_i, \rmy_j \rangle$. Notice that this already shows that angles between pairs of points are the same.
+
+At this moment, it might already be intu\"{i}tive that the collections of points are indeed identical. To finalize the proof formally we will construct a linear map $A$ for which we will show that (1) it maps every $\rmx_i$ to $\rmy_i$ and (2) that it is orthogonal. First note that from the angle equality it follows immediately that for every linear combination:
+\small 
+\begin{equation*}
+    || \sum_i c_i \rmx_i ||_2 = || \sum_i c_i \rmy_i ||_2 \quad (*).\vspace{-.3cm}
+\end{equation*}\normalsize
+Let $V_x$ be the linear span of $\{\rmx_i\}$ (so $V_x$ is the linear subspace of all linear combinations of $\{\rmx_i\}$). Let $\{\rmx_{i_j}\}_{j=1}^d$ be a basis of $V_x$, where $d \leq n$. Recall that one can define a linear map by choosing a basis, and then define for each basis vector where it maps to. Define a linear map $A$ from $V_x$ to $V_y$ by the transformation from the basis $\rmx_{i_j}$ to $\rmy_{i_j}$ for $j=1,...,d$.
+Now pick any point $\rmx_i$ and write it in its basis $\rmx_i = \sum_j c_j \rmx_{i_j} \in V_x$. We want to show $A\rmx_i = \rmy_i$ or alternatively $||\rmy_i - A\rmx_i||_2 = 0$. Note that $A\rmx_i = A \sum_j c_j \rmx_{i_j} =  \sum_j c_j A \rmx_{i_j} = \sum_j c_j \rmy_{i_j}$. Then:
+\small
+\begin{align*}
+    ||\rmy_i - \sum_j c_j \rmy_{i_j}||_2^2 &= \langle \rmy_i, \rmy_i \rangle - 2 \langle \rmy_i, \sum_j c_i \rmy_{i_j} \rangle + \langle \sum_j c_i \rmy_{i_j}, \sum_j c_i \rmy_{i_j} \rangle \\
+    &\stackrel{(*)}{=} \langle \rmx_i, \rmx_i \rangle - 2 \langle \rmx_i, \sum_j c_i \rmx_{i_j} \rangle + \langle \sum_j c_i \rmx_{i_j}, \sum_j c_i \rmx_{i_j} \rangle = \langle \rmx_i, \rmx_i \rangle - 2 \langle \rmx_i, \rmx_i \rangle + \langle \rmx_i, \rmx_i \rangle = 0.
+\end{align*}\normalsize
+Thus showing that $A\rmx_i = \rmy_i$ for all $i = 1, \ldots, M$, proving (1). Finally we want to show that $A$ is orthogonal, when restricted to $V_x$. This follows since:
+\begin{equation*}
+    \langle A \rmx_{i_j}, A \rmx_{i_j} \rangle = \langle \rmy_{i_j}, \rmy_{i_j} \rangle = \langle \rmx_{i_j}, \rmx_{i_j} \rangle 
+\end{equation*}
+for the basis elements $\rmx_{i_1},...,\rmx_{i_d}$. This implies that $A$ is orthogonal (at least when restricted to $V_x$). Finally $A$ can be extended via an orthogonal complement of $V_x$ to the whole space. This concludes the proof for (2) and shows that $A$ is indeed orthogonal.
+
+
+

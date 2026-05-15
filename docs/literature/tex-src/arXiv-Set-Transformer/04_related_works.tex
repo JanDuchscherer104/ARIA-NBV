@@ -1,0 +1,35 @@
+\section{Related Works}
+\label{sec:related_works}
+\textbf{Pooling architectures for permutation invariant mappings} \hspace{1pt}
+Pooling architectures for sets have been used in various problems such as 3D shape recognition~\citep{BaoguangShi2015, Su2015},
+discovering causality~\citep{Lopez-Paz2016},
+learning the statistics of a set~\citep{Edwards2017},
+few-shot image classification~\citep{Snell2017},
+and conditional regression and classification~\citep{Garnelo2018}.
+\citet{Zaheer2017} discuss the structure in general and provides a partial proof of the universality of the pooling architecture,
+and \citet{Wagstaff2019} further discuss the limitation of pooling architectures. \citet{Bloem-Reddy2019} provides a link between
+probabilistic exchangeability and pooling architectures.
+
+\textbf{Attention-based approaches for sets} \hspace{1pt}
+Several recent works have highlighted the competency of attention mechanisms in modeling sets.
+\citet{Vinyals2016a} pool elements in a set by a weighted average with weights computed using an attention mechanism.
+\citet{Yang2018} propose AttSets for multi-view 3D reconstruction, where dot-product attention is applied to compute the weights used to pool the encoded features via weighted sums.
+Similarly, \citet{Ilse2018} use attention-based weighted sum-pooling for multiple instance learning.
+Compared to these approaches, ours use multihead attention in aggregation, and more importantly, we propose to apply self-attention after pooling to model correlation among multiple outputs.
+PMA with $k=1$ seed vector and single-head attention roughly corresponds to these previous approaches.
+Although not permutation invariant, \citet{Mishra2018} has attention as one of its core components to meta-learn to solve various tasks using sequences of inputs.
+\citet{Kim2019} proposed attention-based conditional regression, where self-attention is applied to the query sets.
+
+\textbf{Modeling interactions between elements in sets} \hspace{1pt}
+An important reason to use the Transformer is to explicitly model higher-order interactions among the elements in a set.
+\citet{Santoro2017} propose the relational network, a simple architecture that sum-pools all pairwise interactions of elements in a given set, but not higher-order interactions.
+Similarly to our work, \citet{Ma2018} use the Transformer to model interactions between the objects in a video.
+They use mean-pooling to obtain aggregated features which they fed into an LSTM.
+
+\textbf{Inducing point methods} \hspace{1pt}
+The idea of letting trainable vectors $I$ directly interact with data points is loosely based on the inducing point methods used in sparse Gaussian processes~\citep{Snelson2005} and the Nystr\"{o}m method for matrix decomposition~\citep{Fowlkes2004}.
+$m$ trainable inducing points can also be seen as $m$ independent memory cells accessed with an attention mechanism.
+The differential neural dictionary~\citep{Pritzel2017} stores previous experience as key-value pairs and uses this to process queries.
+One can view the ISAB is the inversion of this idea, where queries $I$ are stored and the input features are used as key-value pairs.
+
+%\ak{we might want to cite https://arxiv.org/abs/1805.00613 as a different approach to the problem: instead of considering permutation invariance, we could just treat permutation as a latent variable}

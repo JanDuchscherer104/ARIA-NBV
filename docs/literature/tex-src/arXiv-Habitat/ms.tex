@@ -1,0 +1,148 @@
+\pdfoutput=1
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{iccv}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\usepackage{epigraph}
+\setlength{\epigraphwidth}{\columnwidth}
+\renewcommand{\textflush}{flushepinormal}
+\renewcommand{\epigraphflush}{flushleft}
+
+%------------------ Custom stuff -------------------------
+
+\DeclareMathSymbol{@}{\mathord}{letters}{"3B}
+
+% font stuff
+\edef\oldtt{\ttdefault}
+\usepackage[scaled]{beramono}
+\usepackage[T1]{fontenc}
+\renewcommand{\ttdefault}{\oldtt}
+\newcommand{\bera}[1]{{\fontfamily{fvm}\selectfont #1}}
+
+% new macros
+\newcommand{\ourtitle}{Habitat: A Platform for Embodied AI Research\xspace}
+\newcommand{\habitatrep}{Habitat Replica\xspace}
+\newcommand{\habitatsim}{\texttt{Habitat-Sim}\xspace}
+\newcommand{\habitatapi}{\texttt{Habitat-API}\xspace}
+\newcommand{\habitatchal}{Habitat Challenge\xspace}
+\newcommand{\turnleft}{\texttt{turn\_left}\xspace}
+\newcommand{\turnright}{\texttt{turn\_right}\xspace}
+\newcommand{\forward}{\texttt{move\_forward}\xspace}
+\newcommand{\callstop}{\texttt{stop}\xspace}
+\newcommand{\maxsteps}{$500$\xspace}
+\newcommand{\spl}{\texttt{SPL}\xspace}
+\newcommand{\gdsp}{\texttt{GDSP}\xspace}
+\newcommand{\blind}{\texttt{Blind}\xspace}
+\newcommand{\rgb}{\texttt{RGB}\xspace}
+\newcommand{\depth}{\texttt{Depth}\xspace}
+\newcommand{\rgbd}{\texttt{RGBD}\xspace}
+\newcommand{\todoblue}[1]{\textcolor{blue}{#1}}
+\newcommand{\xhdr}[1]{\vspace{2pt}\noindent\textbf{#1}}
+
+% new packages
+\usepackage{paralist}
+\usepackage{comment}
+\usepackage{mathtools}
+\usepackage{microtype}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+% \usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
+\usepackage{nicefrac}
+\usepackage{subcaption}
+\captionsetup{font=small}
+
+% custom sty files
+\usepackage{mysymbols}
+\usepackage{pythonhighlight}
+\input{space_saver.tex}
+
+% packages for table management
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+\usepackage{balance}
+
+%------------------ Custom stuff -------------------------
+
+% Include other packages here, before hyperref.
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage[pagebackref=true,breaklinks=true,colorlinks,bookmarks=false]{hyperref}
+
+\usepackage{cleveref}
+%\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
+\iccvfinalcopy
+
+\begin{document}
+\def\iccvPaperID{4367} % *** Enter the ICCV Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+\ificcvfinal\pagestyle{empty}\fi
+
+\author{
+\textbf{Manolis Savva$^{1,4}$*, Abhishek Kadian$^{1}$*, Oleksandr Maksymets$^{1}$*, Yili Zhao$^{1}$,}\\[3pt]
+\textbf{Erik Wijmans$^{1,2,3}$, 
+Bhavana Jain$^{1}$, Julian Straub$^{2}$, Jia Liu$^{1}$, Vladlen Koltun$^{5}$,}\\[3pt]
+\textbf{Jitendra Malik$^{1,6}$, Devi Parikh$^{1,3}$, Dhruv Batra$^{1,3}$}\\[12pt]
+$^{1}$Facebook AI Research, $^{2}$Facebook Reality Labs, 
+$^{3}$Georgia Institute of Technology,\\
+$^{4}$Simon Fraser University, $^{5}$Intel Labs, $^{6}$UC Berkeley\\
+\url{https://aihabitat.org}
+\vspace{-20pt}
+}
+\title{\ourtitle}
+\maketitle
+
+\pagenumbering{gobble} % this shouldn't be needed, but for some reason first page number shows up otherwise
+\let\svthefootnote\thefootnote
+\let\thefootnote\relax\footnote{\llap{\textsuperscript{*}}Denotes equal contribution.}
+\addtocounter{footnote}{-1}\let\thefootnote\svthefootnote
+
+\input{0_abstract}
+\input{1_introduction}
+\input{2_related_work}
+\input{3_ai_habitat}
+\input{4_experiments}
+\input{5_results}
+\input{5b_challenge}
+\input{6_future}
+
+\vspace{1em}
+\xhdr{Acknowledgments.}
+We thank the reviewers for their helpful suggestions.
+The Habitat project would not have been possible without the support and contributions of many individuals.
+We are grateful to Mandeep Baines, Angel Xuan Chang, Alexander Clegg, Devendra Singh Chaplot, Xinlei Chen, Wojciech Galuba, Georgia Gkioxari, Daniel Gordon, Leonidas Guibas, Saurabh Gupta, Jerry (Zhi-Yang) He, Rishabh Jain, Or Litany, Joel Marcey, Dmytro Mishkin, Marcus Rohrbach, Amanpreet Singh, Yuandong Tian, Yuxin Wu, Fei Xia, Deshraj Yadav, Amir Zamir, and Jiazhi Zhang for their help.
+
+\vspace{1em}
+\xhdr{Licenses for referenced datasets.}
+\\
+{%\footnotesize
+Gibson: \url{https://storage.googleapis.com/gibson_material/Agreement%20GDS%2006-04-18.pdf}
+\\
+Matterport3D: \url{http://kaldir.vc.in.tum.de/matterport/MP_TOS.pdf}.
+}
+
+\newpage
+\balance
+
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{biblio}
+}
+
+\newpage
+\appendix
+\input{supplemental_content}
+
+\end{document}

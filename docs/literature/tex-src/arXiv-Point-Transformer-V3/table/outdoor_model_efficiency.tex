@@ -1,0 +1,17 @@
+\begin{tabular}{l|rrrrrr}\toprule
+\multicolumn{2}{l}{Outdoor Efficiency (nuScenes)} &\multicolumn{2}{c}{Training} &\multicolumn{2}{c}{Inference} \\ \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+Methods &Params. &Latency &Memory &Latency &Memory \\
+\midrule
+MinkUNet / 3~\cite{choy20194d} &37.9M &163ms &3.3G &48ms &1.7G \\
+MinkUNet / 5~\cite{choy20194d} &170.3M &455ms &5.6G &145ms &2.1G \\
+MinkUNet / 7~\cite{choy20194d} &465.0M &\textbf{1120ms} &12.4G &\textbf{337ms} &2.8G \\
+\midrule
+PTv2 / 16~\cite{wu2022point} &12.8M &213ms &10.3G &146ms &12.3G \\
+PTv2 / 24~\cite{wu2022point} &12.8M &308ms &17.6G &180ms &15.2G \\
+PTv2 / 32~\cite{wu2022point} &12.8M &354ms &\textbf{21.5G} &213ms &\textbf{19.4G} \\
+\midrule
+\cellcolor[HTML]{efefef}PTv3 / 256~(ours) &\cellcolor[HTML]{efefef}46.2M &\cellcolor[HTML]{efefef}120ms &\cellcolor[HTML]{efefef}3.3G &\cellcolor[HTML]{efefef}44ms &\cellcolor[HTML]{efefef}1.2G \\
+\cellcolor[HTML]{efefef}PTv3 / 1024~(ours) &\cellcolor[HTML]{efefef}46.2M &\cellcolor[HTML]{efefef}119ms &\cellcolor[HTML]{efefef}3.3G &\cellcolor[HTML]{efefef}44ms &\cellcolor[HTML]{efefef}1.2G \\
+\cellcolor[HTML]{efefef}PTv3 / 4096~(ours) &\cellcolor[HTML]{efefef}46.2M &\cellcolor[HTML]{efefef}125ms &\cellcolor[HTML]{efefef}3.3G &\cellcolor[HTML]{efefef}45ms &\cellcolor[HTML]{efefef}1.2G \\
+\bottomrule
+\end{tabular}

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass, fields, is_dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -20,6 +19,8 @@ from .efm_views import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from ..pipelines.oracle_rri_labeler import OracleRriSample
 
 
@@ -47,8 +48,8 @@ class CompactObbBlock:
     obbs: Tensor
     """OBB tensor with shape ``(..., K, 34)`` using EFM ``ObbTW`` layout."""
 
-    sem_id_to_name: list[str] | None = None
-    """Optional semantic id to class-name map."""
+    sem_id_to_name: dict[int, str] | None = None
+    """Optional sparse semantic id to class-name map."""
 
     probs: Tensor | None = None
     """Optional class probabilities aligned with ``obbs``."""

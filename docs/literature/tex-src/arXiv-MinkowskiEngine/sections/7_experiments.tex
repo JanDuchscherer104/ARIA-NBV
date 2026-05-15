@@ -1,0 +1,258 @@
+\section{Experiments}
+\label{sec:experiments}
+
+To validate the proposed high-dimensional networks, we first use multiple standard 3D benchmarks for 3D semantic segmentation. It allows us to gauge the performance of the high-dimensional networks with the same architecture with other state-of-the-art methods. Next, we create multiple 4D datasets from 3D datasets that have temporal sequences and analyze each of the proposed components for ablation study.
+
+\subsection{Implementation}
+We implemented the Minkowski Engine (Sec.~\ref{sec:minkowskiengine}) using C++/CUDA and wrap it with PyTorch~\cite{pytorch}. Data is prepared in parallel data processes that load point clouds, apply data augmentation, and quantize them with Alg.~\ref{alg:sparse_quantization} on the fly. For non-spatial functions, we use the PyTorch functions directly.
+
+
+\subsection{Training and Evaluation}
+We use Momentum SGD with the Poly scheduler to train networks from learning rate $1\text{e-}1$ and apply data augmentation including random scaling, rotation around the gravity axis, spatial translation, spatial elastic distortion, and chromatic translation and jitter.
+% When we train a large network, we use gradient accumulation to support larger batch sizes. However, gradient accumulation tends to perform worse as the batch normalization running mean is less stable.
+
+For evaluation, we use the standard mean Intersection over Union (mIoU) and mean Accuracy (mAcc) for metrics following the previous works. To convert voxel-level predictions to point-level predictions, we simply propagated predictions from the nearest voxel center.
+
+
+\subsection{Datasets}
+
+\textbf{ScanNet.}
+The ScanNet~\cite{scannet} 3D segmentation benchmark consists of 3D reconstructions of real rooms. It contains ~1.5k rooms, some repeated rooms captured with different sensors. We feed an entire room to a MinkowskiNet fully convolutionally without cropping.
+
+\textbf{Stanford 3D Indoor Spaces (S3DIS).}
+The dataset~\cite{stanford3dis} contains 3D scans of six floors of three different buildings. We use the Fold \#1 split following many previous works. We use 5cm and 2cm voxel for the experiment.
+
+\textbf{RueMonge 2014 (Varcity).} The RueMonge 2014 dataset~\cite{ruemonge2014} provides semantic labels for a multi-view 3D reconstruction of the Rue Mongue. To create a 4D dataset, we crop the 3D reconstruction on-the-fly to generate a temporal sequence. We use the official split for all experiments.
+
+\textbf{Synthia 4D.} We use the Synthia dataset~\cite{synthia} to create 3D video sequences. We use 6 sequences of driving scenarios in 9 different weather conditions. Each sequence consists of 4 stereo RGB-D images taken from the top of a car. We back-project the depth images to the 3D space to create 3D videos. We visualized a part of a sequence in Fig.~\ref{fig:3dvideo}.
+
+We use the sequence 1-4 except for sunset, spring, and fog for the train split; the sequence 5 foggy weather for validation; and the sequence 6 sunset and spring for the test. In total, the train/val/test set contain 20k/815/1886 3D scenes respectively.
+
+Since the dataset is purely synthetic, we added various noise to the input point clouds to simulate noisy observations. We used elastic distortion, Gaussian noise, and chromatic shift in the color for the noisy 4D Synthia experiments.
+
+
+\subsection{Results and Analysis}
+
+{\small
+\tabcolsep= 1mm
+\begin{table}[t]
+    \centering
+    \caption{3D Semantic Label Benchmark on ScanNet${}^\dagger$~\cite{scannet}}
+    % \vspace{-0.5em}
+    \resizebox{0.5\columnwidth}{!}{
+    \begin{tabular}{r|c}
+    \toprule
+            \small{Method}  & \small{mIOU} \\
+    \midrule
+        ScanNet~\cite{scannet}  & 30.6\\
+        SSC-UNet~\cite{sparse3dsegmentation} & 30.8 \\
+        PointNet++~\cite{pointnetpp} & 33.9\\
+        ScanNet-FTSDF & 38.3 \\
+        SPLATNet~\cite{splatnet} & 39.3 \\
+        TangetConv~\cite{tangent} & 43.8 \\
+        SurfaceConv \cite{surface} & 44.2 \\
+        3DMV${}^\ddagger$~\cite{3dmv} & 48.4 \\
+        3DMV-FTSDF${}^\ddagger$ & 50.1 \\
+        PointNet++SW & 52.3 \\
+    \midrule
+        MinkowskiNet42 (5cm) & \textbf{67.9} \\
+    \midrule
+        SparseConvNet~\cite{sparse3dsegmentation}${}^\dagger$ & 72.5 \\
+        MinkowskiNet42 (2cm)${}^\dagger$ & \textbf{73.4} \\
+    \bottomrule
+    \end{tabular}}
+    \label{tab:scannet}
+    \caption*{\small{${}^\dagger$: post-CVPR submissions. ${}^\ddagger$: uses 2D images additionally. Per class IoU in the supplementary material. The parenthesis next to our methods indicate the voxel size.}}
+    % \vspace{-2em}
+\end{table}}
+
+
+{\small
+\tabcolsep= 1mm
+\begin{table}[ht]
+    \centering
+    \caption{Segmentation results on the 4D Synthia dataset}
+    % \vspace{-2mm}
+    \resizebox{0.65\columnwidth}{!}{
+    \begin{tabular}{l|cc}
+    \toprule
+        \small{Method}  & \small{mIOU} & \small{mAcc} \\
+    \midrule
+        3D MinkNet20  & 76.24 & 89.31 \\
+        3D MinkNet20 + TA & 77.03 & 89.20 \\
+    \midrule
+        4D Tesseract MinkNet20 & 75.34 & 89.27 \\
+        4D MinkNet20  & 77.46 & 88.013\\
+        4D MinkNet20 + TS-CRF & 78.30 & 90.23 \\
+        4D MinkNet32 + TS-CRF & \textbf{78.67} & \textbf{90.51} \\
+    \bottomrule
+    \end{tabular}}
+    \caption*{\small{TA denotes temporal averaging. Per class IoU in the supplementary material.}}
+    \label{tab:synthia}
+    % \vspace{-2em}
+\end{table}}
+
+
+\begin{table*}[ht]
+    \centering
+    \caption{Segmentation results on the noisy Synthia 4D dataset}
+    % \vspace{-2mm}
+    \resizebox{0.99\textwidth}{!}{
+    \begin{tabular}{l|ccccccccccc|c}
+    \toprule
+        \small{IoU}  & \small{Building} & \small{Road} & \small{Sidewalk} & \small{Fence} & \small{Vegetation} & \small{Pole} & \small{Car} & \small{Traffic Sign} & \small{Pedestrian} & \small{Lanemarking} & \small{Traffic Light} & \small{mIoU} \\
+    \midrule
+        3D MinkNet42               & 87.954              & 97.511          & 78.346          & 84.307          & 96.225          & 94.785          & 87.370          & 42.705          & \textbf{66.666} & 52.665          & 55.353          & 76.717 \\
+        3D MinkNet42 + TA          & 87.796              & 97.068          & 78.500          & 83.938          & 96.290          & 94.764          & 85.248          & 43.723          & 62.048          & 50.319          & 54.825          & 75.865 \\
+    \midrule
+	    4D Tesseract MinkNet42 & \textbf{89.957}     & 96.917          & 81.755          & 82.841          & 96.556          & 96.042          & 91.196          & 52.149          & 51.824          & \textbf{70.388} & \textbf{57.960} & 78.871 \\
+	    4D MinkNet42 &                        88.890 & \textbf{97.720} & \textbf{85.206} & \textbf{84.855} & \textbf{97.325} & \textbf{96.147} & \textbf{92.209} & \textbf{61.794} & 61.647          & 55.673          & 56.735          & \textbf{79.836} \\
+    \bottomrule
+    \end{tabular}}
+    \caption*{\small{TA denotes temporal averaging. As the input pointcloud coordinates are noisy, averaging along the temporal dimension introduces noise.}}
+    \label{tab:noisy_synthia}
+    % \vspace{-2em}
+\end{table*}
+
+\begin{figure}[t]
+  % \vspace{-2em}
+  \centering
+  \begin{tabular}{c|c}
+    \hspace{-1em}
+    \includegraphics[width=0.45\columnwidth]{figures/synthia_rebuttal/synthia_00_3d} &
+    \includegraphics[width=0.45\columnwidth]{figures/synthia_rebuttal/synthia_01_3d} \\
+    \includegraphics[width=0.45\columnwidth]{figures/synthia_rebuttal/synthia_00_crf} &
+    \includegraphics[width=0.45\columnwidth]{figures/synthia_rebuttal/synthia_01_crf} \\
+  \end{tabular}
+		\caption{\small{Visualizations of 3D (top), and 4D networks (bottom) on Synthia. A road (blue) far away from the car is often confused as sidewalks (green) with a 3D network, which persists after temporal averaging. However, 4D networks accurately captured it.}}
+  \label{fig:synthia}
+  % \vspace{-1em}
+\end{figure}
+
+\newcommand\scannetfigwidth{0.48\columnwidth}
+\begin{figure}[t]
+\centering
+\begin{tabular}{c|c}
+\includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_11_rgb} & \includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_40_rgb} \\
+\includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_11_pred} & \includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_40_pred} \\
+\includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_11_gt} &
+\includegraphics[width=\scannetfigwidth]{figures/scannet_results/scannet_val_40_gt} \\
+\end{tabular}
+% \vspace{-1em}
+\caption{\small{Visualization of Scannet predictions. From the top, a 3D input pointcloud, a network prediction, and the ground-truth.}}
+% \vspace{-0.5em}
+\end{figure}
+
+{\tabcolsep= 1mm
+\begin{table}[t]
+    \small
+    \centering
+    \caption{Stanford Area 5 Test (Fold \#1) (S3DIS)~\cite{stanford3dis}}
+    % \vspace{-2mm}
+    \resizebox{0.58\columnwidth}{!}{
+    \begin{tabular}{r|cc}
+    \toprule
+        Method & mIOU & mAcc\\
+    \midrule
+        PointNet \cite{pointnet} & 41.09 & 48.98\\
+        SparseUNet \cite{sparse3dcnn} & 41.72 & 64.62 \\
+        SegCloud \cite{segcloud} & 48.92 & 57.35 \\
+        TangentConv \cite{tangent}  & 52.8 & 60.7 \\
+        3D RNN \cite{3drnn} & 53.4 & 71.3 \\
+        PointCNN \cite{pointcnn}  & 57.26 & 63.86 \\
+        SuperpointGraph \cite{superpoint} & 58.04 & 66.5 \\
+    \midrule
+        MinkowskiNet20 & 62.60 & 69.62 \\ % ./outputs/ResUNet14/Stanford-sparse-lr-1e-1-40k-lars-squared-b6/2018-11-11_00-31-34
+        % SEMinkowskiNet14 & \todo{} & \todo{} \\
+			MinkowskiNet32 & \textbf{65.35} & \textbf{71.71} \\
+        % SEMinkowskiNet18 & \textbf{65.23} & \textbf{71.52} \\
+    \bottomrule
+    \end{tabular}
+    }
+    \caption*{\small{Per class IoU in the supplementary material.}}
+    % \vspace{-2.5em}
+    \label{tab:S3DIS}
+\end{table}}
+
+\newcommand\stanfordfigwidth{0.48\columnwidth}
+\begin{figure}[h]
+\centering
+\begin{tabular}{c|c}
+\includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_00_rgb} & \includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_10_rgb} \\
+\includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_00_pred} & \includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_10_pred} \\
+\includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_00_gt} &
+\includegraphics[width=\stanfordfigwidth]{figures/stanford_results/stanford_area5_10_gt} \\
+\end{tabular}
+% \vspace{-1em}
+\caption{\small{Visualization of Stanford dataset Area 5 test results. From the top, RGB input, prediction, ground truth.}}
+\end{figure}
+
+
+
+{\small
+\tabcolsep= 1mm
+\begin{table}
+    \centering
+    \caption{RueMonge 2014 dataset (Varcity) TASK3~\cite{ruemonge2014}}
+    % \vspace{-2mm}
+    \resizebox{0.54\columnwidth}{!}{
+    \begin{tabular}{l|c}
+    \toprule
+        \small{Method}  & \small{mIOU} \\
+    \midrule
+        MV-CRF~\cite{riemenschneider2014learning} & 42.3 \\
+        Gradde et al.~\cite{gadde2017efficient} & 54.4 \\
+        RF+3D CRF~\cite{martinovic20153d} & 56.4 \\
+        OctNet ($256^3$)~\cite{octnet} & 59.2\\
+        SPLATNet (3D) \cite{splatnet} & 65.4 \\
+    \midrule
+        3D MinkNet20 & 66.46 \\ % ./outputs/ResUNetTemporal14/Varcity-pcrop-lr-1e-1-20k-poly-b2-ns3/2018-10-30_07-11-54
+        % 3D MinkNet14 + TA & \todo{} \\
+        % 4D Tesseract MinkNet14 & \todo{} \\
+        4D MinkNet20 & 66.56 \\ % ./outputs/STResUNet14/Varcity-pcrop-sparse-lr1e-1-sgdlars-squared-10k-b2-ns3/2018-11-05_22-01-31
+        4D MinkNet20 + TS-CRF & \textbf{66.59} \\ % ./outputs/TrilateralCRFResUNet14/Varcity-pcrop-sparse-lr-1e-1-20k-lars-squared-b2-ns-3-mf-10/2018-11-05_19-34-14
+        
+    \bottomrule
+    \end{tabular}}
+    \caption*{\small{The performance saturates quickly due to the small training set. Per class IoU in the supplementary material.}}
+    \label{tab:varcity}
+    % \vspace{-2em}
+\end{table}}
+
+
+\textbf{ScanNet \& Stanford 3D Indoor} The ScanNet and the Stanford Indoor datasets are one of the largest non-synthetic datasets, which make the datasets ideal test beds for 3D segmentation. We were able to achieve +19\% mIOU on ScanNet, and +7\% on Stanford compared with the best-published works by the CVPR deadline. This is due to the depth of the networks and the fine resolution of the space. We trained the same network for 60k iterations with 2cm voxel and achieved 72.1\% mIoU on ScanNet after the deadline. For all evaluation, we feed an entire room to a network and process it fully convolutionally.
+
+
+\textbf{4D analysis} The RueMongue dataset is a small dataset that ranges one section of a street, so with the smallest network, we were able to achieve the best result (Tab.~\ref{tab:varcity}). However, the results quickly saturate. On the other hand, the Synthia 4D dataset has an order of magnitude more 3D scans than any other datasets, so it is more suitable for the ablation study.
+
+We use the Synthia datasets with and without noise for 3D and 4D analysis and results are presented in Tab.~\ref{tab:synthia} and Tab.~\ref{tab:noisy_synthia}. We use various 3D and 4D networks with and without TS-CRF. Specifically, when we simulate noise in sensory inputs on the 4D Synthia dataset, we can observe that the 4D networks are more robust to noise. Note that the number of parameters added to the 4D network compared with the 3D network is less than 6.4 \% and $6\text{e-}3$ \% for the TS-CRF. Thus, with a small increase in computation, we could get a more robust algorithm with higher accuracy. In addition, when we process temporal sequence using the 4D networks, we could even get small speed gain as we process data in a batch mode. On Tab.~\ref{tab:runtime}, we vary the voxel size and the sequence length and measured the runtime of the 3D and 4D networks, as well as the 4D networks with TS-CRF. Note that for large voxel sizes, we tend to get small speed gain on the 4D networks compared with 3D networks.
+
+% TrilateralCRFSTResUNet14: 59267962
+% STResUNet14: 59263111
+% ResUNet14: 55724744
+
+% Due to the page limit, we put more analysis and visualization in the supplementary material.
+
+
+{\small
+\tabcolsep= 1mm
+\begin{table}[h]
+    \centering
+    % \vspace{-0.4em}
+    \caption{\small{Time (s) to process 3D videos with 3D and 4D MinkNet, the volume of a scan at each time step is 50m$\times$ 50m $\times$ 50m}}
+    \resizebox{0.95\columnwidth}{!}{
+    \begin{tabular}{c|ccc|ccc|ccc}
+    \toprule
+\small{Voxel Size}   & \multicolumn{3}{c}{0.6m} & \multicolumn{3}{c}{0.45m} & \multicolumn{3}{c}{0.3m} \\
+    \midrule
+\small{Video Length (s)} & 3D          & 4D         & 4D-CRF & 3D          & 4D          & 4D-CRF & 3D          & 4D         & 4D-CRF \\
+    \midrule
+3            & 0.18        & 0.14       & 0.17   & 0.25        & 0.22    &  0.27      & 0.43        & 0.49    & 0.59   \\
+5            & 0.31        & 0.23       & 0.27   & 0.41        & 0.39    &  0.47      & 0.71        & 0.94    & 1.13   \\
+7            & 0.43        & 0.31       & 0.38   & 0.58        & 0.61    &  0.74      & 0.99        & 1.59    & 2.02   \\
+\bottomrule
+\end{tabular}
+}
+    \label{tab:runtime}
+    % \vspace{-1em}
+\end{table}}

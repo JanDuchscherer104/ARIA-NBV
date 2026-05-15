@@ -15,11 +15,11 @@ feasible candidate table, does reconstruction-quality improvement contain
 planning structure beyond one-step selection?
 
 The key empirical precedent is VIN-NBV, which replaces pure coverage with
-Relative Reconstruction Improvement (#RRI), an oracle label computed from
+#gls("relative-reconstruction-improvement"), an oracle label computed from
 point-mesh reconstruction-error reduction after adding a query view
 @VIN-NBV-frahm2025. ARIA-NBV uses the same quality-driven axis because target
 indoor surfaces can remain poor even when coverage proxies look saturated. The
-thesis transfers this idea to the Project Aria / #ASE regime, where calibrated
+thesis transfers this idea to the Project Aria / #gls("aria-synthetic-environments") regime, where calibrated
 egocentric streams, trajectories, semi-dense points, predicted object boxes,
 and mesh-supervised assets support controlled oracle labels
 @projectaria-engel2023 @ProjectAria-ASE-2025 @EFM3D-straub2024.
@@ -31,7 +31,7 @@ extension is target-specific: actor-visible target selection, target-cropped
 oracle labels, replayable counterfactual rollouts, and a finite-horizon value
 model over candidate rows.
 
-Continuous and hierarchical #NBV papers motivate later directions, but they do
+Continuous and hierarchical #gls("next-best-view") papers motivate later directions, but they do
 not define the first thesis test. GenNBV and Hestia assume mature simulator
 dynamics and reward loops @GenNBV-chen2024 @Hestia-lu2026; active NeRF and 3DGS
 work motivates utility-channel diagnostics rather than replacing the
@@ -40,7 +40,7 @@ mesh-supervised #RRI objective @ActiveNeRF-pan2022 @FisherRF-jiang2024
 @ObjectCentricNBV-jeong2026 @FOVHPE-bae2025.
 
 #thesis-box([Thesis position])[
-  ARIA-NBV tests target-conditioned, quality-driven #NBV on #ASE/EFM as a
+  ARIA-NBV tests target-conditioned, quality-driven #gls("next-best-view", first: false) on #gls("aria-synthetic-environments", first: false)/EFM as a
   finite-candidate planning problem. The core experiment first measures whether
   bounded oracle lookahead exposes non-myopic target-#RRI headroom. If it does,
   a masked candidate-query $Q_H$ model is evaluated by how much of that headroom

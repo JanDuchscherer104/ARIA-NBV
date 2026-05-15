@@ -34,6 +34,7 @@ from ..pose_generation.types import CandidateSamplingResult
 from ..rendering.candidate_depth_renderer import CandidateDepths
 from ..rendering.candidate_pointclouds import CandidatePointClouds
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
+from ..utils.semantic_names import normalize_semantic_name_map
 from ..vin.types import EvlBackboneOutput
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 from ._raw import EfmSnippetLoader, EfmSnippetView, VinSnippetView
@@ -698,19 +699,13 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
         )
 
     @staticmethod
-    def _normalize_semantic_names(value: object | None) -> list[str] | None:
-        """Normalize stored semantic maps to an index-ordered list when possible."""
+    def _normalize_semantic_names(value: object | None) -> dict[int, str] | None:
+        """Normalize stored semantic maps to sparse integer-key dictionaries."""
 
         if value is None:
             return None
-        if isinstance(value, list):
-            return [str(item) for item in value]
-        if isinstance(value, Mapping):
-            try:
-                keys = sorted(value, key=lambda item: int(item))
-            except (TypeError, ValueError):
-                keys = sorted(value)
-            return [str(value[key]) for key in keys]
+        if isinstance(value, (Mapping, list, tuple)):
+            return normalize_semantic_name_map(value)
         return None
 
     def _build_trajectory_metadata(self, record: VinOfflineIndexRecord) -> CompactTrajectoryBlock | None:

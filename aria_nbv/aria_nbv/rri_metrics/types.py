@@ -15,7 +15,7 @@ can be decomposed into accuracy and completeness changes.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import torch
@@ -25,7 +25,7 @@ from ..utils.typed_payloads import from_serializable, to_serializable
 Tensor = torch.Tensor
 
 
-class DistanceAggregation(str, Enum):
+class DistanceAggregation(StrEnum):
     """Supported reduction modes for distance tensors.
 
     - ``mean``: Average over the last dimension (preferred for Chamfer style).

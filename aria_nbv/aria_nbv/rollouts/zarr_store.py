@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +33,15 @@ from zarr.storage import LocalStore
 from ..configs import PathConfig
 from ..utils import BaseConfig
 from ..utils.config_paths import resolve_cache_artifact_dir
+from .manifest import (
+    ROLLOUT_MANIFEST_FILENAME,
+    ROLLOUT_MANIFEST_VERSION,
+    RolloutStoreManifestContext,
+    manifest_sha256,
+    read_rollout_store_manifest,
+    utc_timestamp,
+    write_rollout_store_manifest,
+)
 from .trace import (
     INVALID_REASON_CODES,
     INVALID_REASON_VERSION,
@@ -53,8 +61,8 @@ if TYPE_CHECKING:
 ROLLOUT_ZARR_SCHEMA_ID = "aria_nbv.rollout_zarr_q_invalidity"
 """Schema id stored as a root attribute on rollout replay stores."""
 
-ROLLOUT_ZARR_SCHEMA_VERSION = "0.3-source-facts-derived-qh"
-"""Clean table-owner rollout replay schema version."""
+ROLLOUT_ZARR_SCHEMA_VERSION = "0.4-manifested-shards"
+"""Manifest-backed clean table-owner rollout replay schema version."""
 
 DEFAULT_RETURN_SEMANTICS = "cumulative_target_rri"
 """Default return target family for initial ``Q_H`` replay views."""
@@ -215,6 +223,8 @@ class RolloutZarrWriteResult:
     num_rollouts: int
     num_steps: int
     num_candidates: int
+    manifest_path: Path
+    manifest_sha256: str
 
 
 @dataclass(slots=True)
@@ -283,6 +293,14 @@ class RolloutZarrStoreReader:
 
         return validate_rollout_zarr_store(self.store_dir)
 
+    def manifest(self) -> dict[str, Any]:
+        """Read root attrs and the top-level sidecar manifest without payload arrays."""
+
+        return {
+            "root_attrs": dict(self.root.attrs),
+            "manifest": read_rollout_store_manifest(self.store_dir),
+        }
+
     def q_h_view(self, *, discount_gamma: float | None = None, horizon: int | None = None) -> dict[str, np.ndarray]:
         """Build the padded finite-candidate ``Q_H`` view from factual store tables.
 
@@ -309,6 +327,7 @@ def write_rollout_zarr_store(
     field_retention_policy: str = "compact",
     source_offline_store_version: str = "unknown-source-version",
     split_manifest_hash: str = "unknown-split-manifest",
+    manifest_context: RolloutStoreManifestContext | None = None,
 ) -> RolloutZarrWriteResult:
     """Write rollout records into a standalone ``rollouts.zarr`` store."""
 
@@ -322,6 +341,7 @@ def write_rollout_zarr_store(
         field_retention_policy=field_retention_policy,
         source_offline_store_version=source_offline_store_version,
         split_manifest_hash=split_manifest_hash,
+        manifest_context=manifest_context,
     ).write()
 
 
@@ -340,6 +360,7 @@ class _RolloutZarrWriteSession:
         field_retention_policy: str,
         source_offline_store_version: str,
         split_manifest_hash: str,
+        manifest_context: RolloutStoreManifestContext | None,
     ) -> None:
         self.output_dir = Path(store_dir).expanduser().resolve()
         self.records = records
@@ -350,14 +371,17 @@ class _RolloutZarrWriteSession:
         self.field_retention_policy = field_retention_policy
         self.source_offline_store_version = source_offline_store_version
         self.split_manifest_hash = split_manifest_hash
+        self.manifest_context = manifest_context or RolloutStoreManifestContext.programmatic()
 
     def write(self) -> RolloutZarrWriteResult:
         """Materialize the configured rollout traces to disk."""
 
-        root = zarr.open_group(str(self.output_dir), mode="w")
-        _write_root_metadata(
-            root,
+        created_at_utc = utc_timestamp()
+        dictionaries = _build_dictionaries(self.records)
+        table = _flatten_records(self.records, dictionaries)
+        root_metadata = _root_metadata_payload(
             records=self.records,
+            tables=table,
             return_semantics=self.return_semantics,
             discount_gamma=self.discount_gamma,
             target_protocol_version=self.target_protocol_version,
@@ -365,10 +389,24 @@ class _RolloutZarrWriteSession:
             field_retention_policy=self.field_retention_policy,
             source_offline_store_version=self.source_offline_store_version,
             split_manifest_hash=self.split_manifest_hash,
+            created_at_utc=created_at_utc,
+            manifest_sha256="",
         )
+        manifest_payload = _build_manifest_payload(
+            records=self.records,
+            tables=table,
+            dictionaries=dictionaries,
+            context=self.manifest_context,
+            root_attrs=root_metadata,
+            created_at_utc=created_at_utc,
+        )
+        manifest_digest = manifest_sha256(manifest_payload)
+        root_metadata["manifest_sha256"] = manifest_digest
+
+        root = zarr.open_group(str(self.output_dir), mode="w")
+        root.attrs.update(root_metadata)
         groups = {name: root.create_group(name, overwrite=True) for name in _required_groups()}
 
-        dictionaries = _build_dictionaries(self.records)
         _write_dictionaries(groups["dictionaries"], dictionaries)
         _write_metadata_group(groups["metadata"], field_retention_policy=self.field_retention_policy)
         _write_targets(
@@ -378,14 +416,18 @@ class _RolloutZarrWriteSession:
             target_protocol_version=self.target_protocol_version,
         )
 
-        table = _flatten_records(self.records, dictionaries)
         _write_rollout_tables(groups, table)
+        written_manifest_digest = write_rollout_store_manifest(self.output_dir, manifest_payload)
+        if written_manifest_digest != manifest_digest:
+            raise RuntimeError("Rollout manifest digest changed while writing.")
 
         return RolloutZarrWriteResult(
             store_dir=self.output_dir,
             num_rollouts=int(table.rollouts["rollout_row_id"].shape[0]),
             num_steps=int(table.steps["step_row_id"].shape[0]),
             num_candidates=int(table.candidates["candidate_row_id"].shape[0]),
+            manifest_path=self.output_dir / ROLLOUT_MANIFEST_FILENAME,
+            manifest_sha256=manifest_digest,
         )
 
 
@@ -434,9 +476,40 @@ class _RolloutZarrValidator:
                 f"Unsupported rollout Zarr schema_version={self.root.attrs.get('schema_version')!r}; "
                 f"expected {ROLLOUT_ZARR_SCHEMA_VERSION!r}."
             )
+        self._validate_manifest_contract()
         for group_name in _required_groups():
             if group_name not in self.root:
                 self.errors.append(f"Missing required group {group_name!r}.")
+
+    def _validate_manifest_contract(self) -> None:
+        manifest_path_attr = self.root.attrs.get("manifest_path")
+        if manifest_path_attr != ROLLOUT_MANIFEST_FILENAME:
+            self.errors.append(
+                f"Rollout store root attr 'manifest_path' must be {ROLLOUT_MANIFEST_FILENAME!r}, "
+                f"got {manifest_path_attr!r}."
+            )
+            return
+        manifest_path = self.store_dir / ROLLOUT_MANIFEST_FILENAME
+        if not manifest_path.exists():
+            self.errors.append(f"Missing required top-level rollout manifest {manifest_path.name!r}.")
+            return
+        try:
+            payload = read_rollout_store_manifest(self.store_dir)
+        except (OSError, json.JSONDecodeError) as exc:
+            self.errors.append(f"Failed to read rollout manifest: {exc}.")
+            return
+        expected_hash = self.root.attrs.get("manifest_sha256")
+        if not isinstance(expected_hash, str) or not expected_hash:
+            self.errors.append("Rollout store root attr 'manifest_sha256' is missing.")
+        elif manifest_sha256(payload) != expected_hash:
+            self.errors.append("Rollout store manifest hash does not match root attr 'manifest_sha256'.")
+        if payload.get("manifest_version") != ROLLOUT_MANIFEST_VERSION:
+            self.errors.append(
+                f"Unsupported rollout manifest_version={payload.get('manifest_version')!r}; "
+                f"expected {ROLLOUT_MANIFEST_VERSION!r}."
+            )
+        if payload.get("schema_version") != ROLLOUT_ZARR_SCHEMA_VERSION:
+            self.errors.append("Rollout manifest schema_version does not match the current rollout Zarr schema.")
 
     def _validate_q_h(self, candidate_row_id: np.ndarray) -> None:
         q_h = _build_q_h_arrays(_read_tables_from_root(self.root), horizon=_stored_horizon(self.root), gamma=1.0)
@@ -590,10 +663,10 @@ def _required_groups() -> tuple[str, ...]:
     )
 
 
-def _write_root_metadata(
-    root: zarr.Group,
+def _root_metadata_payload(
     *,
     records: list[RolloutZarrRecord],
+    tables: _RolloutTables,
     return_semantics: str,
     discount_gamma: float,
     target_protocol_version: str,
@@ -601,23 +674,139 @@ def _write_root_metadata(
     field_retention_policy: str,
     source_offline_store_version: str,
     split_manifest_hash: str,
-) -> None:
-    root.attrs.update(
-        {
-            "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
-            "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
-            "zarr_format": 3,
-            "created_at_utc": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
-            "source_offline_store_version": source_offline_store_version,
-            "split_manifest_hash": split_manifest_hash,
-            "reason_code_version": reason_code_version,
-            "target_protocol_version": target_protocol_version,
-            "return_semantics": return_semantics,
-            "discount_gamma": float(discount_gamma),
-            "field_retention_policy": field_retention_policy,
-            "num_rollouts": sum(len(record.result.trajectories) for record in records),
+    created_at_utc: str,
+    manifest_sha256: str,
+) -> dict[str, Any]:
+    """Return compact root attrs for one rollout store."""
+
+    split_values = {
+        record.lineage_for_chain(chain_id).split or "unknown"
+        for record in records
+        for chain_id, _trajectory in enumerate(record.result.trajectories)
+    }
+    return {
+        "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
+        "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
+        "zarr_format": 3,
+        "created_at_utc": created_at_utc,
+        "manifest_path": ROLLOUT_MANIFEST_FILENAME,
+        "manifest_sha256": manifest_sha256,
+        "manifest_version": ROLLOUT_MANIFEST_VERSION,
+        "source_offline_store_version": source_offline_store_version,
+        "split_manifest_hash": split_manifest_hash,
+        "source_split": next(iter(split_values)) if len(split_values) == 1 else "mixed",
+        "reason_code_version": reason_code_version,
+        "target_protocol_version": target_protocol_version,
+        "return_semantics": return_semantics,
+        "discount_gamma": float(discount_gamma),
+        "field_retention_policy": field_retention_policy,
+        "num_sources": int(tables.sources["source_row_id"].shape[0]),
+        "num_targets": int(len(_unique_targets(records))),
+        "num_rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
+        "num_steps": int(tables.steps["step_row_id"].shape[0]),
+        "num_candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+    }
+
+
+def _build_manifest_payload(
+    *,
+    records: list[RolloutZarrRecord],
+    tables: _RolloutTables,
+    dictionaries: dict[str, list[str]],
+    context: RolloutStoreManifestContext,
+    root_attrs: dict[str, Any],
+    created_at_utc: str,
+) -> dict[str, Any]:
+    """Build the human-readable top-level rollout-store manifest."""
+
+    return {
+        "manifest_version": ROLLOUT_MANIFEST_VERSION,
+        "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
+        "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
+        "created_at_utc": created_at_utc,
+        "store_kind": "standalone_rollout_zarr_shard",
+        "root_attrs": {key: value for key, value in root_attrs.items() if key != "manifest_sha256"},
+        "counts": {
+            "sources": int(tables.sources["source_row_id"].shape[0]),
+            "targets": int(len(_unique_targets(records))),
+            "rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
+            "steps": int(tables.steps["step_row_id"].shape[0]),
+            "candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+        },
+        "source_coverage": _source_coverage(records),
+        "config_hashes": _manifest_config_hashes(records),
+        "dictionary_sizes": {name: len(values) for name, values in sorted(dictionaries.items())},
+        "generation": context.to_jsonable(),
+    }
+
+
+def _source_coverage(records: list[RolloutZarrRecord]) -> dict[str, Any]:
+    """Summarize source rows without reading Zarr payload arrays."""
+
+    rows: dict[int, dict[str, Any]] = {}
+    for record in records:
+        lineage = record.lineage
+        source_row_id = -1 if lineage.source_row_id is None else int(lineage.source_row_id)
+        rows[source_row_id] = {
+            "source_row_id": source_row_id,
+            "source_sample_index": lineage.source_sample_index,
+            "source_sample_key": lineage.source_sample_key,
+            "scene_id": lineage.scene_id,
+            "snippet_id": lineage.snippet_id,
+            "split": lineage.split,
+            "source_shard_id": lineage.source_shard_id,
+            "source_shard_row": lineage.source_shard_row,
         }
-    )
+    scene_counts: dict[str, int] = {}
+    split_counts: dict[str, int] = {}
+    for row in rows.values():
+        scene = str(row["scene_id"] or "unknown")
+        split = str(row["split"] or "unknown")
+        scene_counts[scene] = scene_counts.get(scene, 0) + 1
+        split_counts[split] = split_counts.get(split, 0) + 1
+    return {
+        "num_source_rows": len(rows),
+        "scene_counts": dict(sorted(scene_counts.items())),
+        "split_counts": dict(sorted(split_counts.items())),
+        "sources": [rows[key] for key in sorted(rows)],
+    }
+
+
+def _manifest_config_hashes(records: list[RolloutZarrRecord]) -> dict[str, list[str]]:
+    """Collect unique config/protocol hashes stored in rollout lineages."""
+
+    values: dict[str, set[str]] = {
+        "candidate": set(),
+        "oracle": set(),
+        "rollout": set(),
+        "model_checkpoint": set(),
+        "source_manifest": set(),
+        "split_manifest": set(),
+        "target_crop_policy": set(),
+        "target_protocol": set(),
+    }
+    for record in records:
+        lineage = record.lineage
+        _add_manifest_hash(values["candidate"], lineage.candidate_config_hash)
+        _add_manifest_hash(values["oracle"], lineage.oracle_config_hash)
+        _add_manifest_hash(values["rollout"], lineage.rollout_config_hash)
+        _add_manifest_hash(values["model_checkpoint"], lineage.model_checkpoint_hash)
+        _add_manifest_hash(values["source_manifest"], lineage.source_offline_store_manifest_hash)
+        _add_manifest_hash(values["split_manifest"], lineage.split_manifest_hash)
+        _add_manifest_hash(values["target_crop_policy"], lineage.target_crop_policy)
+        _add_manifest_hash(values["target_protocol"], lineage.target_protocol_version)
+    return {name: sorted(items) for name, items in values.items()}
+
+
+def _add_manifest_hash(target: set[str], value: str | None) -> None:
+    if value:
+        target.add(value)
+
+
+def _unique_targets(records: list[RolloutZarrRecord]) -> set[int]:
+    """Return unique target row ids represented by rollout records."""
+
+    return {int(record.lineage.target_row_id) for record in records if record.lineage.target_row_id is not None}
 
 
 def _write_metadata_group(group: zarr.Group, *, field_retention_policy: str) -> None:
@@ -625,13 +814,6 @@ def _write_metadata_group(group: zarr.Group, *, field_retention_policy: str) -> 
     reason_bits = [bit for _name, bit in sorted(INVALID_REASON_CODES.items(), key=lambda item: item[1])]
     _write_array(group, "reason_code_bits", np.asarray(reason_bits, dtype=np.uint16))
     _write_string_array(group, "reason_code_names", reason_names)
-    manifest = {
-        "schema_id": ROLLOUT_ZARR_SCHEMA_ID,
-        "schema_version": ROLLOUT_ZARR_SCHEMA_VERSION,
-        "field_retention_policy": field_retention_policy,
-        "dense_all_action_oracle_q_materialized": False,
-    }
-    _write_array(group, "generation_manifest_json", np.frombuffer(json.dumps(manifest).encode("utf-8"), dtype=np.uint8))
     _write_string_array(group, "field_retention_policy", [field_retention_policy])
 
 

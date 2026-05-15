@@ -1,0 +1,135 @@
+\section{Experiments}
+
+As discussed in the introduction, deep learning-based NBV models for dense reconstruction are currently limited to single, small-scale, centered object reconstruction. To compare \method to these previous methods in this context, we first constrain the camera pose to lie on a sphere centered on an object. We then introduce our dataset made of 13 large-scale 3D models that we created to evaluate \method on free camera motions (3D models courtesy of Brian Trepanier, Andrea Spognetta, and 3D Interiors, under CC License; all models were downloaded from the website Sketchfab).
+
+\input{camera_ready_4_table_objects}
+
+\subsection{Next Best View for Single Object Reconstruction}
+\label{sec:single_object}
+
+We first compare the performance of our model to the state of the art on a subset of the ShapeNet dataset~\cite{shapenet2015} introduced in \cite{zeng-icirs20-pcnbv} and following the protocol of \cite{zeng-icirs20-pcnbv}: We sample 4,000 training meshes from 8 specific categories of objects, 400 validation meshes and 400 test meshes from the same categories, and 400 additional test meshes from 8 categories unseen during training.
+
+The evaluation on the test datasets consists of  10-view reconstructions of single objects. Given a mesh in the dataset, camera positions are discretized on a sphere. We start the reconstruction process by selecting a random camera pose, then we iterate NBV selection 9 times in order to maximize coverage with a sequence of 10 views in total. The evaluation metric is the area under the curve~(AUC) of surface coverage throughout the reconstruction. This criterion not only evaluates the quality of final surface coverage, but also the convergence speed toward a satisfying coverage. Results are presented in Table~\ref{tab:auc_shapenet}. \vincentrmk{Still supp mat? :}Further details about the evaluation, the estimation of ground truth surface coverage gains, and the metric computation are available in the appendix.
+
+
+
+
+\subsection{Active View Planning in a 3D Scene}
+
+\begin{figure}%
+    \centering
+    \subfloat[\centering Dunnottar Castle]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/dunnottar.png} }}%
+    \subfloat[\centering Pantheon]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/pantheon.png} }}%
+    \subfloat[\centering Statue of Liberty]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/liberty.png} }}%
+    \subfloat[\centering Leaning Tower, Pisa]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/pisa.png} }}\\%
+    
+    \subfloat[\centering Fushimi Castle]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/fushimi.png} }}%
+    \subfloat[\centering Alhambra Palace]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/alhambra.png} }}%
+    \subfloat[\centering Eiffel Tower]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/eiffel.png} }}%
+    \subfloat[\centering Natural History Museum]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/compressed/museum.png} }}\\%
+    % \subfloat[\centering Neuschwanstein Castle]{{\includegraphics[width=4.55cm, trim={0 0 0 0}, clip]{images/compressed/neuschwanstein.png} }}\\%
+    
+    \caption{\label{fig:trajectories} {\bf Application of our NBV approach to the reconstruction of large 3D structures}. The path, constructed iteratively in real time with our method, is shown in red (3D models courtesy of Brian Trepanier, Andrea Spognetta, and 3D Interiors, under CC License; all models were downloaded from the website Sketchfab).}
+\end{figure}
+
+\begin{figure}%
+    \centering
+    \subfloat[\centering Dunnottar Castle]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/dunnottar.png} }}%
+    \subfloat[\centering Pantheon]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/pantheon.png} }}%
+    \subfloat[\centering Statue of Liberty]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/liberty.png} }}%
+    \subfloat[\centering Leaning Tower, Pisa]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/pisa.png} }}\\%
+    
+    \subfloat[\centering Fushimi Castle]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/momoyama_recovered.png} }}%
+    \subfloat[\centering Alhambra Palace]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/alhambra.png} }}%
+    \subfloat[\centering Eiffel Tower]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/eiffel.png} }}%
+    \subfloat[\centering Natural History Museum]{{\includegraphics[width=3.4cm, trim={0 0 0 0}, clip]{images/pc_compressed/museum.png} }}\\%
+    % \subfloat[\centering Neuschwanstein Castle]{{\includegraphics[width=3.cm, trim={0 0 0 0}, clip]{images/pc_compressed/bavaria.png} }}\\%
+    
+    \caption{\label{fig:reconstruction} {\bf Reconstruction of large 3D scenes with our NBV approach \method}. We show the partial point cloud gathered by the depth sensor for each scene.}
+\end{figure}
+
+To evaluate the scalability of our model to large environments as well as free camera motion in 3D space, we also conducted experiments using a naive planning algorithm that incrementally builds a path in the scene: We first discretize the camera poses in the scene on a 5D grid, corresponding to coordinates $c_{pos} = (x_c, y_c, z_c)$ of the camera as well as the elevation and azimuth to encode rotation $c_{rot}$. The number of poses depends on the dimensions of the bounding box of the scene. This box is an input to the algorithm, as a way for the user to tell which part of the scene should be reconstructed. In our experiments, the number of different poses is around 10,000. Note we did not retrain our model for such scenes and use the previous model trained on ShapeNet as explained in Section~\ref{sec:single_object}.
+
+
+The depth sensor starts from a random pose (from which, at least, a part of the main structure to reconstruct is visible). Then, at each iteration, our method estimates the coverage gain of direct neighboring poses in the 5D grid, and selects the one with the highest score. The sensor moves to this position, captures a new partial point cloud and concatenates it to the previous one. Since we focus on online path planning for dense reconstruction optimization and designed our model to be scalable with local neighborhood features, the size of the global point cloud can become very large. 
+We iterate the process either 100 times to build a full path around the object in around 5 minutes on a single Nvidia GTX1080 GPU, and recovered a partial point cloud with up to 100,000 points.
+
+
+Contrary to single, small-scale object reconstruction where the object is always entirely included in the field of view, we simulated a limited range in terms of field of view and depth for the depth sensor, so that the extent of the entire scene cannot be covered in a single view. Thus, taking pictures at long range and going around the scene randomly is not an efficient strategy; the sensor must find a path around the surface to optimize the full coverage. We use a ray-casting renderer to approximate a real Lidar. More details about the experiments can be found in the appendix.\vincentrmk{still supp mat?}
+
+We compared the performance of \method with simple baselines: First, a random walk, which chooses neighboring poses randomly with uniform probabilities. Then, we evaluated an alternate version of our model, which we call \method-Entropy, which leverages the first module of our full model to compute occupancy probability in the scene, then selects the next best view as the position that maximizes the Shannon entropy in its field of view. The comparison is interesting, since \method-Entropy adapts classic NBV approaches based on information theory to a deep learning framework. Figures~\ref{fig:trajectories} and \ref{fig:reconstruction} provide qualitative results. Figure~\ref{tab:scene_reconstruction} shows the convergence speed of covered surface by \method and our two baselines, averaged on all scenes of the dataset. % Finally, Table~\ref{tab:scene_experiment_auc} reports surface coverage AUC in every scene for each method.
+
+\begin{figure}%
+    \centering
+    \begin{tabular}{@{}cc@{}}
+  \hspace{-0.0cm}\scalebox{0.75}{ 
+  \begin{tabular}{@{}lccccccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{7}{c}{3D scene} \\
+    \cmidrule(r){2-8}
+     & & {\scriptsize Statue of} & {\scriptsize Manhattan} & {\scriptsize Fushimi} & {\scriptsize Dunnottar} & {\scriptsize Neuschwanstein} &  \\[-1mm]
+    Method & {\scriptsize Colosseum} & {\scriptsize Liberty} & {\scriptsize Bridge} & {\scriptsize Castle} & {\scriptsize Castle} & {\scriptsize Castle} & Mean \\
+    \midrule
+    Random Walk & 0.308 & 0.469 & 0.405 & 0.584 & 0.355 & 0.403 & 0.421\\
+    SCONE-Entropy & 0.512 & 0.681 & 0.361 & 0.802 & 0.456 & 0.538 & 0.558\\
+    SCONE & {\bf 0.571} & {\bf 0.693} & {\bf 0.685} & {\bf 0.841} & {\bf 0.739} & {\bf 0.653} & {\bf 0.697}\\
+    \bottomrule
+  \end{tabular}
+ } 
+ &
+\raisebox{-.5\height}{\includegraphics[width=3.4cm]{images/supp_mat/all_path_planning_curve.png}}\\[3mm]
+(a) & (b)\\
+    \end{tabular}
+    \caption{\label{tab:scene_reconstruction} {\bf (a)~AUCs of surface coverage for several NBV selection methods during active view planning experiments on several 3D scenes from our dataset.} Results are averaged on several trajectories. {\bf (b)~Surface coverage curves for the different NBV selection methods, averaged on all 13 3D scenes.}
+    %
+    Despite being trained only on centered ShapeNet 3D models, the second module of \method is able to generalize to complex scenes when predicting the visibility scores.}
+\end{figure}
+
+Despite being trained only on ShapeNet 3D models, our method is able to compute meaningful paths around the structures and consistently reach satisfying global coverage.
+Since we focused on building a metric for NBV computation, this experiment is simple and does not implement any further prior from common path planning strategies: For instance, we do not compute distant NBV, nor optimal paths to move from a position to a distant NBV with respect to our volumetric mapping. There is no doubt the model could benefit from further strategies inspired by the path planning literature.
+
+\subsection{Ablation Study}
+
+We now provide an ablation study for both modules of our full model: The prediction of occupancy probability, and the computation of coverage gain from predictions about visibility gains. To evaluate both modules separately, we compared their performance on their training critera: MSE for occupancy probability, and softmax followed by KL-Div on a dense set of cameras for coverage gain. The values are reported in Figure~\ref{fig:ablation_study}. \vincentrmk{Do we still have a supp mat? :}We provide extensive details and analysis in the appendix.
+
+\begin{figure}%
+    \centering
+    \begin{tabular}{@{}cc@{}}
+  \hspace{-0.5cm}\scalebox{0.7}{ 
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    % \multicolumn{1}{c}{} & \multicolumn{5}{c}{3D scene} \\
+    % \cmidrule(r){1-2}
+    Architecture & Mean Squared Error & IoU\\
+    % Method & Arena & Statue & Bridge & Castle & Monument & Mean \\
+    \midrule
+    Base Architecture & 0.0397 & 0.843\\
+    No Neighborhood Feature & 0.0816 & 0.702\\
+    With Camera History & \textbf{0.0386} & \textbf{0.844}\\
+    \bottomrule
+  \end{tabular}
+ }
+ &
+\scalebox{0.7}{ 
+  \begin{tabular}{@{}lc@{}}
+    \toprule
+    % \multicolumn{1}{c}{} & \multicolumn{5}{c}{3D scene} \\
+    % \cmidrule(r){1-2}
+    Architecture & Kullback-Leibler Divergence \\
+    % Method & Arena & Statue & Bridge & Castle & Monument & Mean \\
+    \midrule
+    Base Architecture & \textbf{0.00039}\\
+    No prediction $\probfield$ & 0.00051 \\
+    No Camera History & 0.00045 \\
+    \bottomrule
+  \end{tabular}
+ }\\[7mm]
+(a) Occupancy probability & (b) Coverage gain \\
+    \end{tabular}
+    \caption{\label{fig:ablation_study} {\bf (a) Comparison of Mean Squared Error and IoU for variations of our occupancy probability prediction model. (b) Comparison of Kullback-Leibler divergence for variations of our coverage gain computation model.} Thanks to the volumetric prediction $\probfield$, the full model predicts a better distribution of coverage gains on the whole space as it is indicated by KL divergence, which is convenient for full path planning in a 3D scene.}%
+    %
+\end{figure}
+
+\textbf{Occupancy probability.}  Apart from the base architecture presented in Figure~\ref{fig:occupancy_probability_prediction}, we trained the first module under two additional settings. First, we removed the multi-scale neighborhood features computed by downsampling the partial point cloud $P_H$, and trained the module to predict an occupancy probability value $\probfield$ only from global feature $g(P_H)$ and encoding $f(x)$. As anticipated, the lack of neighborhood features not only prevents the model from an efficient scaling to large scenes, but also  causes a huge loss in performance. We also trained a slightly more complex version of the module by feeding it the camera history harmonics $h_H(x)$ as an additional feature. It appears this helps the model to increase its confidence and make better predictions, but the gains are quite marginal.
+
+\textbf{Visibility gain.}  We trained two variations of our second module. First, we completely removed the geometric prediction: We use directly the surface points as proxy points, mapped with an occupancy probability equal to 1. As a consequence, the model suffers from a significant loss in performance to compute coverage gain from its predicted visibility gain functions. Thus, we can confirm that the volumetric framework improves the performance of \method. This result is remarkable, since surface representations usually make better NBV predictions for dense reconstruction of detailed objects in literature. On the contrary, we show that our formalism is able to achieve higher performance by leveraging a volumetric representation with a high resolution deep implicit function $\probfield$. We trained a second variation without the spherical mappings $h_H$ of camera history. We verified that such additional features increase performance, especially at the end of a 3D reconstruction.

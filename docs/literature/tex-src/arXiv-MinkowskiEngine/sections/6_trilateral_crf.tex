@@ -1,0 +1,51 @@
+\section{Trilateral Stationary-CRF}
+\label{sec:crf}
+
+For semantic segmentation, the cross-entropy loss is applied for each pixel or voxel. However, the loss does not enforce consistency as it does not have pair-wise terms. To make such consistency more explicit, we propose a high-dimensional conditional random field (CRF) similar to the one used in image semantic segmentation~\cite{crfasrnn}. In image segmentation, the bilateral space that consists of 2D space and 3D color is used for the CRF. For 3D-videos, we use the trilateral space that consists of 3D space, 1D time, and 3D chromatic space. The color space creates a "spatial" gap between points with different colors that are spatially adjacent (e.g., on a boundary). Thus, it prevents information from "leaking out" to different regions. Unlike conventional CRFs with Gaussian edge potentials and dense connections~\cite{densecrf,crfasrnn}, we do not restrict the compatibility function to be a Gaussian. Instead, we relax the constraint and only apply the stationarity condition.
+
+To find the global optima of the distribution, we use the variational inference and convert a series of fixed point update equations to a recurrent neural network similar to~\cite{crfasrnn}. We use the generalized sparse convolution in 7D space to implement the recurrence and jointly train both the base network that generates unary potentials and the CRF end-to-end.
+
+
+\subsection{Definition}
+
+Let a CRF node in the 7D (space-time-chroma) space be $x_i$ and the unary potential be $\phi_u(x_i)$ and the pairwise potential as $\phi_p(x_i, x_j)$ where $x_j$ is a neighbor of $x_i$, $\mathcal{N}^7(x_i)$. The conditional random field is defined as
+\begin{equation*}
+    P(\mbf{X}) = \frac{1}{Z} \exp{ \sum_i \left( \phi_u(x_i) + \sum_{j \in \mathcal{N}^7(x_i)} \phi_p(x_i, x_j)\right)}
+\end{equation*}
+where $Z$ is the partition function; $X$ is the set of all nodes; and $\phi_p$ must satisfy the \textit{stationarity} condition $\phi_p(\mbf{u}, \mbf{v}) = \phi_p(\mbf{u} + \mbf{\tau_u}, \mbf{v} + \mbf{\tau_v})$ for $\mbf{\tau_u}, \mbf{\tau_v} \in \mathbb{R}^D$. Note that we use the camera extrinsics to define the spatial coordinates of a node $x_i$ in the world coordinate system. This allows stationary points to have the same coordinates throughout the time.
+
+\subsection{Variational Inference}
+The optimization $\argmax_\mbf{X} P(X)$ is intractable. Instead, we use the variational inference to minimize divergence between the optimal $P(\mbf{X})$ and an approximated distribution $Q(\mbf{X})$.
+Specifically, we use the mean-field approximation, $Q = \prod_i Q_i(x_i)$ as the closed form solution exists. From the Theorem 11.9 in~\cite{pgm}, $Q$ is a local maximum if and only if
+\begin{equation*}
+    Q_i(x_i) = \frac{1}{Z_i}\exp \underset{\mbf{X}_{-i} \sim Q_{-i}}{\mathbf{E}} \left[\phi_u(x_i) + \sum_{j \in \mathcal{N}^7(x_
+    i)} \phi_p(x_i, x_j) \right].
+\end{equation*}
+$\mbf{X}_{-i}$ and $Q_{-i}$ indicate all nodes or variables except for the $i$-th one. The final fixed-point equation is Eq.~\ref{eq:vi_update}. The derivation is in the supplementary material.
+\begin{equation} \label{eq:vi_update}
+		Q_i^+(x_i) = \frac{1}{Z_i}\exp \left\{ \phi_u(x_i) + \sum_{j \in \mathcal{N}^7(x_i)} \sum_{x_j} \phi_p(x_i, x_j)Q_j(x_j) \right\}
+\end{equation}
+
+
+
+\subsection{Learning with 7D Sparse Convolution}
+Interestingly, the weighted sum $\phi_p(x_i, x_j)Q_j(x_j)$ in Eq.~\ref{eq:vi_update} is equivalent to a generalized sparse convolution in the 7D space since $\phi_p$ is \textit{stationary} and each edge between $x_i, x_j$ can be encoded using $\mathcal{N}^7$. Thus, we convert fixed point update equation Eq.~\ref{eq:vi_update} into an algorithm in Alg.~\ref{alg:crfvi}.
+\begin{algorithm}[h]
+  \caption{Variational Inference of TS-CRF}
+  \label{alg:crfvi}
+\begin{algorithmic}
+  \Require Input: Logit scores $\phi_u$ for all $x_i$; associated coordinate $C_i$, color $F_i$, time $T_i$
+    \State $Q^0(X) = \exp{\phi_u(X)}$, $C_\text{crf} = [C, F, T]$
+    \For{$n$ from 1 to $N$}
+      \State $\tilde{Q}^n = $ SparseConvolution($(C_\text{crf}, Q^{n-1})$, kernel=$\phi_p$)
+      \State $Q^n = $ Softmax($\phi_u + \tilde{Q}^n$)
+    \EndFor
+    \State \Return $Q^N$
+\end{algorithmic}
+\end{algorithm}
+
+Finally, we use $\phi_u$ as the logit predictions of a 4D Minkowski network and train both $\phi_u$ and $\phi_p$ \textit{end-to-end} using one 4D and one 7D Minkowski network using Eq.~\ref{eq:crfasrnn}.
+\begin{equation} \label{eq:crfasrnn}
+    \frac{\partial L}{\partial \phi_p} = \sum_n^N \frac{\partial L}{\partial Q^{n+}} \frac{\partial Q^{n+}}{\partial \phi_p}, \;\;
+    \frac{\partial L}{\partial \phi_u} = \sum_n^N \frac{\partial L}{\partial Q^{n+}} \frac{\partial Q^{n+}}{\partial \phi_u}
+\end{equation}

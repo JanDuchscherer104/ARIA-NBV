@@ -1,0 +1,43 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Implementation}
+
+% TODO
+% \input{figs/trajectories}  % For conference paper (camera-ready)
+% \input{figs/recons}  % For conference paper (camera-ready)
+
+We implemented our model with PyTorch~\cite{paszke-nips19-pytorch} and use 3D data processing tools from PyTorch3D~\cite{ravi-arxiv20-accelerating3ddeeplearning}, such as ray-casting renderers to generate RGB images as inputs to our model.
+%
+MACARONS learns online to explore large, unknown environments thanks to its self-supervised pipeline that does not need any 3D input data; After being trained long enough, we can either freeze the weights and deactivate online learning to save computation time for future exploration, or let the model continue its training to further finetune it to novel scenes.
+%
+We perform online training with up to 4 GPUs Nvidia Tesla V100 SXM2 32 Go to let the model explore 4 different scenes in parallel and speed up the convergence, but we used a single GPU Nvidia GeForce GTX 1080 Ti for the inference experiments presented below.
+%
+In our experimental setup, after each NBV selection step, we perform 5 memory replay iterations for the depth module and up to 3 for the other modules. We provide extensive details in the appendix.
+
+\subsection{Exploration of large 3D scenes}
+
+\input{tables/auc}
+We compare our method to the state of the art for learning-based NBV computation for dense reconstruction in large environments. All methods use perfect depth maps as input except for MACARONS, which takes RGB images as input. We generate input data from 3D meshes of large scenes~(courtesy of Brian Trepanier and Andrea Spognetta, under CC License; all models were downloaded from the website Sketchfab). This dataset was introduced in~\cite{guedon-nips22-scone-surface-coverage}. To compare the different methods, we follow \cite{guedon-nips22-scone-surface-coverage} and compute the area under the curve of the evolution of the total surface coverage during exploration, after 100 NBV iterations, as presented in Table~\ref{tab:coverage_auc}. 
+%
+The surface coverage is computed using the ground truth meshes. AUCs are averaged on multiple trajectories in each scene: We use the same starting camera poses and same sets of candidate camera poses $C_t$ for each method for fair comparison. 
+%
+For this experiment, MACARONS was trained on a set of several scenes: The 8 scenes above the bar in Table~\ref{tab:coverage_auc} were seen during online training (but with different, random starting camera poses and trajectories), and the 4 scenes below the bar were not. The other methods were trained on ShapeNet~\cite{chang-15-shapenet} with 3D supervision since their learning process cannot scale to unknown, large environments.
+
+During this experiment, we freeze all weights of MACARONS and only perform inference computation to better demonstrate the ability of our model to generalize to novel scenes, even when online learning is deactivated.
+%
+Even if it only uses RGB images, our model is able to outperform the baselines in large environments since, contrary to other methods, its self-supervised online training strategy allows it to scale its learning process to any kind of unknown environment, where no ground truth is available and data has to be acquired with a camera.
+%
+% Figures~\ref{fig:trajectories}  % TODO: for camera-ready
+Figures~\ref{fig:supp-mat-trajectory} % TODO: for arxiv version
+and~\ref{fig:surface-reconstruction} show examples of trajectories as well as of surface reconstructions computed with MACARONS.
+
+\subsection{Ablation study}
+\input{tables/shapenet}
+\input{tables/new_loss_vs_old_loss}
+
+Apart from adapting learning-based NBV prediction to RGB inputs, we proposed both a novel loss to learn the surface coverage gain compared to~\cite{guedon-nips22-scone-surface-coverage}, and a new online training strategy to let the model learn from any kind of environment in a self-supervised fashion. To quantify the benefits of each of these two improvements, we perform two additional experiments.
+
+First, we use our new loss function to train our volume occupancy module and surface coverage gain module for isolated, single objects with explicit 3D supervision on the ShapeNet dataset~\cite{chang-15-shapenet}, similar to \cite{guedon-nips22-scone-surface-coverage}. We call the resulting model MACARONS-NBV. We compare with other methods in Table~\ref{tab:coverage_auc_shapenet} and verify that our new loss does not lower but slightly increases performance compared to the state of the art for the specific case of single object reconstruction.
+
+Then, we reconstruct 3D scenes with both our full model and MACARONS-NBV. For the latter, we use perfect depth maps rather than the depth prediction module. We compare two versions of MACARONS-NBV: One is trained on ShapeNet using the loss from~\cite{guedon-nips22-scone-surface-coverage}, the other is trained using our new loss. Table~\ref{tab:loss_ablation} shows how our new loss is crucial to increase performance in large scenes, and how self-supervised learning increases performance even further.

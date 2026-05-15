@@ -1,0 +1,84 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{iccv}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\input{vcl-shortcuts.tex}
+\usepackage{enumitem}
+\usepackage[accsupp]{axessibility}
+
+\newcommand{\ve}[1]{\mathbf{#1}} % for displaying a vector
+\newcommand{\ma}[1]{\mathrm{#1}} % for displaying a matrix
+% Include other packages here, before hyperref.
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
+\iccvfinalcopy % *** Uncomment this line for the final submission
+
+\def\iccvPaperID{****} % *** Enter the ICCV Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+\ificcvfinal\pagestyle{empty}\fi
+
+\begin{document}
+
+%%%%%%%%% TITLE
+\title{Point Transformer}
+
+\author{Hengshuang Zhao$^{1,2}$ \quad Li Jiang$^{3}$ \quad Jiaya Jia$^{3}$ \quad Philip Torr$^{1}$ \quad Vladlen Koltun$^{4}$\\
+	$^{1}$University of Oxford \quad
+	$^{2}$The University of Hong Kong \\
+	$^{3}$The Chinese University of Hong Kong \quad
+	$^{4}$Intel Labs\\ 
+}
+
+\maketitle
+% Remove page # from the first page of camera-ready.
+\ificcvfinal\thispagestyle{empty}\fi
+
+%%%%%%%%% ABSTRACT
+\begin{abstract}
+Self-attention networks have revolutionized natural language processing and are making impressive strides in image analysis tasks such as image classification and object detection. Inspired by this success, we investigate the application of self-attention networks to 3D point cloud processing. We design self-attention layers for point clouds and use these to construct self-attention networks for tasks such as semantic scene segmentation, object part segmentation, and object classification. Our Point Transformer design improves upon prior work across domains and tasks. For example, on the challenging S3DIS dataset for large-scale semantic scene segmentation, the Point Transformer attains an mIoU of 70.4\% on Area 5, outperforming the strongest prior model by 3.3 absolute percentage points and crossing the 70\% mIoU threshold for the first time.
+\end{abstract}
+
+%%%%%%%%% BODY TEXT
+\section{Introduction}
+\label{sec:introduction}
+\input{tex/introduction.tex}
+
+\section{Related Work}
+\label{sec:related}
+\input{tex/related-work.tex}
+
+\section{Point Transformer}
+\label{sec:method}
+\input{tex/method.tex}
+
+\section{Experiments}
+\label{sec:experiments}
+\input{tex/experiments.tex}
+
+\section{Conclusion}
+\label{sec:conclusion}
+\input{tex/conclusion.tex}
+
+\appendix
+\section{Appendix}
+\label{sec:appendix}
+\input{tex/appendix.tex}
+
+\balance
+
+{\small
+	\bibliographystyle{ieee_fullname}
+	\bibliography{paper}
+}
+
+\end{document}

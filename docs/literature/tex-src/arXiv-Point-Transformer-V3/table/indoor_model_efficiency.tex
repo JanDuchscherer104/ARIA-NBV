@@ -1,0 +1,11 @@
+\begin{tabular}{l|rrrrrr}\toprule
+\multicolumn{2}{l}{Indoor Efficiency (ScanNet)} &\multicolumn{2}{c}{Training} &\multicolumn{2}{c}{Inference} \\ \cmidrule(lr){3-4} \cmidrule(lr){5-6}
+Methods &Params. &Latency &Memory &Latency &Memory \\
+\midrule
+MinkUNet~\cite{choy20194d} &37.9M &267ms &\textbf{4.9G} &90ms &\textbf{4.7G} \\
+OctFormer~\cite{Wang2023OctFormer} &44.0M &264ms &12.9G &86ms &12.5G \\
+Swin3D~\cite{yang2023swin3d} &71.1M &602ms &13.6G &456ms &8.8G \\
+PTv2~\cite{wu2022point} &12.8M &312ms &13.4G &191ms &18.2G \\
+\cellcolor[HTML]{efefef}PTv3~(ours) &\cellcolor[HTML]{efefef}46.2M &\cellcolor[HTML]{efefef}\textbf{151ms} &\cellcolor[HTML]{efefef}6.8G &\cellcolor[HTML]{efefef}\textbf{61ms} &\cellcolor[HTML]{efefef}5.2G \\
+\bottomrule
+\end{tabular}

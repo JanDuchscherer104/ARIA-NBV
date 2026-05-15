@@ -1,0 +1,51 @@
+---
+config:
+  theme: base
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 22
+    rankSpacing: 36
+    curve: basis
+  layout: elk
+  themeVariables:
+    background: "#ffffff"
+    fontFamily: "Inter, DejaVu Sans, Arial, sans-serif"
+    fontSize: "18px"
+    primaryTextColor: "#1f2937"
+    lineColor: "#64748b"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart TD
+  Source["$$\\begin{array}{c}\\textbf{\\texttt{sources/}}\\\\\\texttt{source\\_row\\_id}\\\\\\text{one VIN root row}\\end{array}$$"]
+  TargetBranch{{"$$\\begin{array}{c}\\textbf{BRANCH}\\\\\\text{top-K targets}\\\\ e,\\ z_e\\end{array}$$"}}
+  Target["$$\\begin{array}{c}\\textbf{\\texttt{targets/}}\\\\\\texttt{target\\_row\\_id}\\\\\\text{actor-visible + GT-EVAL}\\end{array}$$"]
+  PolicyBranch{{"$$\\begin{array}{c}\\textbf{BRANCH}\\\\\\text{policy recipe}\\\\ \\pi\\end{array}$$"}}
+  ChainBranch{{"$$\\begin{array}{c}\\textbf{BRANCH}\\\\\\text{retained chain}\\\\\\texttt{chain\\_id}\\end{array}$$"}}
+  Rollout["$$\\begin{array}{c}\\textbf{\\texttt{rollouts/}}\\\\\\texttt{rollout\\_row\\_id}\\\\ H,\\ \\texttt{branch\\_factor},\\ \\texttt{beam\\_width}\\end{array}$$"]
+  Time{{"$$\\begin{array}{c}\\textbf{TIME}\\\\ t=0,\\ldots,H-1\\\\\\texttt{step\\_index}\\end{array}$$"}}
+  Step["$$\\begin{array}{c}\\textbf{\\texttt{steps/}}\\\\\\texttt{step\\_row\\_id}\\\\\\texttt{selected\\_candidate\\_row\\_id}\\end{array}$$"]
+  ActionSet{{"$$\\begin{array}{c}\\textbf{ACTION SET}\\\\ i=1,\\ldots,N_q\\\\\\texttt{shell\\_index}\\end{array}$$"}}
+  Candidate["$$\\begin{array}{c}\\textbf{\\texttt{candidates/}}\\\\ q_{t,i},\\ m_{t,i}\\\\ r_t^e(q_{t,i}),\\ \\rho_{t,i}\\end{array}$$"]
+  Lineage["$$\\begin{array}{c}\\textbf{\\texttt{lineage/}}\\\\\\text{config + protocol hashes}\\\\\\text{keyed by }\\texttt{rollout\\_row\\_id}\\end{array}$$"]
+  QView["$$\\begin{array}{c}\\textbf{\\texttt{q\\_h\\_view()}}\\\\\\texttt{Float/Bool}[H,N_q]\\\\\\text{derived from steps + candidates}\\end{array}$$"]
+
+  Source --> TargetBranch --> Target
+  Target --> PolicyBranch --> ChainBranch --> Rollout
+  Rollout --> Time --> Step --> ActionSet --> Candidate
+  Rollout --> Lineage
+  Step -->|"$$\\texttt{selected\\_candidate\\_row\\_id}$$"| Candidate
+  Step --> QView
+  Candidate --> QView
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Source,Target,Rollout,Step,Candidate,Lineage data;
+  class TargetBranch,PolicyBranch,ChainBranch,Time,ActionSet compute;
+  class QView output;

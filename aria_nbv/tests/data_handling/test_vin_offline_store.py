@@ -8,8 +8,8 @@ import sys
 import tarfile
 from dataclasses import asdict
 from io import BytesIO
-from pathlib import Path
 from types import MethodType, SimpleNamespace
+from typing import TYPE_CHECKING
 
 import msgspec
 import numpy as np
@@ -54,6 +54,9 @@ ARIA_POSE_T_WORLD_RIG = aria_constants.ARIA_POSE_T_WORLD_RIG
 PerspectiveCameras = pytest.importorskip(
     "pytorch3d.renderer.cameras",
 ).PerspectiveCameras
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_sample_index(path: Path, records: list[VinOfflineIndexRecord]) -> None:
@@ -225,7 +228,7 @@ def _make_source_sample(*, offset: float = 0.0) -> EfmSnippetView:
         ARIA_POSE_TIME_NS: torch.tensor([100, 200], dtype=torch.int64),
         "pose/gravity_in_world": torch.tensor([0.0, 0.0, -9.81], dtype=torch.float32),
         ARIA_OBB_PADDED: ObbTW(_make_obb_tensor(2, offset=offset).tensor().unsqueeze(0).repeat(2, 1, 1)),
-        ARIA_OBB_SEM_ID_TO_NAME: ["chair", "table"],
+        ARIA_OBB_SEM_ID_TO_NAME: {0: "chair", 1: "table", 28: "window"},
     }
     return EfmSnippetView(
         efm=efm,
@@ -268,7 +271,7 @@ def _make_stub_backbone() -> EvlBackboneOutput:
         clas_pr=torch.ones((1, 3, 2, 2, 2), dtype=torch.float32),
         cent_pr_nms=scalar_grid * 5.0,
         obb_pred_viz=ObbTW(_make_obb_tensor(2, offset=0.25).tensor().unsqueeze(0)),
-        obb_pred_sem_id_to_name=["chair", "table", "lamp"],
+        obb_pred_sem_id_to_name={0: "chair", 1: "table", 2: "lamp"},
         obb_pred_probs_full_viz=[torch.full((3,), 1.0 / 3.0, dtype=torch.float32) for _ in range(2)],
         pts_world=torch.zeros((1, 8, 3), dtype=torch.float32),
         feat2d_upsampled={"rgb": torch.ones((1, 1, 2, 2, 2), dtype=torch.float32)},
@@ -452,8 +455,8 @@ def test_flush_vin_offline_payloads_normalizes_numpy_scalars(tmp_path: Path) -> 
     offsets = np.load(tmp_path / "shard-000000" / offsets_path, allow_pickle=False)
     payload_bytes = (tmp_path / "shard-000000" / payload_path).read_bytes()
     payload = msgspec.msgpack.decode(payload_bytes[int(offsets[0]) : int(offsets[1])])
-    assert payload["obb_pred_sem_id_to_name"] == ["chair", "table"]  # noqa: S101
-    assert all(isinstance(name, str) for name in payload["obb_pred_sem_id_to_name"])  # noqa: S101
+    assert payload["obb_pred_sem_id_to_name"] == {0: "chair", 1: "table"}  # noqa: S101
+    assert all(isinstance(name, str) for name in payload["obb_pred_sem_id_to_name"].values())  # noqa: S101
 
 
 def test_vin_offline_writer_finalizes_prepared_rows_on_keyboard_interrupt(tmp_path: Path) -> None:
@@ -901,7 +904,7 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert int(first.vin_snippet.lengths[0].item()) == 2  # noqa: S101
     assert first.gt_obbs is not None  # noqa: S101
     assert first.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
-    assert first.gt_obbs.sem_id_to_name == ["chair", "table"]  # noqa: S101
+    assert first.gt_obbs.sem_id_to_name == {0: "chair", 1: "table", 28: "window"}  # noqa: S101
     assert first.detected_obbs is None  # noqa: S101
     assert first.trajectory is not None  # noqa: S101
     assert torch.equal(first.trajectory.time_ns, torch.tensor([100, 200], dtype=torch.int64))  # noqa: S101
@@ -958,7 +961,7 @@ def test_vin_offline_store_persists_detected_obbs_for_training(tmp_path: Path) -
     assert first.detected_obbs.obbs.shape == (1, 2, 34)  # noqa: S101
     assert first.detected_obbs.probs is not None  # noqa: S101
     assert first.detected_obbs.probs.shape == (2, 3)  # noqa: S101
-    assert first.detected_obbs.sem_id_to_name == ["chair", "table", "lamp"]  # noqa: S101
+    assert first.detected_obbs.sem_id_to_name == {0: "chair", 1: "table", 2: "lamp"}  # noqa: S101
 
     batch_dataset = VinOfflineDatasetConfig(
         store=store_cfg,

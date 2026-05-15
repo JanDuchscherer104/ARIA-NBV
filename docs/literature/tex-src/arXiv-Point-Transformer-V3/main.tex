@@ -1,0 +1,80 @@
+\pdfoutput=1
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage[pagenumbers]{cvpr} %
+\usepackage[accsupp]{axessibility}
+
+\input{shortcuts.tex}
+
+\def\paperID{200}
+\def\confName{CVPR}
+\def\confYear{2024}
+
+\begin{document}
+
+\title{\textcolor{blue}{P}oint \textcolor{blue}{T}ransformer \textcolor{red}{V3}: Simpler, Faster, Stronger}
+
+\author{Xiaoyang Wu\textsuperscript{\mdseries1,2} \authorskip 
+Li Jiang\textsuperscript{3} \authorskip
+Peng-Shuai Wang\textsuperscript{\mdseries4} \\ 
+Zhijian Liu\textsuperscript{\mdseries5} \authorskip
+Xihui Liu\textsuperscript{1} \authorskip
+Yu Qiao\textsuperscript{2} \authorskip
+Wanli Ouyang\textsuperscript{2} \authorskip
+Tong He\textsuperscript{2*} \authorskip 
+Hengshuang Zhao\textsuperscript{1*}
+ \\ \\
+\textsuperscript{1}HKU \institutionskip
+\textsuperscript{2}SH AI Lab \institutionskip
+\textsuperscript{3}CUHK(SZ) \institutionskip
+\textsuperscript{4}PKU \institutionskip
+\textsuperscript{5}MIT \\ 
+{\tt\small \url{https://github.com/Pointcept/PointTransformerV3}}
+}
+
+\twocolumn[{%
+\renewcommand\twocolumn[1][]{#1}%
+\vspace{-12mm}
+\maketitle
+\vspace{-10mm}
+\begin{center}
+    \captionsetup{type=figure}
+    \includegraphics[width=\linewidth]{figure/teaser.pdf}
+    \vspace{-4mm}
+    \captionof{figure}{\textbf{Overview of Point Transformer V3 (PTv3).} Compared to its predecessor, PTv2~\cite{wu2022point}, our PTv3 shows superiority in the following aspects: 1. \textit{Stronger performance.}  PTv3 achieves state-of-the-art results across a variety of indoor and outdoor 3D perception tasks. 2. \textit{Wider receptive field.} Benefit from the simplicity and efficiency, PTv3 expands the receptive field from 16 to 1024 points. 3. \textit{Faster speed.} PTv3 significantly increases processing speed, making it suitable for latency-sensitive applications. 4. \textit{Lower Memory Consumption.} PTv3 reduces memory usage, enhancing accessibility for broader situations.}\label{fig:teaser}
+\end{center}%
+}]
+\begin{abstract}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\footnotetext[1]{Corresponding author.}
+\vspace{-2.5mm}
+  \input{./section/0_abstract}
+\vspace{-4.5mm}
+\end{abstract}
+
+\input{./section/1_introduction}
+
+\input{./section/2_related}
+
+\input{./section/3_method}
+
+\input{./section/4_experiments}
+
+\input{./section/5_conclusion}
+
+\vspace{-2mm}
+\section*{Acknowledgements}
+\vspace{-2mm}
+This work is supported in part by the National Natural Science Foundation of China (NO. 622014840), the National Key R\&D Program of China (NO. 2022ZD0160101), HKU Startup Fund, and HKU Seed Fund for Basic Research.
+
+\appendix
+\section*{Appendix}
+\input{./section/6_appendix}
+
+{
+\small
+\bibliographystyle{ieeenat_fullname}
+\bibliography{main}
+}
+
+\end{document}

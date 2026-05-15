@@ -1,0 +1,21 @@
+\section{Related Work}
+
+The 4D spatio-temporal perception fundamentally requires 3D perception as a slice of 4D along the temporal dimension is a 3D scan. However, as there are no previous works on 4D perception using neural networks, we will primarily cover 3D perception, specifically 3D segmentation using neural networks. We categorized all previous works in 3D as either (a) 3D-convolutional neural networks or (b) neural networks without 3D convolutions. Finally, we cover early 4D perception methods. Although 2D videos are spatio-temporal data, we will not cover them in this paper as 3D perception requires radically different data processing, implementation, and architectures.
+
+\textbf{3D-convolutional neural networks.}
+The first branch of 3D-convolutional neural networks uses a rectangular grid and a dense representation \cite{segcloud, scannet} where the empty space is represented either as $\mathbf{0}$ or the signed distance function. This straightforward representation is intuitive and is supported by all major public neural network libraries. However, as the most space in 3D scans is empty, it suffers from high memory consumption and slow computation. To resolve this, OctNet~\cite{octnet} proposed to use the Octree structure to represent 3D space and convolution on it.
+
+The second branch is sparse 3D-convolutional neural networks~\cite{splatnet, sparse3dcnn}. There are two quantization methods used for high dimensions: a rectangular grid and a permutohedral lattice~\cite{permutohedral}. \cite{splatnet} used a permutohedral lattice whereas \cite{sparse3dcnn} used a rectangular grid for 3D classification and semantic segmentation.
+
+The last branch is 3D pseudo-continuous convolutional neural networks~\cite{montecarlo, pointcnn}. Unlike the previous works, they define convolutions using continuous kernels in a continuous space. However, finding neighbors in a continuous space is expensive, as it requires KD-tree search rather than a hash table, and are susceptible to uneven distribution of point clouds.
+
+
+\textbf{Neural networks without 3D convolutions.}
+Recently, we saw a tremendous increase in neural networks without 3D convolutions for 3D perception. Since 3D scans consist of thin observable surfaces, \cite{surface, tangent} proposed to use 2D convolutions on the surface for semantic segmentation.
+
+Another direction is PointNet-based methods~\cite{pointnet, pointnetpp}. PointNets use a set of input coordinates as features for a multi-layer perceptron. However, this approach processes a limited number of points and thus a sliding window for cropping out a section from an input was used for large spaces making the receptive field size rather limited. \cite{superpoint} tried to resolve such shortcomings with a recurrent network on top of multiple pointnets, and \cite{pointcnn} proposed a variant of 3D continuous convolution for lower layers of a PointNet and got a significant performance boost.
+
+\textbf{4D perception.}
+The first 4D perception algorithm~\cite{4dseg95} proposed a dynamic deformable balloon model for 4D cardiac image analysis. Later, \cite{4dmrf} used a 4D Markov Random Fields for cardiac segmentation. Recently, a "Spatio-Temporal CNN"~\cite{stcnn} combined a 3D-UNet with a 1D-AutoEncoder for temporal data and applied the model for auto-encoding brain fMRI images, but it is not a 4D-convolutional neural network.
+
+In this paper, we propose the first high-dimensional convolutional neural networks for 4D spatio-temporal data, or 3D videos and the 7D space-time-chroma space. Compared with other approaches that combine temporal data with a recurrent neural network or a shallow model (CRF), our networks use a homogeneous representation and convolutions consistently throughout the networks. Instead of using an RNN, we use convolution for the temporal axis since it is proven to be more effective in sequence modeling~\cite{bai2018empirical}.

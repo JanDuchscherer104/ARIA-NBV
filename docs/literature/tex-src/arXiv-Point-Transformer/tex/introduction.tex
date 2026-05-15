@@ -1,0 +1,26 @@
+3D data arises in many application areas such as autonomous driving, augmented reality, and robotics. Unlike images, which are arranged on regular pixel grids, 3D point clouds are sets embedded in continuous space. This makes 3D point clouds structurally different from images and precludes immediate application of deep network designs that have become standard in computer vision, such as networks based on the discrete convolution operator.
+
+A variety of approaches to deep learning on 3D point clouds have arisen in response to this challenge. Some voxelize the 3D space to enable the application of 3D discrete convolutions~\cite{maturana2015voxnet,song2016ssc}. This induces massive computational and memory costs and underutilizes the sparsity of point sets in 3D. Sparse convolutional networks relieve these limitations by operating only on voxels that are not empty~\cite{graham20183d,choy20194d}.
+Other designs operate directly on points and propagate information via pooling operators~\cite{qi2017pointnet,qi2017pointnet2} or continuous convolutions~\cite{wang2018pccn,thomas2019kpconv}. Another family of approaches connect the point set into a graph for message passing~\cite{wang2019dgcnn,li2019deepgcns}.
+
+\begin{figure}
+	\begin{center}
+		\includegraphics[width=0.99\linewidth]{figure/teaser.pdf}
+	\end{center}
+	\caption{The Point Transformer can serve as the backbone for various 3D point cloud understanding tasks such as object classification, object part segmentation, and semantic scene segmentation.}
+	\label{fig:application}
+\end{figure}
+
+In this work, we develop an approach to deep learning on point clouds that is inspired by the success of transformers in natural language processing~\cite{vaswani2017attention,wu2019pay,Devlin2018,dai2019transformer,Yang2019xlnet} and image analysis~\cite{hu2019local,ramachandran2019stand,zhao2020san}. The transformer family of models is particularly appropriate for point cloud processing because the self-attention operator, which is at the core of transformer networks, is in essence a set operator: it is invariant to permutation and cardinality of the input elements. The application of self-attention to 3D point clouds is therefore quite natural, since point clouds are essentially sets embedded in 3D space.
+
+We flesh out this intuition and develop a self-attention layer for 3D point cloud processing. Based on this layer, we construct Point Transformer networks for a variety of 3D understanding tasks. We investigate the form of the self-attention operator, the application of self-attention to local neighborhoods around each point, and the encoding of positional information in the network. The resulting networks are based purely on self-attention and pointwise operations.
+
+We show that Point Transformers are remarkably effective in 3D deep learning tasks, both at the level of detailed object analysis and large-scale parsing of massive scenes. In particular, Point Transformers set the new state of the art on large-scale semantic segmentation on the S3DIS dataset (70.4\% mIoU on Area 5), shape classification on ModelNet40 (93.7\% overall accuracy), and object part segmentation on ShapeNetPart (86.6\% instance mIoU). Our full implementation and trained models will be released upon acceptance. In summary, our main contributions include the following.
+\begin{itemize}[itemsep=0mm, topsep=2mm]
+	\item
+	We design a highly expressive Point Transformer layer for point cloud processing. The layer is invariant to permutation and cardinality and is thus inherently suited to point cloud processing.
+	\item
+	Based on the Point Transformer layer, we construct high-performing Point Transformer networks for classification and dense prediction on point clouds. These networks can serve as general backbones for 3D scene understanding.
+	\item
+	We report extensive experiments over multiple domains and datasets. We conduct controlled studies to examine specific choices in the Point Transformer design and set the new state of the art on multiple highly competitive benchmarks, outperforming long lines of prior work.
+\end{itemize}

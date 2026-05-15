@@ -1,0 +1,1460 @@
+\documentclass{article}
+
+\usepackage{alex}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks = true,
+    linkcolor = blue,
+    linkbordercolor = {white},
+    citecolor=blue,
+}
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+\PassOptionsToPackage{numbers,compress,sort}{natbib}
+\usepackage[final]{nips_2017}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}   
+\usepackage{hyperref}      
+\usepackage{url}           
+\usepackage{booktabs}      
+\usepackage{amsfonts}      
+\usepackage{nicefrac}      
+\usepackage{microtype}     
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{xspace}
+\usepackage{backref}
+
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+\renewcommand{\baselinestretch}{0.95}
+\frenchspacing
+
+\def\algocmt#1{ \hfill \texttt{/\!\!/} {\it #1} }
+
+\newcommand{\compactparagraph}[1]{\vspace*{-10pt}\paragraph{#1}}
+\newcommand{\refsec}[1]{Sec.~\ref{#1}}
+\newcommand{\refapp}[1]{Appendix ~\ref{#1}}
+\newcommand{\reffig}[1]{Fig.~\ref{#1}}
+\newcommand{\reftab}[1]{Tab.~\ref{#1}}
+\newcommand{\refthm}[1]{Theorem \ref{#1}}	
+\newcommand{\xx}[0]{\ensuremath{\mathbf{x}}}
+\newcommand{\ff}[0]{\ensuremath{\mathbf{f}}}
+
+\newcommand{\extra}[1]{\textcolor{OliveGreen}{#1}}
+\newcommand{\wrong}[1]{\textcolor{red}{#1}}
+\newcommand{\correct}[1]{\textcolor{brown}{#1}}
+
+\newcommand{\latinphrase}[1]{\emph{#1}}    %
+\newcommand{\etal}{\latinphrase{et~al.}\xspace}
+\newcommand{\ie}{\latinphrase{i.e.}\xspace}
+\newcommand{\eg}{\latinphrase{e.g.}\xspace}
+\newcommand{\etc}{\latinphrase{etc}\xspace}
+
+\newcommand{\aka}[0]{a.k.a.~}
+\newcommand{\wrt}{w.r.t.~}
+
+\newcommand{\yy}[0]{\ensuremath{\mathbf{y}}}
+\newcommand{\dd}[0]{\ensuremath{\mathrm{d}}}
+\newcommand{\domain}[0]{\ensuremath{\mathrm{Dom}}}
+\newcommand{\thetas}[0]{\ensuremath{\boldsymbol{\theta}}}
+\newcommand{\phis}[0]{\ensuremath{\boldsymbol{\phi}}}
+\newcommand{\deepsets}{DeepSets\xspace}
+
+\usepackage{url}           
+\usepackage{booktabs}      
+\usepackage{amsfonts}      
+\usepackage{nicefrac}      
+\usepackage{microtype}     
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+\usepackage{xspace}
+
+\usepackage{enumitem}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{flushend}
+
+\title{Deep Sets}
+
+\author{
+Manzil Zaheer$^{1,2}$, 
+Satwik Kottur$^1$, 
+Siamak Ravanbhakhsh$^1$,\\
+\textbf{Barnab\'as  P\'oczos$^1$,
+Ruslan Salakhutdinov$^1$,
+Alexander J Smola$^{1,2}$}\\
+$^1$ Carnegie Mellon University \qquad $^2$ Amazon Web Services\\
+\texttt{\{manzilz,skottur,mravanba,bapoczos,rsalakhu,smola\}@cs.cmu.edu}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We study the problem of designing models for machine learning tasks defined on \emph{sets}.
+In contrast to traditional approach of operating on fixed dimensional vectors, we consider objective functions defined on sets that are invariant to permutations.
+Such problems are widespread, ranging from estimation of population statistics \cite{poczos13aistats}, to anomaly detection in piezometer data of embankment dams \cite{Jung15Exploration}, to cosmology \cite{Ntampaka16Dynamical,Ravanbakhsh16ICML1}.
+Our main theorem characterizes the permutation invariant functions and provides a family of functions to which any permutation invariant objective function must belong. This family of functions has a special structure which enables us to design a deep network architecture that can operate on sets and which can be deployed on a variety of scenarios including both unsupervised and supervised learning tasks. We also derive the necessary and sufficient conditions for permutation equivariance in deep models. We demonstrate the applicability of our method on population statistic estimation, point cloud classification, set expansion, and outlier detection.
+\end{abstract}
+
+\vspace{-5mm}
+\section{Introduction}
+\label{sec:introduction}
+
+A typical machine learning algorithm, like regression or classification, is designed for fixed dimensional data instances.
+Their extensions to handle the case when the inputs or outputs are permutation invariant sets rather than fixed dimensional vectors is not trivial and researchers have only recently started to investigate them  \cite{oliva13ICML,szabo16JMLR,muandet13ICML,muandet12NIPS}.
+In this paper, we present a generic framework to deal with the setting where input and possibly output instances in a machine learning task are sets.
+
+Similar to fixed dimensional data instances, we can characterize two learning paradigms in case of sets.
+In \textbf{supervised learning}, we have an output label for a set that is invariant or equivariant to the permutation of set elements. Examples include tasks like estimation of population statistics \cite{poczos13aistats}, where applications range from giga-scale cosmology \cite{Ntampaka16Dynamical,Ravanbakhsh16ICML1} to nano-scale quantum chemistry \cite{PhysRevLett.117.135502}.
+
+Next, there can be the \textbf{unsupervised setting}, where the ``set'' structure needs to be learned, \eg by leveraging the homophily/heterophily tendencies within sets.
+An example is the task of set expansion (\aka audience expansion), where given a set of objects that are similar to each other (\eg set of words \{\textit{lion, tiger, leopard}\}), our goal is to find new objects from a large pool of candidates such that the selected new objects are similar to the query set (\eg find words like \textit{jaguar} or \textit{cheetah} among all English words). 
+This is a standard problem in similarity search and metric learning, and a typical application is to find new image tags given a small set of possible tags. Likewise, in the field of computational advertisement, given a set of high-value customers, the goal would be to find similar people. This is an important problem in many scientific applications, \eg given a small set of interesting celestial objects, astrophysicists might want to find similar ones in large sky surveys.
+ 
+\paragraph{Main contributions.}
+In this paper, (i) we propose a fundamental architecture, \textit{\deepsets}, to deal with sets as inputs and show that the properties of this architecture are both necessary and sufficient (\refsec{sec:function-property}). (ii) We extend this architecture to allow for conditioning on arbitrary objects, and (iii) based on this architecture we develop a \emph{deep network} that can operate on sets with possibly different sizes (\refsec{sec:deep-bs}).
+We show that a simple parameter-sharing scheme enables a general treatment of sets within supervised and semi-supervised settings. 
+(iv) Finally, we demonstrate the wide applicability of our framework through experiments on diverse problems (\refsec{sec:experiments}).
+
+
+\section{Permutation Invariance and Equivariance}
+\label{sec:function-property}
+\subsection{Problem Definition} 
+A function $f$ transforms its domain $\mathcal{X}$ into its range $\mathcal{Y}$. Usually, the input domain is a vector space $\mathbb{R}^d$ and the output response range is either a discrete space, e.g. $\{0,1\}$ in case of classification, or a continuous space $\mathbb{R}$ in case of regression. Now, if the input is a set $X=\{x_1,\ldots,x_M\}, x_m\in \mathfrak{X}$, \ie, the input domain is the power set $\mathcal{X}=2^\mathfrak{X}$, then we would like the response of the function to be ``indifferent''  to the ordering of the elements.  In other words,
+\vspace{-3mm}
+\begin{property}\label{prop:invariant}
+A function $f:2^\mathfrak{X}\to\mathcal{Y}$ acting on sets must be permutation \textbf{invariant} to the order of objects in the set, \ie for any permutation $\pi: f(\{x_1,\ldots,x_M\}) = f(\{x_{\pi(1)},\ldots,x_{\pi(M)}\}) $.
+\end{property}
+\vspace{-4mm}
+In the supervised setting, given $N$ examples of of $X^{(1)},. . . ,X^{(N)}$ as well as their labels $y^{(1)},...,y^{(N)}$, the task would be to classify/regress (with variable number of predictors) while being permutation invariant w.r.t. predictors. Under unsupervised setting, the task would be to assign high scores to valid sets and low scores to improbable sets. 
+These scores can then be used for set expansion tasks, such as image tagging or audience expansion in field of computational advertisement.
+In \textit{transductive} setting, each instance $x_{m}^{(n)}$ has an associated labeled $y_{m}^{(n)}$. Then, the objective would be instead to learn a permutation \textbf{equivariant} function $\ff: \mathfrak{X}^{M} \to \mathcal{Y}^{M}$ that upon permutation of the input instances permutes the output labels, \ie  for any permutation $\pi$:
+\begin{equation}
+\vspace{-1mm}
+\ff([x_{\pi(1)},\ldots, x_{\pi(M)}]) = [f_{\pi(1)}(\xx), \ldots, f_{\pi(M)}(\xx)]
+\label{prop:equivariant}
+\end{equation}
+\vspace{-3mm}
+
+\subsection{Structure}
+We want to study the structure of functions on sets.
+Their study in total generality is extremely difficult, so we analyze case-by-case. We begin by analyzing the \textbf{invariant} case when $\mathfrak{X}$ is a countable set and $\mathcal{Y} = \mathbb{R}$, where the next theorem characterizes its structure.
+
+\begin{theorem}\label{thm:universal}
+\vspace{-3mm}
+A function $f(X)$ operating on a set $X$ having elements from a countable universe, is a valid set function, \ie, \textbf{invariant} to the permutation of instances in $X$, iff it can be decomposed in the form $\rho \left( \sum_{x\in X} \phi(x) \right)$, for suitable transformations $\phi$ and $\rho$.
+\end{theorem}
+\vspace{-3mm}
+
+The extension to case when $\mathfrak{X}$ is uncountable, like $\mathfrak{X}=\mathbb{R}$, we could only prove that $f(X) = \rho \left( \sum_{x\in X} \phi(x) \right)$ holds for sets of fixed size.
+The proofs and difficulties in handling the uncountable case, are discussed in \refapp{app:proofs}. However, we still conjecture that exact equality holds in general.
+
+Next, we analyze the \textbf{equivariant} case when $\mathfrak{X}=\mathcal{Y}=\mathbb{R}$ and $\ff$ is restricted to be a neural network layer. The standard neural network layer is represented as $\ff_{\Theta}(\xx) = \boldsymbol{\sigma}( \Theta \xx)$ 
+where $\Theta \in \mathbb{R}^{M \times M}$ is the weight vector and $\sigma: \mathbb{R} \to \mathbb{R}$ is a nonlinearity such as sigmoid function. The following lemma states the necessary and sufficient conditions for permutation-equivariance in this type of function. 
+\begin{lemma}\label{lemma:equivariant}
+\vspace{-3mm}
+The function $\ff_{\Theta}: \mathbb{R}^{M} \to \mathbb{R}^{M}$ defined above is permutation \textbf{equivariant} iff all the off-diagonal elements of $\Theta$ are tied together and all the diagonal elements are equal as well. That is,
+\vspace{-3mm}
+\begin{align}
+\vspace{-3mm}
+ \Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})\quad\quad {\lambda},{\gamma} \in \mathbb{R} \quad \mathbf{1} = [1,\ldots,1]^{\mathsf{T}} \in \mathbb{R}^M \quad\quad \mathbf{I}\in\mathbb{R}^{M\times M} \text{is the identity matrix}
+ \nonumber
+\end{align}
+\end{lemma}
+\vspace{-3mm}
+This result can be easily extended to higher dimensions, \ie,  $\mathfrak{X}=\mathbb{R}^d$ when $\lambda, \gamma$ can be matrices.
+
+
+\subsection{Related Results}\label{sec:rel-res}
+The general form of \refthm{thm:universal} is closely related with important results in different domains. Here, we quickly review some of these connections.
+\paragraph{de Finetti theorem.}
+A related concept is that of an exchangeable model in Bayesian statistics, It is backed by deFinetti's theorem which states that any exchangeable model can be factored as
+\begin{equation}
+  \label{eq:definetti}
+  p(X|\alpha, M_0) = \int \mathrm{d}\theta \sbr{\prod_{m=1}^M p(x_m|\theta)} p(\theta|\alpha, M_0), 
+\end{equation}
+where $\theta$ is some latent feature and $\alpha, M_0$ are the hyper-parameters of the prior. To see that this fits into our result, let us consider exponential families with conjugate priors, where we can analytically calculate the integral of \eqref{eq:definetti}. In this special case $p(x|\theta) = \exp\rbr{\inner{\phi(x)}{\theta} - g(\theta)}$ and $p(\theta|\alpha, M_0) = \exp\rbr{\inner{\theta}{\alpha} - M_0
+  g(\theta)- h(\alpha, M_0)}$.
+Now if we marginalize out $\theta$, we get a form which looks exactly like the one in \refthm{thm:universal}
+\begin{equation}
+  p(X|\alpha, M_0) = \exp\left( h\rbr{\alpha + \sum_{m} \phi(x_m), M_0 + M} - h(\alpha,
+  M_0)\right).
+\end{equation}
+
+\paragraph{Representer theorem and kernel machines.}
+Support distribution machines use $f(p) = \sum_i \alpha_i y_i K(p_i,p) + b$ as the prediction function \cite{muandet12NIPS,poczos12SDM},
+where $p_i,p$ are distributions and $\alpha_i,b \in \mathbb{R}$. 
+In practice, the $p_i,p$ distributions are never given to us explicitly, usually only i.i.d. sample sets are available from these distributions, and therefore we need to estimate kernel $K(p,q)$ using these samples. A popular approach is to use $\hat K(p,q)=\frac{1}{MM'} \sum_{i,j} k(x_i,y_j)$, where $k$ is another kernel operating on the samples $\{x_i\}_{i=1}^M\sim p$ and $\{y_j\}_{j=1}^{M'}\sim q$. Now, these prediction functions can be seen fitting into the structure of our Theorem.
+
+\paragraph{Spectral methods.} 
+A consequence of the polynomial decomposition is that spectral methods \cite{AnaGeHsuKakTel12} can be viewed as a special case of the mapping $\rho \circ \phi(X)$: in that case one can compute polynomials, usually only up to a relatively low degree (such as $k=3$), to perform inference about statistical properties of the distribution. The statistics are exchangeable in the data, hence they could be represented by the above map.
+
+
+\section{Deep Sets}
+\label{sec:deep-bs}
+\subsection{Architecture}
+\textbf{Invariant model.} The structure of permutation invariant functions in \refthm{thm:universal} hints at a general strategy for inference over sets of objects, which we call \deepsets. Replacing $\phi$ and $\rho$ by universal approximators leaves matters unchanged, since, in particular, $\phi$ and $\rho$ can be used to approximate arbitrary polynomials. Then, it remains to learn these approximators, yielding in the following model:
+\vspace{-6mm}
+\begin{itemize}[leftmargin=3mm, itemsep=0mm,partopsep=0pt,parsep=0pt]
+\item Each instance $x_m$ is transformed (possibly by several layers) into some representation $\phi(x_m)$.
+\item The representations $\phi(x_m)$ are added up and the output is processed using the $\rho$ network in the same manner as in any deep network (\eg  fully connected layers, nonlinearities, \etc.). 
+\item Optionally: If we have additional meta-information $z$, then the above mentioned networks could be conditioned to obtain the conditioning mapping $\phi(x_m|z)$. 
+\end{itemize}
+\vspace{-3mm}
+In other words, the key is to add up all representations and then apply nonlinear transformations. 
+
+\textbf{Equivariant model.}
+Our goal is to design neural network layers that are equivariant to the permutations of elements in the input $\xx$. Based on Lemma~\ref{lemma:equivariant}, a neural network layer $\ff_\Theta(\xx)$ is permutation equivariant if and only if all the off-diagonal elements of $\Theta$ are tied together and all the diagonal elements are equal as well, \ie,
+$ \Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})$ for ${\lambda},{\gamma} \in \mathbb{R}$.
+This function is simply a non-linearity applied to a weighted combination of (i) its input $ \mathbf{I} \xx$ and; (ii) the sum of input values $(\mathbf{1} \mathbf{1}^{\mathsf{T}}) \xx$. Since summation does not depend on the permutation, the layer is permutation-equivariant. We can further manipulate the operations and parameters in this layer to get other \textbf{variations}, \eg:
+\begin{equation}
+  \label{eq:3}
+ \ff(\xx) \doteq \boldsymbol{\sigma}\left(\lambda \mathbf{I} \xx + \gamma\; \textrm{maxpool}({\xx}) \mathbf{1} \right).
+\end{equation}
+where the maxpooling operation over elements of the set (similar to sum) is commutative. 
+In practice, this variation performs better in some applications. This may be due to the fact that for $\lambda = \gamma$, the input to the non-linearity is max-normalized. Since composition of permutation equivariant functions is also permutation equivariant, we can build \deepsets by stacking such layers.
+
+\subsection{Other Related Works}\label{sec:related}
+Several recent works study equivariance and invariance in deep networks w.r.t. general group of transformations~\cite{gens2014deep,cohen2016group,ravanbakhsh_symmetry}.
+For example, \cite{chen2014unsupervised} construct deep permutation invariant features by 
+pairwise coupling of features at the previous layer, where $f_{i,j}([x_i, x_j]) \doteq [|x_i - x_j|, x_i+x_j]$ 
+is invariant to transposition of $i$ and $j$. Pairwise interactions within sets have also been studied in \cite{chang2016compositional,guttenberg2016permutation}.
+\cite{vinyals2015order} approach unordered instances by finding ``good'' orderings.
+
+The idea of pooling a function across set-members is not new. In \cite{lopez2016discovering}, pooling was used binary classification
+task for causality on a set of samples. \cite{shi2015deeppano} use pooling across a panoramic projection of 3D object for classification, while \cite{su2015multi} perform pooling across multiple views.
+\cite{hartford2016deep} observe the invariance of the payoff matrix in normal form games to the permutation of its rows and columns (\ie player actions) and leverage pooling to predict the player action. The need of permutation equivariance also arise in deep learning over sensor networks and multi-agent setings, where a special case of Lemma~\ref{lemma:equivariant} has been used as the architecture  \cite{sukhbaatar2016learning}.
+
+In light of these related works, we would like to emphasize our novel contributions: (i) the universality result of \refthm{thm:universal} for permutation invariance that also relates \deepsets to other machine learning techniques, see \refsec{sec:deep-bs}; (ii) the permutation equivariant layer of \eqref{eq:3}, which, according to Lemma~\ref{lemma:equivariant} identifies necessary and sufficient form of parameter-sharing in a standard neural layer and; (iii) novel application settings that we study next. 
+
+\section{Applications and Empirical Results}
+\label{sec:experiments}
+\vspace{-1mm}
+We present a diverse set of applications for \deepsets.
+For the supervised setting, we apply \deepsets to estimation of population statistics, sum of digits and classification of point-clouds, and regression with clustering side-information.
+The permutation-equivariant variation of \deepsets is applied to the task of outlier detection.
+Finally, we investigate the application of \deepsets to unsupervised set-expansion, in particular, concept-set retrieval and image tagging.
+In most cases we compare our approach with the state-of-the art and report competitive results.
+
+\subsection{Set Input Scalar Response}
+\subsubsection{Supervised Learning: Learning to Estimate Population Statistics}
+\label{sec:pop-stat}
+\begin{figure}[t]
+\centering
+    \begin{subfigure}[b]{0.23\textwidth}
+    \captionsetup{width=0.8\textwidth}
+    \captionsetup{format=hang}
+        \includegraphics[width=0.93\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/entropy_rotation.png}
+        \includegraphics[width=0.96\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/entropy_rotation_n.png}
+        \caption{\scriptsize Entropy estimation for rotated of 2d Gaussian}
+        \label{fig:rotation}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.23\textwidth}
+    \captionsetup{width=0.8\textwidth}
+    \captionsetup{format=hang}
+        \includegraphics[width=0.93\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_corr.png}
+        \includegraphics[width=0.96\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_corr_n.png}
+        \caption{\scriptsize Mutual information estimation by varying correlation}
+        \label{fig:rank}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.23\textwidth}
+    \captionsetup{width=0.8\textwidth}
+    \captionsetup{format=hang}
+        \includegraphics[width=0.93\textwidth, height=0.665\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_rank1.png}
+        \includegraphics[width=0.96\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_rank1_n.png}
+        \caption{\scriptsize Mutual information estimation by varying rank-1 strength}
+        \label{fig:entropy}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.23\textwidth}
+    \captionsetup{width=0.8\textwidth}
+    \captionsetup{format=hang}
+        \includegraphics[width=0.93\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_32dGaussian.png}
+        \includegraphics[width=0.96\textwidth, trim={3mm 3mm 3mm 3mm},clip]{figures/mutinfo_32dGaussian_n.png}
+        \caption{\scriptsize Mutual information on 32d random covariance matrices}
+        \label{fig:mutual}
+    \end{subfigure}
+    \vspace{-1mm}
+    \caption{\small Population statistic estimation: Top set of figures, show prediction of \deepsets vs SDM for $N=2^{10}$ case. Bottom set of figures, depict the mean squared error behavior as number of sets is increased. SDM has lower error for small $N$ and \deepsets requires more data to reach similar accuracy. But for high dimensional problems \deepsets easily \emph{scales} to large number of examples and produces much \emph{lower} estimation error. Note that the $N \times N$ matrix inversion in SDM makes it prohibitively expensive for $N > 2^{14}=16384$.}
+\label{fig:pop-est}
+\vspace{-5mm}
+\end{figure}
+
+In the first experiment, we learn entropy and mutual information of Gaussian distributions, without providing any information about Gaussianity to \deepsets. The Gaussians are generated as follows:
+\vspace{-2.5mm}
+\begin{itemize}[leftmargin=3mm, itemsep=0.7mm,partopsep=0mm,parsep=0mm]
+\item Rotation: We randomly chose a $2 \times 2$ covariance matrix $\Sigma$, and then generated $N$ sample sets from $\mathcal{N}(0, R(\alpha)\Sigma R(\alpha)^T)$ of size $M=[300-500]$ for $N$ random values of $\alpha \in [0,\pi]$. Our goal was to learn the entropy of the marginal distribution of first dimension. $R(\alpha)$ is the rotation matrix.
+\item Correlation: We randomly chose a $d \times d$ covariance matrix $\Sigma$ for $d=16$, and then generated $N$ sample sets from $\mathcal{N}(0, [\Sigma, \alpha\Sigma; \alpha\Sigma, \Sigma] )$ of size $M=[300-500]$ for $N$ random values of $\alpha \in (-1, 1)$. Goal was to learn the mutual information of among the first $d$ and last $d$ dimension.
+\item Rank 1: We randomly chose $v\in\mathbb{R}^{32}$ and then generated a sample sets from $\mathcal{N}(0, I + \lambda vv^T)$ of size $M=[300-500]$ for $N$ random values of $\lambda\in (0,1)$. Goal was to learn the  mutual information.
+\item Random: We chose $N$ random $d \times d$ covariance matrices $\Sigma$ for $d=32$, and using each, generated a sample set from $\mathcal{N}(0, \Sigma)$ of size $M=[300-500]$. Goal was to learn the  mutual information.
+\end{itemize}
+\vspace{-2.5mm}
+We train using $L_2$ loss with a \deepsets architecture having 3 fully connected layers with ReLU activation for both transformations $\phi$ and $\rho$.
+We compare against Support Distribution Machines (SDM) using a RBF kernel \cite{poczos12SDM}, and analyze the results in \reffig{fig:pop-est}.
+
+\vspace{-1mm}
+\subsubsection{Sum of Digits}
+\label{sec:digit-sum}
+\vspace{-1mm}
+\begin{wrapfigure}{r}{0.5\textwidth}
+\vspace{-5mm}
+    \centering
+    \begin{subfigure}[b]{0.24\textwidth}
+        \includegraphics[trim={0cm 3mm 0cm 0},clip, height=0.7\textwidth, width=\textwidth]{figures/text_digit_add_acc.png}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.24\textwidth}
+            \includegraphics[trim={0cm 3mm 0cm 0},clip, height=0.7\textwidth, width=\textwidth]{figures/image_digit_add_acc.png}
+    \end{subfigure}
+    \vspace{-2mm}
+    \caption{\small Accuracy of digit summation with text (\emph{left}) and image (\emph{right}) inputs.
+    All approaches are trained on tasks of length 10 at most, tested on examples of length up to 100.
+    We see that \deepsets generalizes better.}
+    \label{fig:digit-sum}
+    \vspace{-8mm}
+\end{wrapfigure}
+Next, we compare to what happens if our set data is treated as a sequence. We consider the task of finding sum of a given set of digits. We consider two variants of this experiment:
+
+\compactparagraph{Text.}
+We randomly sample a subset of maximum $M=10$ digits from this dataset to build $100k$ ``sets'' of training images, where the set-label is sum of digits in that set. We test against sums of $M$ digits, for $M$ starting from 5 all the way up to 100 over another $100k$ examples.
+
+\compactparagraph{Image.} 
+MNIST8m \cite{loosli-canu-bottou-2006} contains 8 million instances of $28\times 28$ grey-scale stamps of digits in $\{0, \ldots , 9\}$. We randomly sample a subset of maximum $M=10$ images from this dataset to build $N=100k$ ``sets'' of training and $100k$ sets of test images, where the set-label is the sum of digits in that set (\ie individual labels per image is unavailable). We test against sums of $M$ images of MNIST digits, for $M$ starting from 5 all the way up to 50.
+
+We compare against recurrent neural networks -- LSTM and GRU. All models are defined to have similar number of layers and parameters. The output of all models is a scalar, predicting the sum of $N$ digits. Training is done on tasks of length 10 at most, while at test time we use examples of length up to 100. The accuracy, \ie exact equality after rounding, is shown in \reffig{fig:digit-sum}. \deepsets generalize much better. Note for image case, the best classification error for single digit is around $p=0.01$ for MNIST8m, so in a collection of $N$ of images at least one image will be misclassified is $1-(1-p)^N$, which is 40\% for $N=50$. This matches closely with observed value in \reffig{fig:digit-sum}(b).
+
+\subsubsection{Point Cloud Classification}\label{sec:pointcloud}
+\begin{wraptable}{r}{0.5\textwidth}
+\vspace{-4mm}
+\small
+\scalebox{.78}{
+ \begin{tabular}{m{20mm} | m{15mm} m{25mm} l} 
+ \toprule
+ Model & Instance Size &  Representation & Accuracy \\
+ \midrule
+  3DShapeNets \cite{wu20153d} & $30^3$ &  voxels (using convolutional deep belief net) &$77\%$ \\ 
+  VoxNet \cite{maturana2015voxnet} & $32^3$ &  voxels  (voxels from point-cloud + 3D CNN)  &$83.10\%$ \\ 
+  MVCNN \cite{su2015multi} & $164 \times 164 \times 12$ &  multi-vew images  (2D CNN + view-pooling)  &$90.1\%$ \\
+  VRN Ensemble \cite{brock2016generative} & $32^3$ &  voxels  (3D CNN, variational autoencoder)  &$95.54\%$ \\
+  3D GAN \cite{wu2016learning} & $64^3$ &  voxels  (3D CNN, generative adversarial training)  &$83.3\%$ \\ 
+  \deepsets & \textbf{$\mathbf{5000 \times 3}$} &  point-cloud  &$90 \pm .3 \%$ \\
+  {\deepsets} & \textbf{$\mathbf{100 \times 3}$} &  point-cloud  &$82 \pm 2 \%$ \\
+\bottomrule
+\end{tabular}
+}
+\caption{\small Classification accuracy and the representation-size used by different methods on the ModelNet40.}\label{table:point_cloud}
+\vspace{-2mm}
+\end{wraptable}
+A point-cloud is a set of low-dimensional vectors. This type of data is frequently encountered in various applications like robotics, vision, and cosmology.
+In these applications, existing methods often convert the point-cloud data to voxel or mesh representation as a preprocessing step, \eg~\cite{maturana2015voxnet,ravanbakhshestimating,lin2004mesh}. Since the output of many range sensors, such as LiDAR, is in the form of point-cloud, direct application of deep learning methods to point-cloud is highly desirable. Moreover, it is easy and cheaper to apply transformations, such as rotation and translation, when working with point-clouds than voxelized 3D objects.
+
+As point-cloud data is just a set of points, we can use \deepsets to classify point-cloud representation of a subset of ShapeNet objects~\cite{chang2015shapenet}, called ModelNet40~\cite{wu20153d}. This subset consists of 3D representation of 9,843 training and 2,468 test instances belonging to 40 classes of objects. We produce point-clouds with  100, 1000 and 5000 particles each ($x,y,z$-coordinates) from the mesh representation of objects using the point-cloud-library's sampling routine~\cite{Rusu_ICRA2011_PCL}. Each set is normalized by the initial layer of the deep network to have zero mean (along individual axes) and unit (global) variance. \reftab{table:point_cloud} compares our method using three permutation equivariant layers against the competition; see \refapp{app:point_cloud} for details.
+
+\subsubsection{Improved Red-shift Estimation Using Clustering Information}\label{sec:galaxy}
+An important regression problem in cosmology is to estimate the red-shift of galaxies, corresponding to their age as well as their distance from us~\cite{binney1998galactic} based on photometric observations. One way to estimate the red-shift from photometric observations is using a regression model~\cite{connolly1995slicing} on the galaxy clusters. The prediction for each galaxy does not change by permuting the members of the galaxy cluster. Therefore, we can treat each galaxy cluster as a ``set'' and use \deepsets to estimate the individual galaxy red-shifts. See \refapp{app:red_shift} for more details.
+
+\begin{wraptable}{r}{0.28\textwidth}
+\vspace{-4mm}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Method && Scatter \\
+\midrule
+MLP && 0.026 \\
+redMaPPer && 0.025 \\
+\deepsets && 0.023 \\
+\bottomrule
+\end{tabular}
+\caption{\small Red-shift experiment. Lower scatter is better.}
+\label{tbl:galaxy}
+\vspace{-4mm}
+\end{wraptable} 
+For each galaxy, we have $17$ photometric features from the redMaPPer galaxy cluster catalog~\cite{rozo2014redmapper} that contains photometric readings for 26,111 red galaxy clusters. Each galaxy-cluster in this catalog has between $\sim 20-300$ galaxies -- \ie $\xx \in \mathbb{R}^{N(c) \times 17}$, where $N(c)$ is the cluster-size. The catalog also provides accurate spectroscopic red-shift estimates for a \textit{subset} of these galaxies.
+
+We randomly split the data into 90\% training and 10\% test clusters, and  minimize the squared loss of the prediction for available spectroscopic red-shifts. As it is customary in cosmology literature, we report the average  \textbf{scatter} $\frac{|z_{\mathrm{spec}} - z|}{1 + z_{\mathrm{spec}}}$, where $z_{\mathrm{spec}}$ is the accurate spectroscopic measurement and $z$ is a photometric estimate in \reftab{tbl:galaxy}. 
+
+\subsection{Set Expansion}
+In the set expansion task, we are given a set of objects that are similar to each other and our goal is to find new objects from a large pool of candidates such that the selected new objects are similar to the query set. To achieve this one needs to reason out the concept connecting the given set and then retrieve words based on their relevance to the inferred concept. It is an important task due to wide range of potential applications including personalized information retrieval, computational advertisement, tagging large amounts of unlabeled or weakly labeled datasets. 
+
+Going back to de Finetti's theorem in \refsec{sec:related}, where we consider the marginal probability of a set of observations, the marginal probability allows for very simple metric for scoring additional elements to be added to $X$. In other words, this allows one to perform set expansion via the following score
+\begin{align}
+  \label{eq:score-bayes}
+  \vspace{-1mm}
+  s(x|X) = \log p(X \cup \cbr{x}|\alpha) - \log p(X|\alpha) p(\cbr{x}|\alpha)
+\end{align}
+Note that $s(x|X)$ is the point-wise mutual information between $x$ and $X$. Moreover, due to exchangeability, it follows that regardless of the order of elements we have 
+\vspace{-3mm}
+\begin{align}
+  \label{eq:setscore}
+  \vspace{-3mm}
+  S(X) = \sum_{m} s\rbr{x_m|\cbr{x_{m-1}, \ldots x_1}} = \log p(X|\alpha) - \sum_{m=1}^M \log p(\cbr{x_m}|\alpha)
+\end{align}
+When inferring sets, our goal is to find set completions $\cbr{x_{m+1}, \ldots x_M}$ for an initial set of query terms $\cbr{x_1, \ldots, x_m}$, such that the aggregate set is coherent. This is the key idea of the Bayesian Set algorithm~\cite{ghahramani2005bayesian} (details in \refapp{app:bs}).
+Using \deepsets, we can solve this problem in more generality as we can drop the assumption of data belonging to certain exponential family. 
+
+For learning the score $s(x|X)$, we take recourse to large-margin classification with structured loss functions \cite{TasGueKol04} to obtain the relative loss objective
+$l(x,x'|X) = \max(0, s(x'|X) - s(x|X) + \Delta(x,x'))$.
+In other words, we want to ensure that $s(x|X) \geq s(x'|X) + \Delta(x,x')$ whenever $x$ should be added and $x'$ should not be added to $X$.
+
+\textbf{Conditioning.}
+Often machine learning problems do not exist in isolation. For example, task like tag completion from a given set of tags is usually related to an object $z$, for example an image, that needs to be tagged. Such meta-data are usually abundant, \eg author information in case of text, contextual data such as the user click history, or extra information collected with LiDAR point cloud. 
+
+Conditioning graphical models with meta-data is often complicated. 
+For instance, in the Beta-Binomial model we need to ensure that the counts are always nonnegative, regardless of $z$.
+Fortunately, \deepsets does not suffer from such complications and the fusion of multiple sources of data can be done in a relatively straightforward manner. Any of the existing methods in deep learning, including  feature concatenation by averaging, or by max-pooling, can be employed. Incorporating these meta-data often leads to significantly improved performance as will be shown in experiments; \refsec{sec:image-tag}.
+
+\vspace*{-5pt}
+\subsubsection{Text Concept Set Retrieval}
+\label{sec:text-set}
+\begin{table*}
+    \setlength{\tabcolsep}{3pt}
+    \centering
+    \resizebox{\linewidth}{!}{
+    { \small
+    \begin{tabular}{l | ccccc | ccccc | ccccc}
+    \toprule
+    \multirow{3}{*}{Method} 
+    & \multicolumn{5}{c|}{LDA-$1k$ (Vocab = $17k$)}
+    & \multicolumn{5}{c|}{LDA-$3k$ (Vocab = $38k$)}
+    & \multicolumn{5}{c}{LDA-$5k$ (Vocab = $61k$)} 
+    \\
+     & \multicolumn{3}{c}{\textbf{Recall (\%)}} & \multirow{2}{*}{\textbf{MRR}} & \multirow{2}{*}{\textbf{Med.}}
+     & \multicolumn{3}{c}{\textbf{Recall (\%)}} & \multirow{2}{*}{\textbf{MRR}} & \multirow{2}{*}{\textbf{Med.}}
+     & \multicolumn{3}{c}{\textbf{Recall (\%)}} & \multirow{2}{*}{\textbf{MRR}} & \multirow{2}{*}{\textbf{Med.}} \\
+     
+     & \textbf{@10} & \textbf{@100} & \textbf{@1k} & &
+     & \textbf{@10} & \textbf{@100} & \textbf{@1k} & &
+     & \textbf{@10} & \textbf{@100} & \textbf{@1k} & &
+     \\
+    \midrule    
+    Random & 0.06 & 0.6 & 5.9 & 0.001 & 8520
+        & 0.02 & 0.2 & 2.6 & 0.000 & 28635 
+        & 0.01 & 0.2 & 1.6 & 0.000 & 30600 
+        \\
+    Bayes Set & 1.69 & 11.9 & 37.2 & 0.007 & 2848
+        & 2.01 & 14.5 & 36.5 & 0.008 & 3234 
+        & 1.75 & 12.5 & 34.5 & 0.007 & 3590 
+        \\
+    w2v Near & \textbf{6.00} & \textbf{28.1} & \textbf{54.7} & 0.021 & \textbf{641}
+        & 4.80 & 21.2 & 43.2 & 0.016 & 2054 
+        & 4.03 & 16.7 & 35.2 & 0.013 & 6900 
+        \\
+    NN-max & 4.78 & 22.5 & 53.1 & 0.023 & 779 
+        & 5.30 & 24.9 & 54.8 & 0.025 & 672 
+        & 4.72 & 21.4 & 47.0 & 0.022 & 1320 
+        \\
+    NN-sum-con & 4.58 & 19.8 & 48.5 & 0.021 & 1110
+        & 5.81 & 27.2 & 60.0 &\textbf{ 0.027} & 453
+        & 4.87 & 23.5 & 53.9 & 0.022 & 731
+        \\
+    NN-max-con & 3.36 & 16.9 & 46.6 & 0.018 & 1250 
+        & 5.61 & 25.7 & 57.5 & 0.026 & 570
+        & 4.72 & 22.0 & 51.8 & 0.022 & 877
+        \\
+    \deepsets & 5.53 & 24.2 & 54.3 & \textbf{0.025} & 696
+        & \textbf{6.04} & \textbf{28.5} & \textbf{60.7} & \textbf{0.027} & \textbf{426}
+        & \textbf{5.54} & \textbf{26.1} & \textbf{55.5} & \textbf{0.026} & \textbf{616}
+        \\
+    \bottomrule
+    \end{tabular}}}
+    \caption{\small Results on Text Concept Set Retrieval on LDA-1k, LDA-3k, and LDA-5k. Our \deepsets model outperforms other methods on LDA-3k and LDA-5k. However, all neural network based methods have inferior performance to w2v-Near baseline on LDA-1k, possibly due to small data size. Higher the better for recall@k and mean reciprocal rank (MRR). Lower the better for median rank (Med.)}
+    \label{tab:lda-result-table}
+    \vspace{-5mm}
+\end{table*}
+
+In text concept set retrieval, the objective is to retrieve words belonging to a `concept' or `cluster', given few words from that particular concept. For example, given the set of words \{\emph{tiger}, \emph{lion}, \emph{cheetah}\}, we would need to retrieve other related words like \emph{jaguar}, \emph{puma}, \etc, which belong to the same concept of big cats. This task of concept set retrieval can be seen as a set completion task conditioned on the latent semantic concept, and therefore our \deepsets form a desirable approach.
+
+\compactparagraph{Dataset.}
+We construct a large dataset containing sets of $N_T=50$ related words by extracting topics from latent Dirichlet allocation \cite{Pritchard945, Blei03latentdirichlet}, taken out-of-the-box\footnote{\url{github.com/dmlc/experimental-lda}}. To compare across scales, we consider three values of $k=\{1k, 3k, 5k\}$ giving us three datasets LDA-$1k$, LDA-$3k$, and LDA-$5k$, with corresponding vocabulary sizes of $17k, 38k,$ and $61k$.
+
+\compactparagraph{Methods.}
+We learn this using a margin loss with a \deepsets architecture having 3 fully connected layers with ReLU activation for both transformations $\phi$ and $\rho$. Details of the architecture and training are in \refapp{app:lda-model-details}. We compare to several baselines:
+(a) \textbf{Random} picks a word from the vocabulary uniformly at random.
+(b) \textbf{Bayes Set} \cite{ghahramani2005bayesian}.
+(c) \textbf{w2v-Near} computes the nearest neighbors in the word2vec \cite{mikolov2013distributed} space.
+Note that both Bayes Set and w2v NN are strong baselines.
+The former runs Bayesian inference using Beta-Binomial conjugate pair, while the latter uses the powerful $300$ dimensional word2vec trained on the billion word GoogleNews corpus\footnote{\url{code.google.com/archive/p/word2vec/}}.
+(d) \textbf{NN-max} uses a similar architecture as our \deepsets but uses max pooling to compute the set feature, as opposed to sum pooling.
+(e) \textbf{NN-max-con} uses max pooling on set elements but concatenates this pooled representation with that of query for a final set feature.
+(f) \textbf{NN-sum-con} is similar to NN-max-con but uses sum pooling followed by concatenation with query representation.
+
+\compactparagraph{Evaluation.}
+We consider the standard retrieval metrics -- recall@K, median rank and mean reciprocal rank, for evaluation.
+To elaborate, recall@K measures the number of true labels that were recovered in the top K retrieved words. We use three values of K$\;=\{10, 100, 1k\}$. The other two metrics, as the names suggest, are the median and mean of reciprocals of the true label ranks, respectively. Each dataset is split into TRAIN ($80\%$), VAL ($10\%$) and TEST ($10\%$). We learn models using TRAIN and evaluate on TEST, while VAL is used for hyperparameter selection and early stopping.
+
+\compactparagraph{Results and Observations.}
+As seen in \reftab{tab:lda-result-table}: (a) Our \deepsets model outperforms all other approaches on LDA-$3k$ and LDA-$5k$ by any metric, highlighting the significance of permutation invariance property. (b) On LDA-$1k$, our model does not perform well when compared to w2v-Near. We hypothesize that this is due to small size of the dataset insufficient to train a high capacity neural network, while w2v-Near has been trained on a billion word corpus. Nevertheless, our approach comes the closest to w2v-Near amongst other approaches, and is only 0.5\% lower by Recall@10.
+
+
+
+\subsubsection{Image Tagging}
+\label{sec:image-tag}
+\begin{wraptable}{r}{0.4\textwidth}
+\vspace{-5mm}
+    \setlength{\tabcolsep}{4pt}
+    \centering
+    \scalebox{.75} {
+    \begin{tabular}{l | cccc | cccc}
+    \toprule
+    \multirow{2}{*}{Method} 
+    & \multicolumn{4}{c|}{ESP game} 
+    & \multicolumn{4}{c}{IAPRTC-12.5}\\
+    
+    & P & R & F1 & N+
+    & P & R & F1 & N+\\
+    \midrule
+        
+     Least Sq. & 35 & 19 & 25 & 215 
+        & 40 & 19 & 26 & 198 \\
+    
+    MBRM & 18 & 19 & 18 & 209
+        & 24 & 23 & 23 & 223 \\
+        
+    JEC & 24 & 19 & 21 & 222 
+        & 29 & 19 & 23 & 211 \\
+    
+    FastTag & 46 & 22 & 30 & \textbf{247}
+        & \textbf{47} & 26 & 34 & \textbf{280} \\
+    
+    Least Sq.(D) & \textbf{44} & 32 & \textbf{37} & 232 
+        & 46 & 30 & 36 & 218 \\
+    
+    FastTag(D) & \textbf{44} & 32 & \textbf{37} & 229
+        & 46 & \textbf{33} & \textbf{38} & 254 \\
+
+    \deepsets & 39 & \textbf{34} & 36 & 246
+        & 42 & 31 & 36 & 247 \\
+    \bottomrule
+    \end{tabular}}
+    \caption{\small Results of image tagging on ESPgame and IAPRTC-12.5 datasets. Performance of our \deepsets approach is roughly similar to the best competing approaches, except for precision. Refer text for more details. Higher the better for all metrics -- precision (P), recall (R), f1 score (F1), and number of non-zero recall tags (N+).}
+    \label{tab:espgame-iaprtc}
+\vspace{-5mm}
+\end{wraptable}
+
+We next experiment with image tagging, where the task is to retrieve all relevant tags corresponding to an image.
+Images usually have only a subset of relevant tags, therefore predicting other tags can help enrich information that can further be leveraged in a downstream supervised task.
+In our setup, we learn to predict tags by conditioning \deepsets on the image, \ie, we train to predict a partial set of tags from the image and remaining tags.
+At test time, we predict tags from the image alone.
+
+\compactparagraph{Datasets.}
+We report results on the following three datasets - ESPGame, IAPRTC-12.5 and our in-house dataset, COCO-Tag. We refer the reader to \refapp{app:image-tagging-details}, for more details about datasets.
+
+\compactparagraph{Methods.}
+The setup for \deepsets to tag images is similar to that described in \refsec{sec:text-set}.
+The only difference being the conditioning on the image features, which is concatenated with the set feature obtained from pooling individual element representations.
+
+\compactparagraph{Baselines.}
+We perform comparisons against several baselines, previously reported in \cite{chen2013fast}. Specifically, we have Least Sq., a ridge regression model, MBRM \cite{Feng:2004:MBR:1896300.1896446}, JEC \cite{Makadia:2008:NBI:1478172.1478199} and FastTag \cite{chen2013fast}. Note that these methods do not use deep features for images, which could lead to an unfair comparison. As there is no publicly available code for MBRM and JEC, we cannot get performances of these models with Resnet extracted features. However, we report results with deep features for FastTag and Least Sq., using code made available by the authors \footnote{\url{http://www.cse.wustl.edu/~mchen/}}.
+
+\compactparagraph{Evaluation.}
+For ESPgame and IAPRTC-12.5, we follow the evaluation metrics as in \cite{guillaumin2009tagprop}--precision (P), recall (R), F1 score (F1), and number of tags with non-zero recall (N+).
+These metrics are evaluate for each tag and the mean is reported (see \cite{guillaumin2009tagprop} for further details).
+For COCO-Tag, however, we use recall@K for three values of K$\;=\{10, 100, 1000\}$, along with median rank and mean reciprocal rank (see evaluation in \refsec{sec:text-set} for metric details).
+
+\begin{wraptable}{r}{0.4\textwidth}
+    \setlength{\tabcolsep}{4pt}
+    \centering
+    \scalebox{.72} {
+    \begin{tabular}{l | ccccc }
+    \toprule
+    \multirow{3}{*}{Method} 
+
+     & \multicolumn{3}{c}{\textbf{Recall}} & \multirow{2}{*}{\textbf{MRR}} & \multirow{2}{*}{\textbf{Med.}} \\
+     & \textbf{@10} & \textbf{@100} & \textbf{@1k} & &\\
+    \midrule
+    w2v NN (blind) & 5.6 & 20.0 & 54.2 & 0.021 & 823\\
+    \deepsets (blind) & 9.0 & 39.2 & 71.3 & 0.044 & 310\\
+    \deepsets & \textbf{31.4} & \textbf{73.4} & \textbf{95.3} & \textbf{0.131} & \textbf{28}\\
+    \bottomrule
+    \end{tabular}}
+    \caption{\small Results on COCO-Tag dataset. Clearly, \deepsets outperforms other baselines significantly. Higher the better for recall@K and mean reciprocal rank (MRR). Lower the better for median rank (Med).}
+    \label{tab:coco-tag-table}
+\vspace{-5mm}
+\end{wraptable}
+\compactparagraph{Results and Observations.}
+\reftab{tab:espgame-iaprtc} shows results of image tagging on ESPgame and IAPRTC-12.5, and \reftab{tab:coco-tag-table} on COCO-Tag. Here are the key observations from \reftab{tab:espgame-iaprtc}: 
+(a) performance of our \deepsets model is comparable to the best approaches on all metrics but precision, 
+(b) our recall beats the best approach by 2\% in ESPgame.
+On further investigation, we found that the \deepsets model retrieves more relevant tags, which are not present in list of ground truth tags due to a limited $5$ tag annotation.
+Thus, this takes a toll on precision while gaining on recall, yet yielding improvement on F1.
+On the larger and richer COCO-Tag, we see that the \deepsets approach outperforms other methods comprehensively, as expected.
+Qualitative examples are in \refapp{app:image-tagging-details}.
+
+\subsection{Set Anomaly Detection}
+\label{sec:set-ano}
+The objective here is to find the anomalous face in each set, simply by observing examples and without any access to the attribute values.
+CelebA dataset~\cite{liu2015faceattributes} contains 202,599 face images, each annotated with 40 boolean attributes.
+We build $N=18,000$ sets of $64\times 64$ stamps, using these attributes each containing $M=16$ images (on the training set) as follows:
+randomly select 2 attributes, draw 15 images having those attributes, and a single target image where both attributes are absent.
+Using a similar procedure we build sets on the test images.
+No individual person`s face appears in both train and test sets.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{figures/face_outlier2.png} 
+\caption{{\small Each row shows a set, constructed from CelebA dataset, such that all set members except for an outlier, share at least two attributes (on the right). The \textbf{outlier is identified with a red frame}. The model is trained by observing examples of sets and their anomalous members, \textbf{without access to the attributes}. The probability assigned to each member by the outlier detection network is visualized using a \textbf{red bar} at the bottom of each image. The probabilities in each row sum to one.}}
+\label{fig:faces}
+\vspace{-5mm}
+\end{figure}
+Our deep neural network consists of 9 2D-convolution and max-pooling layers followed by 3 permutation-equivariant layers, and finally a softmax layer that assigns a probability value to each set member (Note that one could identify arbitrary number of outliers using a sigmoid activation at the output).
+Our trained model successfully finds the anomalous face in \textbf{75\% of test sets}.
+Visually inspecting these instances suggests that the task is non-trivial even for humans; see \reffig{fig:faces}.
+
+As a \textit{baseline}, we repeat the same experiment by using a set-pooling layer after convolution layers, and replacing the permutation-equivariant layers with fully connected layers of same size, where the final layer is a 16-way softmax.
+The resulting network shares the convolution filters for all instances within all sets, however the input to the softmax is not equivariant to the permutation of input images. Permutation equivariance seems to be crucial here as the baseline model achieves a training and \textbf{test accuracy of $\sim 6.3 \%$}; the same as random selection. See \refapp{app:celeb} for more details.
+
+\section{Summary}
+\label{sec:summary}
+In this paper, we develop \deepsets, a model based on powerful permutation invariance and equivariance properties, along with the theory to support its performance.
+We demonstrate the generalization ability of \deepsets across several domains by extensive experiments, and show both qualitative and quantitative results.
+In particular, we explicitly show that \deepsets outperforms other intuitive deep networks, which are not backed by theory (\refsec{sec:text-set}, \refsec{sec:digit-sum}).
+Last but not least, it is worth noting that the state-of-the-art we compare to is a specialized technique for each task, whereas our one model, \ie, \deepsets, is competitive across the board.
+
+\bibliographystyle{unsrtnat}
+\bibliography{bibfile,references}
+
+\newpage
+\appendix
+\onecolumn
+\begin{center}
+\bfseries\large
+Appendix: Deep Sets
+\end{center}
+\section{Proofs and Discussion Related to Theorem 2}
+\label{app:proofs}
+
+A function $f$ transforms its domain $\mathcal{X}$ into its range $\mathcal{Y}$. Usually, the input domain is a vector space $\mathbb{R}^d$ and the output response range is either a discrete space, e.g. $\{0,1\}$ in case of classification, or a continuous space $\mathbb{R}$ in case of regression.
+
+Now, if the input is a set $X=\{x_1,\ldots,x_M\}, x_m\in \mathfrak{X}$, i.e. $\mathcal{X}=2^\mathfrak{X}$, then we would like the response of the function not to depend on the ordering of the elements in the set.  In other words,
+
+
+\textbf{Property 1} {\em 
+\; A function $f:2^\mathfrak{X}\to\mathbb{R}$ acting on sets must be permutation invariant to the order of objects in the set, i.e.
+\begin{equation}
+f(\{x_1,...,x_M\}) = f(\{x_{\pi(1)},...,x_{\pi(M)}\})
+\end{equation}
+for any permutation $\pi$.
+}
+
+Now, roughly speaking, we claim that such functions must have a structure of the form $f(X)=\rho\left( \sum_{x \in X} \phi(x)\right)$ for some functions $\rho$ and $\phi$. Over the next two sections we try to formally prove this structure of the permutation invariant functions.
+
+\subsection{Countable Case}
+\textbf{Theorem 2} {\em 
+\; Assume the elements are countable, i.e. $|\mathfrak{X}| < \aleph_0$. A function $f:2^\mathfrak{X}\to\mathbb{R}$ operating on a set $X$ can be a valid set function, i.e. it is permutation invariant to the elements in $X$, if and only if it can be decomposed in the form $\rho \left( \sum_{x\in X} \phi(x) \right)$, for suitable transformations $\phi$ and $\rho$.
+}
+\begin{proof}
+  Permutation invariance follows from the fact that sets have no particular order, hence any function on a set must not exploit any particular order either. The sufficiency follows by observing that the function $\rho\left( \sum_{x \in X} \phi(x)\right)$ satisfies the permutation invariance condition. 
+
+To prove necessity, i.e. that all functions can be decomposed in this manner, we begin by noting that there must be a mapping from the elements to natural numbers functions, since the elements are countable. Let this mapping be denoted by $c:\mathfrak{X}\to\mathbb{N}$. Now if we let $\phi(x)=4^{-c(x)}$ then $\sum_{x\in X} \phi(x)$ constitutes an unique representation for every set $X\in 2^\mathfrak{X}$. Now a function $\rho:\mathbb{R}\to\mathbb{R}$ can always be constructed such that $f(X) = \rho\left( \sum_{x \in X} \phi(x)\right)$.
+\end{proof}
+
+
+
+\subsection{Uncountable Case}
+The extension to case when $\mathfrak{X}$ is uncountable, \eg $\mathfrak{X}=[0,1]$, is not so trivial. We could only prove in case of fixed set size, \eg $\mathcal{X}=[0,1]^M$ instead of $\mathcal{X}=2^\mathfrak{X}=2^{[0,1]}$,  that any permutation invariant continuous function can be expressed as $\rho \left( \sum_{x\in X} \phi(x) \right)$. Also, we show that there is a universal approximator of the same form. These results are discussed below.
+
+To illustrate the uncountable case, we assume a fixed set size of $M$. 
+Without loss of generality we can let $\mathfrak{X}=[0,1]$.
+Then the domain becomes $[0,1]^M$. Also, to handle ambiguity due to permutation, we often define the domain to be the set $\mathcal{X}=\{ (x_1,...,x_M) \in [0,1]^M : x_1 \leq x_2 \leq \cdots \leq x_M \}$ for some ordering of the elements in $\mathfrak{X}$.
+
+The proof builds on the famous Newton-Girard formulae which connect moments of a sample set (sum-of-power) to the elementary symmetric polynomials. But first we present some results needed for the proof. The first result establishes that sum-of-power mapping is injective.
+
+\textbf{Lemma 4} {\em 
+Let $\mathcal{X}=\{ (x_1,...,x_M) \in [0,1]^M : x_1 \leq x_2 \leq \cdots \leq x_M \}$. The sum-of-power mapping $E: \mathcal{X} \to \mathbb{R}^{M+1}$ defined by the coordinate functions
+\begin{equation}
+Z_q := E_q(X) := \sum_{m=1}^M (x_m)^q, \qquad q = 0, ..., M.
+\end{equation}
+is injective.
+}
+\begin{proof}
+Suppose for some $u, v \in \mathcal{X}$, we have $E(u) = E(v)$. We will now show that it must be the case that $u=v$.
+Construct two polynomials as follows:
+\begin{equation}
+P_u(x) = \prod_{m=1}^M (x-u_m) \qquad \qquad P_v(x) = \prod_{m=1}^M (x-v_m)
+\end{equation}
+If we expand the two polynomials we obtain:
+\begin{equation}
+\begin{aligned}
+P_u(x) &= x^M - a_1x^{M-1} + \cdots (-1)^{M-1} a_{M-1}x + (-1)^{M} a_M  \\
+P_v(x) &= x^M - b_1x^{M-1} + \cdots (-1)^{M-1} b_{M-1}x + (-1)^{M} b_M
+\end{aligned}
+\end{equation}
+with coefficients being elementary symmetric polynomials in $u$ and $v$ respectively, \ie
+\begin{equation}
+a_m = \sum_{1\leq j_1 < j_2 < \cdots < j_m \leq M  } u_{j_1}u_{j_2}\cdots u_{j_m}
+\qquad
+b_m = \sum_{1\leq j_1 < j_2 < \cdots < j_m \leq M  } v_{j_1}v_{j_2}\cdots v_{j_m}
+\end{equation}
+These elementary symmetric polynomials can be uniquely expressed 
+as a function of $E(u)$ and $E(v)$ respectively, by Newton-Girard formula. The $m$-th coefficient is given by the determinant of $m \times m$ matrix having terms from $E(u)$ and $E(v)$ respectively:
+\begin{equation}
+\begin{aligned}
+a_m &= \frac{1}{m} \det \left( \begin{array}{cccccc}
+E_1(u) & 1 & 0 & 0 & \cdots & 0 \\
+E_2(u) & E_1(u) & 1 & 0 & \cdots & 0 \\
+E_3(u) & E_2(u) & E_1(u) & 1 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots & \vdots \\
+E_{m-1}(u) & E_{m-2}(u) & E_{m-3}(u) & E_{m-4}(u) & \cdots & 1 \\
+E_m(u) & E_{m-1}(u) & E_{m-2}(u) & E_{m-3}(u) & \cdots & E_1(u) \\
+\end{array} \right)\\
+\\
+b_m &= \frac{1}{m} \det \left( \begin{array}{cccccc}
+E_1(v) & 1 & 0 & 0 & \cdots & 0 \\
+E_2(v) & E_1(v) & 1 & 0 & \cdots & 0 \\
+E_3(v) & E_2(v) & E_1(v) & 1 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots & \vdots \\
+E_{m-1}(v) & E_{m-2}(v) & E_{m-3}(v) & E_{m-4}(v) & \cdots & 1 \\
+E_m(v) & E_{m-1}(v) & E_{m-2}(v) & E_{m-3}(v) & \cdots & E_1(v) \\
+\end{array} \right)
+\end{aligned}
+\end{equation}
+Since we assumed $E(u)=E(v)$ implying $[a_1, ..., a_M] = [b_1, ..., b_M]$, 
+which in turn implies that the polynomials $P_u$ and $P_v$ are the same. Therefore, 
+their roots must be the same, which shows that $u=v$.
+\end{proof}
+
+The second result we borrow from \cite{curgus2006roots} which establishes a homeomorphism between coefficients and roots of a polynomial.
+
+\textbf{Theorem 5 \cite{curgus2006roots} } {\em 
+The function $f : \mathbb{C}^M \to \mathbb{C}^M$, which associates every $a \in \mathbb{C}^M$ to the multiset of roots, $f(a) \in \mathbb{C}^M$, of the monic polynomial formed using $a$ as the coefficient \ie $x^M + a_1x^{M-1} + \cdots (-1)^{M-1}a_{M-1}x + (-1)^Ma_M$, is a homeomorphism.
+}
+
+Among other things, this implies that (complex) roots of a polynomial depends continuously on the coefficients. We will use this fact for our next lemma.
+
+Finally, we establish a continuous inverse mapping for the sum-of-power function.
+
+\textbf{Lemma 6} {\em 
+Let $\mathcal{X}=\{ (x_1,...,x_M) \in [0,1]^M : x_1 \leq x_2 \leq \cdots \leq x_M \}$. We define the sum-of-power mapping $E: \mathcal{X} \to \mathcal{Z}$  by the coordinate functions
+\begin{equation}
+Z_q := E_q(X) := \sum_{m=1}^M (x_m)^q, \qquad q = 0, ..., M.
+\end{equation}
+where $\mathcal{Z}$ is the range of the function. The function $E$ has a continuous inverse mapping.
+}
+\begin{proof}
+First of all note that $\mathcal{Z}$, the range of $E$, is a compact set. This follows from following observations:
+\begin{itemize}
+\item The domain of $E$ is a bounded polytope (\ie a compact set),
+\item $E$ is a continuous function, and 
+\item image of a compact set under a continuous function is a compact set.
+\end{itemize}
+
+To show the continuity of inverse mapping, we establish connection to the continuous dependence of roots of polynomials on its coefficients.
+
+As in Lemma 4, for any $u \in \mathcal{X}$, let $z=E(u)$ and construct the polynomial:
+\begin{equation}
+P_u(x) = \prod_{m=1}^M (x-u_m)
+\end{equation}
+If we expand the polynomial we obtain:
+\begin{equation}
+\begin{aligned}
+P_u(x) &= x^M - a_1x^{M-1} + \cdots (-1)^{M-1} a_{M-1}x + (-1)^{M} a_M
+\end{aligned}
+\end{equation}
+with coefficients being elementary symmetric polynomials in $u$, \ie
+\begin{equation}
+a_m = \sum_{1\leq j_1 < j_2 < \cdots < j_m \leq M  } u_{j_1}u_{j_2}\cdots u_{j_m}
+\end{equation}
+These elementary symmetric polynomials can be uniquely expressed 
+as a function of $z$ by Newton-Girard formula:
+\begin{equation}
+\begin{aligned}
+a_m = \frac{1}{m} \det \left( \begin{array}{cccccc}
+z_1 & 1 & 0 & 0 & \cdots & 0 \\
+z_2 & z_1 & 1 & 0 & \cdots & 0 \\
+z_3 & z_2 & z_1 & 1 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots & \vdots \\
+z_{m-1} & z_{m-2} & z_{m-3} & z_{m-4} & \cdots & 1 \\
+z_m & z_{m-1} & z_{m-2} & z_{m-3} & \cdots & z_1 \\
+\end{array} \right)\\
+\end{aligned}
+\end{equation}
+Since determinants are just polynomials, $a$ is a continuous function of $z$. Thus to show continuity of inverse mapping of $E$, it remains to show continuity from $a$ back to the roots $u$. In this regard, we invoke Theorem 5. Note that homeomorphism implies the mapping as well as its inverse is continuous. Thus, restricting to the compact set $\mathcal{Z}$ where the map from coefficients to roots only goes to the reals, the desired result follows. To explicitly check the continuity, note that limit of $E^{-1}(z)$, as $z$ approaches $z^*$ from inside $\mathcal{Z}$, always exists and is equal to $E^{-1}(z^*)$ since it does so in the complex plane.
+\end{proof}
+
+With the lemma developed above we are in a position to tackle the main theorem.
+
+\begin{figure}[b]
+\centering
+\includegraphics[scale=0.4]{figures/cont_proof.png}
+\caption{\small Outline of the proof strategy for Theorem 2.1. The proof consists of two parts. First, we desire to show that we can find unique embeddings for each possible input, \ie we show that there exists a homeomorphism $E$ of the form $E(X)=\sum_{x\in X}\phi(x)$ between original domain and some higher dimensional space $\mathcal{Z}$. The second part of the proof consists of showing we can map the embedding to desired target value, \ie to show the existence of the continuous map $\rho$ between $\mathcal{Z}$ and original target space such that $f(X)=\rho(\sum_{x\in X}\phi(x))$.}
+\label{fig:proof}
+\end{figure}
+\textbf{Theorem 7} {\em 
+\; Let $f: [0, 1]^M \to \mathbb{R}$ be a permutation
+invariant continuous function iff it has the representation
+\begin{equation}
+f(x_1, ..., x_M) = \rho\left(\sum_{m=1}^M \phi(x_m)\right)
+\end{equation}
+for some continuous outer and inner function $\rho:\mathbb{R}^{M+1}\to\mathbb{R}$ and $\phi:\mathbb{R}\to\mathbb{R}^{M+1}$ respectively. The inner function $\phi$  is independent of the function $f$.
+}
+\begin{proof}
+The sufficiency follows by observing that the function $\rho\left( \sum_{m=1}^M \phi(x_m)\right)$ satisfies the permutation invariance condition. 
+
+To prove necessity, \ie that all permutation invariant continuous functions over the compact set can be expressed in this manner, we divide the proof into two parts, with outline in \reffig{fig:proof}. We begin by
+looking at the continuous embedding formed by the inner function: $E(X) = \sum_{m=1}^M \phi(x_m)$. Consider $\phi: \mathbb{R} \to \mathbb{R}^{M+1}$ defined as $\phi(x) = [1, x, x^2, ..., x^M]$. Now as $E$ is a polynomial, the image of $[0, 1]^M$ in $\mathbb{R}^{M+1}$ under $E$ is a compact set as well, denote it by $\mathcal{Z}$. Then by definition, the embedding $E: [0, 1]^M \to \mathcal{Z}$ is surjective. Using Lemma 4 and 6, we know that upon restricting the permutations, \ie replacing $[0,1]^M$ with $\mathcal{X}=\{ (x_1,...,x_M) \in [0,1]^M : x_1 \leq x_2 \leq \cdots \leq x_M \}$, the embedding $E: \mathcal{X} \to \mathcal{Z}$ is injective with a continuous inverse. Therefore, combining these observation we get that $E$ is a homeomorphism between $\mathcal{X}$ and $\mathcal{Z}$. Now it remains to show that we can map the embedding to desired target value, \ie to show the existence of the continuous map $\rho: \mathcal{Z} \to \mathbb{R}$ such that $\rho(E(X))=f(X)$. In particular consider the map $\rho(z) = f(E^{-1}(z))$. The continuity of $\rho$ follows directly from the fact that composition of continuous functions is continuous. Therefore we can always find continuous functions
+$\phi$ and $\rho$ to express any permutation invariant function $f$ as $\rho\left( \sum_{m=1}^M \phi(x_m)\right)$.
+\end{proof}
+
+A very similar but more general results holds in case of
+any continuous function (not necessarily permutation
+invariant). The result is known as Kolmogorov-Arnold representation theorem \cite[Chap. 17]{khesin2014arnold} which we state below:
+
+\textbf{Theorem 8} {\em \textbf{(Kolmogorov–Arnold representation)}
+\; Let $f: [0, 1]^M \to \mathbb{R}$ be an arbitrary multivariate continuous function iff it has the representation
+\begin{equation}
+f(x_1, ..., x_M) = \rho\left(\sum_{m=1}^M \lambda_m\phi(x_m)\right)
+\end{equation}
+with continuous outer and inner functions $\rho:\mathbb{R}^{2M+1}\to\mathbb{R}$ and $\phi:\mathbb{R}\to\mathbb{R}^{2M+1}$. The inner function $\phi$ is independent of the function $f$.
+}
+
+This theorem essentially states a representation theorem for any multivariate continuous function. Their representation is very similar to the one we are proved, except for the dependence of inner transformation on the co-ordinate through $\lambda_m$. Thus it is reassuring that behind all the beautiful
+mathematics something intuitive is happening. If the function is permutation invariant, this dependence on co-ordinate of the inner transformation gets dropped!
+
+Further we can show that arbitrary approximator having the same form can be obtained for continuous permutation-invariant functions.
+
+\textbf{Theorem 9} {\em 
+\; Assume the elements are from a compact set in $\mathbb{R}^d$, \ie possibly uncountable, and the set size is fixed to $M$. Then any continuous function operating on a set $X$, i.e. $f:\mathbb{R}^{d\times M}\to\mathbb{R}$ which is permutation invariant to the elements in $X$ can be approximated arbitrarily close in the form of $\rho \left( \sum_{x\in X} \phi(x) \right)$, for suitable transformations $\phi$ and $\rho$.
+}
+\begin{proof}
+Permutation invariance follows from the fact that sets have no particular order, hence any function on a set must not exploit any particular order either. The sufficiency follows by observing that the function $\rho\left( \sum_{x \in X} \phi(x)\right)$ satisfies the permutation invariance condition. 
+
+To prove necessity, \ie that all continuous functions over the compact set can be approximated arbitrarily close in this manner, we begin noting that polynomials are universal approximators by Stone–Weierstrass theorem \cite[sec. 5.7]{marsden1993elementary}. In this case the Chevalley-Shephard-Todd (CST) theorem \cite[chap. V, theorem 4]{bourbaki1990elements}, or more  precisely, its special case, the Fundamental Theorem of Symmetric Functions states that symmetric polynomials are given by a  polynomial of homogeneous symmetric monomials. The latter are given by the sum over monomial terms, which is all that we need since it implies that all symmetric polynomials can be written in the form required by the theorem.
+\end{proof}
+
+Finally, we still conjecture that even in case of sets of all sizes, \ie when the domain is $2^{[0,1]}$, a representation of the form $f(X) = \rho \left( \sum_{x\in X} \phi(x) \right)$ should exist for all ``continuous'' permutation invariant functions for some suitable transformations $\rho$ and $\phi$. However, in this case even what a ``continuous'' function means is not clear as the space $2^{[0,1]}$ does not have any natural topology. As a future work, we want to study further by defining various topologies, like using Fr\'echet distance as used in \cite{curgus2006roots} or MMD distance. Our preliminary findings in this regards hints that using MMD distance if the representation is allowed to be in $\ell^2$, instead of being finite dimensional, then the conjecture seems to be provable. Thus, clearly this direction needs further exploration. We end this section by providing some examples:
+
+\paragraph{Examples:}
+\begin{itemize}
+\item $x_1x_2(x_1+x_2+3)$, Consider $\phi(x) = [x, x^2, x^3]$ and $\rho([u,v, w])=uv-w+3(u^2-v)/2$, then $\rho(\phi(x_1)+\phi(x_2))$ is the desired function.
+
+\item $x_1x_2x_3+x_1+x_2+x_3$, Consider $\phi(x) = [x, x^2, x^3]$ and $\rho([u,v,w])=(u^3+2w-3uv)/6 + u$, then $\rho(\phi(x_1)+\phi(x_2)+\phi(x_3))$ is the desired function.
+
+\item $1/n(x_1+x_2+x_3+...+x_m)$, Consider $\phi(x) = [1,x]$ and $\rho([u,v])=v/u$, then $\rho(\phi(x_1)+\phi(x_2)+\phi(x_3)+...+\phi(x_m))$ is the desired function.
+
+\item $\max\{x_1,x_2,x_3,...,x_m\}$, Consider $\phi(x) = [e^{\alpha x}, x e^{\alpha x}]$ and $\rho([u,v]) = v/u$, then as $\alpha\to\infty$, then we have $\rho(\phi(x_1)+\phi(x_2)+\phi(x_3)+...+\phi(x_m))$ approaching the desired function.
+
+\item Second largest among $\{x_1,x_2,x_3,...,x_m\}$, Consider $\phi(x) = [e^{\alpha x}, x e^{\alpha x}]$ and $\rho([u,v]) = (v-(v/u)e^{\alpha v/u})/(u-e^{\alpha v/u})$, then as $\alpha\to\infty$, we have $\rho(\phi(x_1)+\phi(x_2)+\phi(x_3)+...+\phi(x_m))$ approaching the desired function.
+
+\end{itemize}
+
+\newpage
+\section{Proof of Lemma 3}
+
+Our goal is to design neural network layers that are equivariant to permutations of elements in the input $\xx$. The function $\ff: \mathfrak{X}^{M} \to \mathcal{Y}^{M}$ is \textbf{equivariant} to the permutation of its inputs iff 
+\begin{align*}
+  \ff(\pi \xx) = \pi \ff(\xx) \quad \forall \pi \in \mathcal{S}_M
+\end{align*}
+where the symmetric group $\mathcal{S}_M$ is the set of all permutation of indices $1,\ldots,M$.
+
+
+Consider the standard neural network layer
+\begin{equation}\label{eqa:1}
+  \ff_{\Theta}(\xx) \doteq \boldsymbol{\sigma}( \Theta \xx) \quad \Theta \in \mathbb{R}^{M \times M}
+\end{equation}
+where $\Theta$ is the weight vector and $\sigma: \mathbb{R} \to \mathbb{R}$ is a nonlinearity such as sigmoid function. The following lemma states the necessary and sufficient conditions for permutation-equivariance in this type of function. 
+
+\textbf{Lemma 3} {\em 
+\; The function $\ff_{\Theta}: \mathbb{R}^{M} \to \mathbb{R}^{M}$ as defined in \eqref{eqa:1} is permutation equivariant if and only if all the off-diagonal elements of $\Theta$ are tied together and all the diagonal elements are equal as well. That is,
+\begin{align}
+ \Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})\quad\quad {\lambda},{\gamma} \in \mathbb{R} \quad \mathbf{1} = [1,\ldots,1]^{\mathsf{T}} \in \mathbb{R}^M
+ \nonumber
+\end{align}
+where $\mathbf{I}\in\mathbb{R}^{M\times M}$ is the identity matrix.
+}
+
+\begin{proof}\\
+From definition of permutation equivariance $\ff_{\Theta}(\pi \xx) = \pi \ff_{\Theta}(\xx)$ and definition of $\ff$ in \eqref{eqa:1}, the condition becomes
+ $\boldsymbol{\sigma}( \Theta \pi \xx) = \pi \boldsymbol{\sigma}( \Theta \xx)$, which (assuming sigmoid is a bijection) is equivalent to $\Theta \pi = \pi \Theta$. Therefore we need to show that the necessary and sufficient conditions for the matrix $\Theta \in \mathbb{R}^{M \times M}$ to commute with all permutation matrices $\pi \in \mathcal{S}_M$ is given by this proposition.
+We prove this in both directions:
+   \begin{itemize}
+   \item To see why $\Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})$ commutes with any permutation matrix, first note that commutativity is linear -- that is
+$$\Theta_1 \pi = \pi \Theta_1 \wedge \Theta_2 \pi = \pi \Theta_2 \quad \Rightarrow \quad (a \Theta_1 +  b \Theta_2) \pi = \pi (a \Theta_1 +  b \Theta_2).$$
+Since both Identity matrix $\mathbf{I}$, and constant matrix $\mathbf{1} \mathbf{1}^\mathsf{T}$, commute with any permutation matrix, so does their linear combination $\Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})$.
+\item We need to show that in a matrix $\Theta$ that commutes with ``all'' permutation matrices
+  \begin{itemize}
+  \item \textit{All diagonal elements are identical}: Let $\pi_{k,l}$ for $1\leq k,l\leq M, k \neq l$, be a transposition (\ie a permutation that only swaps two elements). The inverse permutation matrix of $\pi_{k,l}$ is the permutation matrix of $\pi_{l,k} = \pi_{k,l}^{\mathsf{T}}$. We see that commutativity of $\Theta$ with the transposition $\pi_{k,l}$ implies that $\Theta_{k,k} = \Theta_{l,l}$: 
+    \begin{align*}
+  \pi_{k,l} \Theta = \Theta \pi_{k,l} \; \Rightarrow  \; \pi_{k,l} \Theta \pi_{l,k} = \Theta \; \Rightarrow \;  (\pi_{k,l} \Theta \pi_{l,k})_{l,l} = \Theta_{l,l} \; \Rightarrow \;  \Theta_{k,k} = \Theta_{l,l}
+    \end{align*}
+Therefore, $\pi$ and $\Theta$ commute for any permutation $\pi$, they also commute for any transposition $\pi_{k,l}$ and therefore $\Theta_{i,i} = \lambda\, \forall i$.
+\item \textit{All off-diagonal elements are identical}: We show that since $\Theta$ commutes with 
+any product of transpositions, any choice two off-diagonal elements should be identical.
+Let $(i,j)$ and $(i',j')$ be the index of two off-diagonal elements (\ie $i \neq j$ and $i' \neq j'$).
+Moreover for now assume $i \neq i'$ and $j \neq j'$. Application of the transposition $\pi_{i,i'} \Theta$, swaps the rows $i,i'$ in $\Theta$.
+Similarly, $\Theta \pi_{j,j'}$ switches the $j^{th}$ column with $j'^{th}$ column. From commutativity property of $\Theta$ and $\pi \in \mathcal{S}_n$ we have
+\begin{align*}
+ \pi_{j',j}\pi_{i,i'} \Theta =  \Theta \pi_{j',j}\pi_{i,i'} \; &\Rightarrow \pi_{j',j}\pi_{i,i'} \Theta (\pi_{j',j}\pi_{i,i'})^{-1} = \Theta \; &\Rightarrow \\
+ \pi_{j',j}\pi_{i,i'} \Theta \pi_{i',i} \pi_{j, j'} = \Theta \; &\Rightarrow (\pi_{j',j}\pi_{i,i'} \Theta \pi_{i',i} \pi_{j, j'})_{i,j} = \Theta_{i,j} \; &\Rightarrow \; \Theta_{i',j'} = \Theta_{i,j}
+\end{align*}
+where in the last step we used our assumptions that $i \neq i'$, $j \neq j'$, $i \neq j$ and $i' \neq j'$. In the cases where either $i = i'$ or $j = j'$, we can use the above to show that $\Theta_{i,j} = \Theta_{i'', j''}$ and  $\Theta_{i',j'} = \Theta_{i'', j''}$, for some $i'' \neq i,i'$ and $j'' \neq j,j'$, and conclude $\Theta_{i,j} = \Theta_{i', j'}$.
+  \end{itemize}
+  \end{itemize}
+\end{proof}
+
+
+\newpage
+\section{More Details on the architecture}
+\label{app:model}
+\subsection{Invariant model}
+The structure of permutation invariant functions  in \refthm{thm:universal} hints at a general strategy for inference over sets of objects, which we call deep sets. Replacing $\phi$ and $\rho$ by universal approximators leaves matters unchanged, since, in particular, $\phi$ and $\rho$ can be used to approximate arbitrary polynomials. Then, it remains to learn these approximators. This yields in the following model:
+\begin{wrapfigure}{r}{0.5\textwidth}
+\vspace{3mm}
+\centering
+\includegraphics[width=0.5\textwidth]{figures/deepsets}
+\caption{\small Architecture of \deepsets: Invariant}
+\label{fig:arch}
+\end{wrapfigure}
+
+\begin{itemize*}
+\item Each instance $x_m \forall 1\leq m \leq M$ is transformed (possibly by several layers) into
+  some representation $\phi(x_m)$.
+\item The addition $\sum_m \phi(x_m)$ of these representations 
+  processed using the $\rho$ network very much in the same manner as in any deep network (\eg
+  fully connected layers, nonlinearities, \etc). 
+\item Optionally: If we have additional meta-information $z$, then the above mentioned networks could be conditioned to obtain the conditioning mapping $\phi(x_m|z)$. 
+\end{itemize*}
+
+In other words, the key to deep sets is to add up all representations and then apply nonlinear transformations. 
+
+The overall model structure is illustrated in \reffig{fig:arch}.
+
+This architecture has a number of desirable properties in terms of universality and correctness. We assume in the following that the networks we choose are, in principle, universal approximators. That is, we assume that they can represent any functional mapping. This is a well established property (see e.g. \cite{Micchelli86b} for details in the case of radial basis function networks).
+
+What remains is to state the derivatives with regard to this novel type of layer. Assume parametrizations $w_\rho$ and $w_\phi$ for $\rho$ and $\phi$ respectively. Then we have
+\begin{equation*}
+  \partial_{w_\phi} \rho\rbr{\sum_{x' \in X} \phi(x')} = 
+  \rho'\rbr{\sum_{x' \in X} \phi(x)} \sum_{x' \in X} \partial_{w_\phi} \phi(x')
+\end{equation*}
+This result reinforces the common knowledge of parameter tying in deep networks when ordering is irrelevant. Our result backs this practice with theory and strengthens it by proving that it is the only way to do it.
+
+\subsection{Equivariant model}
+Consider the standard neural network layer
+\begin{equation}\label{eqc:1}
+f_{\Theta}(\xx) = \sigma( \Theta \xx)
+\end{equation}
+where  $\Theta \in \mathbb{R}^{M \times M}$ is the weight vector and $\sigma: \mathbb{R}^M \to \mathbb{R}^{M}$ is a point-wise nonlinearity such as a sigmoid function. The following lemma states the \textit{necessary and sufficient} conditions for permutation-equivariance in this type of function. 
+
+\begin{wrapfigure}{r}{0.3\textwidth}
+\vspace{-8.6mm}
+\centering
+\includegraphics[width=0.25\textwidth]{figures/perm_eq_1d}
+\vspace{-2mm}
+\caption{\small Illustration of permutation equivariant layer. Same color indicates weight sharing.}
+\label{fig:perm1d}
+\vspace{-5mm}
+\end{wrapfigure}
+\textbf{Lemma 3} {\em 
+\; The function $f_{\Theta}(\xx) = \sigma( \Theta \xx)$ for $\Theta \in \mathbb{R}^{M \times M}$ is permutation equivariant, iff all the off-diagonal elements of $\Theta$ are tied together and all the diagonal elements are equal as well. That is,
+\begin{align}
+ \Theta = {\lambda} \mathbf{I} + {\gamma} \; (\mathbf{1} \mathbf{1}^{\mathsf{T}})\quad\quad {\lambda},{\gamma} \in \mathbb{R} \quad \mathbf{1} = [1,\ldots,1]^{\mathsf{T}} \in \mathbb{R}^M
+ \nonumber
+\end{align}
+where $\mathbf{I}\in\mathbb{R}^{M\times M}$ is the identity matrix.
+}
+
+This function is simply a non-linearity applied to a weighted combination of i) its input $ \mathbf{I} \xx$ and; ii) the sum of input values $(\mathbf{1} \mathbf{1}^{\mathsf{T}}) \xx$. Since summation does not depend on the permutation, the layer is
+permutation-equivariant. Therefore we can manipulate the operations and parameters in this layer, for example to get another \textbf{variation} $f(\xx) = \sigma\left(\lambda \mathbf{I} \xx + \gamma\; \textrm{maxpool}({\xx}) \mathbf{1} \right)$,
+where the maxpooling operation over elements of the set (similarly to summation) is commutative. In practice using this variation performs better in some applications.
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+\vspace{-10mm}
+\centering
+\includegraphics[width=0.5\textwidth]{figures/perm_eq}
+\vspace{-7mm}
+\caption{\small Architecture of \deepsets: Equivariant}
+\vspace{-3mm}
+\label{fig:arch}
+\end{wrapfigure}
+So far we assumed that each instance $x_m \in \mathbb{R}$ -- \ie a single input and also output channel. For \textbf{multiple input-output channels}, we may speed up the operation of the layer using matrix multiplication.
+For $D$/$D'$ input/output channels (\ie $\xx \in \mathbb{R}^{M \times D}$, $\yy \in \mathbb{R}^{M \times D'}$, this layer becomes
+\begin{equation}
+f(\xx) = \sigma \big(
+\xx \Lambda \, -\,  \mathbf{1}\mathbf{1}^{\mathsf{T}}\xx \Gamma
+\big)
+\end{equation}
+where $\Lambda, \Gamma \in \mathbb{R}^{D\times D'}$ are model parameters. As before, we can have a maxpool version as:
+$f(\xx) = \sigma \big(
+\xx \Lambda \, -\,  \mathbf{1} \textrm{maxpool}(\xx) \Gamma
+\big)$
+where $\textrm{maxpool}(\xx) = (\max_m \xx) \in \mathbb{R}^{1 \times D}$ is a row-vector of maximum value of $\xx$ over the ``set'' dimension.
+We may further reduce the number of parameters in favor of better generalization by factoring $\Gamma$ and $\Lambda$ and keeping
+a single $\Lambda \in \mathbb{R}^{D,D'}$ and $\beta \in \mathbb{R}^{D'}$
+\begin{equation}
+  \label{eqc:5}
+ f(\xx) = \sigma \big( \beta + 
+\big (\xx \, -\,  \mathbf{1} \textrm{maxpool}(\xx) \big ) \Gamma
+\big) 
+\end{equation}
+\paragraph{Stacking:} Since composition of permutation equivariant functions is also permutation equivariant, we can build deep models by stacking layers of \eqref{eqc:5}. Moreover, application of any commutative pooling operation (\eg max-pooling) over the set instances produces a permutation \textit{invariant} function.
+\begin{figure}[h]
+\centering
+\vspace{-5mm}
+\includegraphics[width=0.6\textwidth]{figures/stack_perm_eq}
+\caption{\small Using multiple permutation equivariant layers. Since permutation equivariance compose we can stack multiple such layers}
+\end{figure}
+
+
+\newpage
+\section{Bayes Set \cite{ghahramani2005bayesian}}
+\label{app:bs}
+Bayesian sets consider the problem of estimating the likelihood of subsets $X$ of a ground set $\Xcal$. In general this is achieved by an exchangeable model motivated by deFinetti's theorem concerning exchangeable distributions via 
+\begin{align}
+  \label{eq:definetti-app}
+  p(X|\alpha) = \int d\theta \sbr{\prod_{m=1}^M p(x_m|\theta)} p(\theta|\alpha). 
+\end{align}
+This allows one to perform set expansion, simply via the score
+\begin{align}
+  \label{eq:score}
+  s(x|X) = \log \frac{p(X \cup \cbr{x}|\alpha)}{p(X|\alpha) p(\cbr{x}|\alpha)}
+\end{align}
+Note that $s(x|X)$ is the pointwise mutual information between $x$ and $X$. Moreover, due to exchangeability, it follows that regardless of the order of elements we have 
+\begin{align}
+  \label{eq:setscore-app}
+  S(X) := \sum_{m=1}^M s\rbr{x_m|\cbr{x_{m-1}, \ldots x_1}} = \log
+  p(X|\alpha) - \sum_{m=1}^M \log p(\cbr{x_m}|\alpha)
+\end{align}
+In other words, we have a set function $\log p(X|\alpha)$ with a modular term-dependent correction. When inferring sets it is our goal to find set completions $\cbr{x_{m+1}, \ldots x_M}$ for an initial set of query terms $\cbr{x_1, \ldots, x_m}$ such that the aggregate set is well coherent. This is the key idea of the Bayesian Set algorithm. 
+
+\subsection{Exponential Family}
+\label{sec:family}
+In exponential families, the above approach assumes a particularly nice form whenever we have conjugate priors. Here we have
+\begin{align}
+  p(x|\theta) = \exp\rbr{\inner{\phi(x)}{\theta} - g(\theta)}
+  \text{ and }
+  p(\theta|\alpha, M_0) = \exp\rbr{\inner{\theta}{\alpha} - M_0
+  g(\theta)- h(\alpha, M_0)}.
+\end{align}
+The mapping $\phi: x \to \Fcal$ is usually referred as sufficient statistic of $x$ which maps $x$ into a feature space $\Fcal$. Moreover, $g(\theta)$ is the log-partition (or cumulant-generating) function. Finally, $p(\theta|\alpha,M_0)$ denotes the conjugate distribution which is in itself a member of the exponential family. It has the normalization $h(\alpha,M_0) = \int d\theta \exp\rbr{\inner{\theta}{\alpha} - M_0 g(\theta)}$. The advantage of this is that $s(x|X)$ and $S(X)$ can be computed in closed form \cite{ghahramani2005bayesian} via
+\begin{align}
+  s(X) & = h\rbr{\alpha + \phi(X), M_0 + M} + (M-1) h(\alpha,
+  M_0) - \sum_{m=1}^M h(\alpha + \phi(x_m), M + 1)\\
+  s(x|X) & = h\rbr{\alpha + \phi(\cbr{x} \cup X), M_0 + M
+           + 1}+ h(\alpha, M_0) 
+      \label{eq:relativescore} \\
+  & - h\rbr{\alpha + \phi(X), M_0 + M} - h(\alpha + \phi(x), M + 1)
+    \nonumber
+\end{align}
+For convenience we defined the sufficient statistic of a set to be the sum over its constituents, i.e.\ $\phi(X) = \sum_m \phi(x_m)$. It allows for very simple computation and maximization over additional elements to be added to $X$, since $\phi(X)$ can be precomputed. 
+
+\subsection{Beta-Binomial Model}
+\label{sec:bb}
+The model is particularly simple when dealing with the Binomial distribution and its conjugate Beta prior, since the ratio of Gamma functions allows for simple expressions. In particular, we have 
+\begin{align}
+  h(\beta) = \log \Gamma(\beta^+) + \log \Gamma(\beta^-) - \Gamma(\beta).
+\end{align}
+With some slight abuse of notation we let $\alpha = (\beta^+, \beta^-)$ and $M_0 = \beta^+ + \beta^-$. Setting $\phi(1) = (1,0)$ and $\phi(0) = (0,1)$ allows us to obtain $\phi(X) = (M^+, M^-)$, i.e. $\phi(X)$ contains the counts of occurrences of $x_m = 1$ and $x_m = 0$ respectively. This leads to the following score functions 
+\begin{align}
+  s(X) =& \log \Gamma(\beta^+ + M^+) + \log \Gamma(\beta^- + M^-) - 
+         \log \Gamma(\beta + M)  \\
+  \nonumber
+  & - \log \Gamma(\beta^+) - \log \Gamma(\beta^-) + \log
+    \Gamma(\beta) - M^+ \log \frac{\beta^+}{\beta} - M^- \log
+    \frac{\beta^-}{\beta} \\
+  s(x|X) = &
+             \begin{cases}
+               \log \frac{\beta^+ + M^+}{\beta + M} - 
+               \log \frac{\beta^+}{\beta}
+               \text{ if } x = 1 \\
+               \log \frac{\beta^- + M^-}{\beta + M} - 
+               \log \frac{\beta^-}{\beta}
+               \text{ otherwise }
+             \end{cases}
+\end{align}
+This is the model used by \cite{ghahramani2005bayesian} when estimating Bayesian Sets for objects. In particular, they assume that for any given object $x$ the vector $\phi(x) \in \cbr{0; 1}^d$ is a $d$-dimensional binary vector, where each coordinate is drawn independently from some Beta-Binomial model. The advantage of the approach is that it can be computed very efficiently while only maintaining minimal statistics of $X$.
+
+In a nutshell, the \emph{algorithmic} operations performed in the Beta-Binomial model are as follows:
+\begin{align}
+  \label{eq:nutshell-bb}
+  s(x|X) = 1^\top \sbr{
+  \sigma\rbr{\sum_{m=1}^M \phi(x_m) + \phi(x) + \beta} - 
+  \sigma\rbr{\phi(x) + \beta}}
+\end{align}
+In other words, we sum over statistics of the candidates $x_m$, add a bias term $\beta$, perform a \emph{coordinate-wise} nonlinear transform over the aggregate statistic (in our case a logarithm), and finally we aggregate over the so-obtained scores, weighing each contribution equally. $s(X)$ is expressed analogously. 
+
+\subsection{Gauss Inverse Wishart Model}
+Before abstracting away the probabilistic properties of the model, it is worth paying some attention to the case where we assume that $x_i \sim \Ncal(\mu, \Sigma)$ and $(\mu, \Sigma) \sim \mathrm{NIW}(\mu_0, \lambda, \Psi, \nu)$, for a suitable set of conjugate parameters. While the details are (arguably) tedious, the overall structure of the model is instructive.
+
+First note that the sufficient statistic of the data $x \in \RR^d$ is now given by $\phi(x) = (x, x x^\top)$. Secondly, note that the conjugate log-partition function $h$ amounts to computing \emph{determinants} of terms involving $\sum_m x_m x_m^\top$ and moreover, nonlinear combinations of the latter with $\sum_m x_m$. 
+
+The \emph{algorithmic} operations performed in the Gauss Inverse Wishart model are as follows:
+\begin{align}
+  \label{eq:nutshell-gw}
+  s(x|X) = \sigma\rbr{\sum_{m=1}^M \phi(x_m) + \phi(x) + \beta} - 
+  \sigma\rbr{\phi(x) + \beta}
+\end{align}
+Here $\sigma$ is a nontrivial convex function acting on a (matrix, vector) pair and $\phi(x)$ is no longer a trivial map but performs a nonlinear dimension altering transformation on $x$. We will use this general template to fashion the Deep Sets algorithm. 
+
+
+\newpage
+\section{Text Concept Set Retrieval}
+\label{app:lda-model-details}
+
+We consider the task of text concept set retrieval, where the objective is to retrieve words belonging to a `concept' or `cluster', given few words from that particular concept. For example, given the set of words \{\emph{tiger}, \emph{lion}, \emph{cheetah}\}, we would need to retrieve other related words like \emph{jaguar}, \emph{puma}, \etc, which belong to the same concept of big cats. The model implicitly needs to reason out the concept connecting the given set and then retrieve words based on their relevance to the inferred concept. Concept set retrieval is an important due to wide range of potential applications including personalized information retrieval, tagging large amounts of unlabeled or weakly labeled datasets, \etc. This task of concept set retrieval can be seen as a set completion task conditioned on the latent semantic concept, and therefore our \deepsets form a desirable approach.
+
+\compactparagraph{Dataset}
+To construct a large dataset containing sets of related words, we make use of Wikipedia text due to its huge vocabulary and concept coverage. First, we run topic modeling on publicly available wikipedia text with $K$ number of topics. Specifically, we use the famous latent Dirichlet allocation \cite{Pritchard945, Blei03latentdirichlet}, taken out-of-the-box\footnote{\url{github.com/dmlc/experimental-lda}}. Next, we choose top $N_T=50$ words for each latent topic as a set giving a total of $K$ sets of size $N_T$. To compare across scales, we consider three values of $k=\{1k, 3k, 5k\}$ giving us three datasets LDA-$1k$, LDA-$3k$, and LDA-$5k$, with corresponding vocabulary sizes of $17k, 38k,$ and $61k$. Few of the topics from LDA-1k are visualized in \reftab{tab:lda-qual-examples}.
+
+\compactparagraph{Methods}
+Our \deepsets model uses a feedforward neural network (NN) to represent a query and each element of a set, \ie, $\phi(x)$  for an element $x$ is encoded as a NN.
+Specifically, $\phi(x)$ represents each word via $50$-dimensional embeddings that are we learn jointly, followed by two fully connected layers of size $150$, with ReLU activations.
+We then construct a set representation or feature, by sum pooling all the individual representations of its elements, along with that of the query.
+Note that this sum pooling achieves permutation invariance, a crucial property of our \deepsets (\refthm{thm:universal}). Next, use input this set feature into another NN to assign a single score to the set, shown as $\rho(.)$.
+We instantiate $\rho(.)$ as three fully connected layers of sizes $\{150, 75, 1$\} with ReLU activations.
+In summary, our \deepsets consists of two neural networks -- (a) to extract representations for each element, and (b) to score a set after pooling representations of its elements.
+
+\compactparagraph{Baselines}
+We compare to several baselines: (a) \textbf{Random} picks a word from the vocabulary uniformly at random. (b) \textbf{Bayes Set} \cite{ghahramani2005bayesian}, and (c) \textbf{w2v-Near} that computes the nearest neighbors in the word2vec \cite{mikolov2013distributed} space. Note that both Bayes Set and w2v NN are strong baselines.
+The former runs Bayesian inference using Beta-Binomial conjugate pair, while the latter uses the powerful $300$ dimensional word2vec trained on the billion word GoogleNews corpus\footnote{\url{code.google.com/archive/p/word2vec/}}. (d) \textbf{NN-max} uses a similar architecture as our \deepsets with an important difference. It uses max pooling to compute the set feature, as opposed to \deepsets which uses sum pooling. (e) \textbf{NN-max-con} uses max pooling on set elements but concatenates this pooled representation with that of query for a final set feature. (f) \textbf{NN-sum-con} is similar to NN-max-con but uses sum pooling followed by concatenation with query representation. 
+
+\compactparagraph{Evaluation}
+To quantitatively evaluate, we consider the standard retrieval metrics -- recall@K, median rank and mean reciprocal rank. To elaborate, recall@K measures the number of true labels that were recovered in the top K retrieved words. We use three values of K$\;=\{10, 100, 1k\}$. The other two metrics, as the names suggest, are the median and mean of reciprocals of the true label ranks, respectively. Each dataset is split into TRAIN ($80\%$), VAL ($10\%$) and TEST ($10\%$). We learn models using TRAIN and evaluate on TEST, while VAL is used for hyperparameter selection and early stopping.
+
+\compactparagraph{Results and Observations}
+\reftab{tab:lda-result-table} contains the results for the text concept set retrieval on LDA-$1k$, LDA-$3k$, and LDA-$5k$ datasets. We summarize our findings below: (a) Our /deepsets model outperforms all other approaches on LDA-$3k$ and LDA-$5k$ by any metric, highlighting the significance of permutation invariance property. For instance, /deepsets is better than the w2v-Near baseline by 1.5\% in Recall@10 on LDA-5k. (b) On LDA-$1k$, neural network based models do not perform well when compared to w2v-Near. We hypothesize that this is due to small size of the dataset insufficient to train a high capacity neural network, while w2v-Near has been trained on a billion word corpus. Nevertheless, our approach comes the closest to w2v-Near amongst other approaches, and is only 0.5\% lower by Recall@10. 
+
+\begin{figure}[ht]
+    \vspace{-3mm}
+    \centering
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+    \begin{tabular}[b]{c}
+    \textbf{Topic 1} \\ \hline
+     legend \\
+       airy\\
+       tale\\
+       witch\\
+       devil\\
+       giant\\
+      story\\
+      folklore\\
+      \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+     \begin{tabular}[b]{c}
+      \textbf{Topic 2} \\ \hline
+      president   \\
+      vice   \\
+      served   \\
+      office  \\
+      elected   \\
+      secretary \\
+      presidency   \\
+      presidential   \\
+      \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+    \begin{tabular}[b]{c}
+      \textbf{Topic 3} \\ \hline
+       plan   \\
+       proposed   \\
+       plans   \\
+       proposal   \\
+       planning   \\
+       approved   \\
+       planned   \\
+       development   \\
+    \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+    \begin{tabular}[b]{c}
+    \textbf{Topic 4} \\ \hline
+       newspaper   \\
+       daily   \\
+       paper   \\
+       news   \\
+       press   \\
+       published   \\
+       newspapers   \\
+       editor   \\
+    \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+    \begin{tabular}[b]{c}
+     \textbf{Topic 5} \\ \hline
+       round   \\
+       teams   \\
+       final   \\
+       played   \\
+       redirect   \\
+       won   \\
+       competition   \\
+       tournament   \\
+    \end{tabular}
+    \end{subfigure}       
+    \begin{subfigure}[b]{0.15\textwidth}
+    \centering
+    \begin{tabular}[b]{c}
+     \textbf{Topic 6} \\ \hline
+       point   \\
+       angle   \\
+       axis   \\
+       plane   \\
+       direction   \\
+       distance   \\
+       surface   \\
+       curve   \\
+    \end{tabular}
+    \end{subfigure}
+    \caption{\small Examples from our LDA-1k datasets. Notice that each of these are latent topics of LDA and hence are semantically similar.}
+    \label{tab:lda-qual-examples}
+    \vspace{-6mm}
+\end{figure}
+
+
+\newpage
+\section{Image Tagging}
+\label{app:image-tagging-details}
+We next experiment with image tagging, where the task is to retrieve all relevant tags corresponding to an image. Images usually have only a subset of relevant tags, therefore predicting other tags can help enrich information that can further be leveraged in a downstream supervised task. In our setup, we learn to predict tags by conditioning /deepsets on the image. Specifically, we train by learning to predict a partial set of tags from the image and remaining tags. At test time, we the test image is used to predict relevant tags.
+
+\compactparagraph{Datasets}
+We report results on the following three datasets:\\ 
+(a) \emph{ESPgame} \cite{von2004labeling}: Contains around $20k$ images spanning logos, drawings, and personal photos, collected interactively as part of a game. There are a total of $268$ unique tags, with each image having $4.6$ tags on average and a maximum of $15$ tags.\\
+(b) \emph{IAPRTC-12.5} \cite{trove.nla.gov.au/work/3578667}: Comprises of around $20k$ images including pictures of different sports and actions, photographs of people, animals, cities, landscapes, and many other aspects of contemporary life. A total of $291$ unique tags have been extracted from captions for the images. For the above two datasets, train/test splits are similar to those used in previous works \cite{guillaumin2009tagprop, chen2013fast}.\\
+(c) \emph{COCO-Tag: } We also construct a dataset in-house, based on MSCOCO dataset\cite{lin2014microsoft}. COCO is a large image dataset containing around $80k$ train and $40k$ test images, along with five caption annotations. We extract tags by first running a standard spell checker\footnote{\url{http://hunspell.github.io/}} and lemmatizing these captions. Stopwords and numbers are removed from the set of extracted tags. Each image has $15.9$ tags on an average and a maximum of $46$ tags. We show examples of image tags from COCO-Tag in \reffig{fig:coco-tag-examples}. The advantages of using COCO-Tag are three fold--richer concepts, larger vocabulary and more tags per image, making this an ideal dataset to learn image tagging using /deepsets.
+
+\compactparagraph{Image and Word Embeddings}
+Our models use features extracted from Resnet, which is the state-of-the-art convolutional neural network (CNN) on ImageNet 1000 categories dataset using the publicly available 152-layer pretrained model\footnote{\url{github.com/facebook/fb.resnet.torch}}. To represent words, we jointly learn embeddings with the rest of /deepsets neural network for ESPgame and IAPRTC-12.5 datasets. But for COCO-Tag, we bootstrap from $300$ dimensional word2vec embeddings\footnote{\url{https://code.google.com/p/word2vec/}} as the vocabulary for COCO-Tag is significantly larger than both ESPgame and IAPRTC-12.5 ($13k$ vs $0.3k$).
+
+\compactparagraph{Methods}
+The setup for \deepsets to tag images is similar to that described in \refapp{app:lda-model-details}.
+The only difference being the conditioning on the image features, which is concatenated with the set feature obtained from pooling individual element representations.
+In particular, $\phi(x)$ represents each word via $300$-dimensional word2vec embeddings, followed by two fully connected layers of size $300$, with ReLU activations, to construct the set representation or features.
+As mentioned earlier, we concatenate the image features and pass this set features into another NN to assign a single score to the set, shown as $\rho(.)$.
+We instantiate $\rho(.)$ as three fully connected layers of sizes $\{300, 150, 1$\} with ReLU activations.
+The resulting feature forms the new input to a neural network used to score the set, in this case, score the relevance of a tag to the image.
+
+\compactparagraph{Baselines}
+We perform comparisons against several baselines, previously reported from \cite{chen2013fast}. Specifically, we have Least Sq., a ridge regression model, MBRM \cite{Feng:2004:MBR:1896300.1896446}, JEC \cite{Makadia:2008:NBI:1478172.1478199} and FastTag \cite{chen2013fast}. Note that these methods do not use deep features for images, which could lead to an unfair comparison. As there is no publicly available code for MBRM and JEC, we cannot get performances of these models with Resnet extracted features. However, we report results with deep features for FastTag and Least Sq., using code made available by the authors \footnote{\url{http://www.cse.wustl.edu/~mchen/}}.
+
+\compactparagraph{Evaluation}
+For ESPgame and IAPRTC-12.5, we follow the evaluation metrics as in \cite{guillaumin2009tagprop} -- precision (P), recall (R), F1 score (F1) and number of tags with non-zero recall (N+). Note that these metrics are evaluate for each tag and the mean is reported.  We refer to \cite{guillaumin2009tagprop} for further details. For COCO-Tag, however, we use recall@K for three values of K$\;=\{10, 100, 1000\}$, along with median rank and mean reciprocal rank (see evaluation in \refapp{app:lda-model-details} for metric details).
+
+\compactparagraph{Results and Observations}
+\reftab{tab:espgame-iaprtc} contains the results of image tagging on ESPgame and IAPRTC-12.5, and \reftab{tab:coco-tag-table} on COCO-Tag. Here are the key observations from \reftab{tab:espgame-iaprtc}: (a) The performance of /deepsets is comparable to the best of other approaches on all metrics but precision. (b) Our recall beats the best approach by 2\% in ESPgame. On further investigation, we found that /deepsets retrieves more relevant tags, which are not present in list of ground truth tags due to a limited $5$ tag annotation. Thus, this takes a toll on precision while gaining on recall, yet yielding improvement in F1. On the larger and richer COCO-Tag, we see that /deepsets approach outperforms other methods comprehensively, as expected. We show qualitative examples in \reffig{fig:coco-tag-examples}.
+
+\begin{figure}[ht]
+\vspace{-1mm}
+\centering
+\small
+    \begin{subfigure}[b]{0.30\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_1.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_2.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_4.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+    \begin{tabular}[b]{cc}
+      \textbf{GT} & \textbf{Pred} \\ \hline
+      building & \correct{building}\\
+      sign & \correct{street}\\
+      brick & \extra{city}\\
+      picture & \extra{brick}\\
+      empty & \extra{sidewalk}\\
+      white & \extra{side}\\
+      black & \extra{pole}\\
+      street & \correct{white}\\
+      image & \extra{stone}\\
+      \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+     \begin{tabular}[b]{cc}
+      \textbf{GT} & \textbf{Pred} \\ \hline
+      standing & \correct{person}\\
+      surround & \correct{group}\\
+      woman & \extra{man}\\
+      crowd & \correct{table}\\
+      wine & \extra{sit}\\
+      person & \extra{room}\\
+      group & \correct{woman}\\
+      table & \extra{couple}\\
+      bottle & \extra{gather} \\
+      \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+    \begin{tabular}[b]{cc}
+      \textbf{GT} & \textbf{Pred} \\ \hline
+      traffic &\correct{clock}\\
+      city &\correct{tower}\\
+      building &\extra{sky}\\
+      tall &\correct{building}\\
+      large &\correct{tall}\\
+      tower &\correct{large}\\
+      European &\extra{cloudy}\\
+      front &\correct{front}\\
+      clock &\correct{city}\\
+    \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_3.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_5.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[trim={0cm 0 0cm 0},clip, height=\textwidth, width=\textwidth]{figures/coco-tag/example_6.jpg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \begin{tabular}[b]{cc}
+    \textbf{GT} & \textbf{Pred} \\ \hline
+      photograph & \wrong{ski}\\
+      snowboarder & \correct{snow}\\
+      snow & \correct{slope}\\
+      glide & \correct{person}\\
+      hill & \extra{snowy}\\
+      show & \correct{hill}\\
+      person & \correct{man}\\
+      slope & \wrong{skiing}\\
+      young & \wrong{skier}\\
+    \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \begin{tabular}[b]{cc}
+    \textbf{GT} & \textbf{Pred} \\ \hline
+      laptop &\wrong{refrigerator}\\
+      person &\wrong{fridge}\\
+      screen &\correct{room}\\
+      room &\wrong{magnet}\\
+      desk &\wrong{cabinet}\\
+      living &\wrong{kitchen}\\
+      counter &\extra{shelf}\\
+      computer &\extra{wall}\\
+      monitor &\correct{counter}\\
+    \end{tabular}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+    \begin{tabular}[b]{cc}
+    \textbf{GT} & \textbf{Pred} \\ \hline
+      beach &\wrong{jet}\\
+      shoreline &\wrong{airplane}\\
+      stand &\wrong{propeller}\\
+      walk &\extra{ocean}\\
+      sand &\wrong{plane}\\
+      lifeguard &\extra{water}\\
+      white &\extra{body}\\
+      person &\correct{person}\\
+      surfboard &\extra{sky}\\
+    \end{tabular}
+    \end{subfigure}
+    \caption{\small Qualitative examples of image tagging using /deepsets. \emph{Top row}: Positive examples where most of the retrieved tags are present in the ground truth (brown) or are relevant but not present in the ground truth (green). \emph{Bottom row}: Few failure cases with irrelevant/wrong tags (red). From left to right, (i) Confusion between snowboarding and skiing, (ii) Confusion between back of laptop and refrigerator due to which other tags are kitchen-related, (iii) Hallucination of airplane due to similar shape of surfboard.}
+    \label{fig:coco-tag-examples}
+\end{figure}
+
+
+
+\section{Improved Red-shift Estimation Using Clustering Information}\label{app:red_shift}
+An important regression problem in cosmology is to estimate the red-shift of galaxies, corresponding to their age as well as their distance from us~\cite{binney1998galactic}. Two common types of observation for distant galaxies include a) photometric and b) spectroscopic observations, where the latter can produce more accurate red-shift estimates.
+
+One way to estimate the red-shift from photometric observations is using a regression model~\cite{connolly1995slicing}. We use a multi-layer Perceptron for this purpose and use the more accurate spectroscopic red-shift estimates as the ground-truth. As another baseline, we have a photometric redshift estimate that is provided by the catalogue and uses various observations (including clustering information) to estimate individual galaxy-red-shift. Our objective is to use clustering information of the galaxies to improve our red-shift prediction using the multi-layer Preceptron.
+
+Note that the prediction for each galaxy does not change by permuting the members of the galaxy cluster. Therefore, we can treat each galaxy cluster as a ``set'' and use permutation-equivariant layer to estimate the individual galaxy red-shifts.
+ 
+For each galaxy, we have $17$ photometric features \footnote{We have a single measurement for each u,g,r, i and z band as well as measurement error bars, location of the galaxy in the sky,  as well as the probability of each galaxy being the cluster center. We do not include the information regarding the richness estimates of the clusters from the catalog, for any of the methods, so that baseline multi-layer Preceptron is blind to the clusters.} from the redMaPPer galaxy cluster catalog~\cite{rozo2014redmapper}, which contains photometric readings for 26,111 red galaxy clusters.  In this task in contrast to the previous ones, sets have different cardinalities; each galaxy-cluster in this catalog has between $\sim 20-300$ galaxies -- \ie $\xx \in \mathbb{R}^{N(c) \times 17}$, where $N(c)$ is the cluster-size. See \reffig{fig:cluster_results}(a) for distribution of cluster sizes.  The catalog also provides accurate spectroscopic red-shift estimates for a \textit{subset} of these galaxies as well as photometric estimates that uses clustering information.  \reffig{fig:cluster_results}(b) reports the distribution of available spectroscopic red-shift estimates per cluster.
+
+We randomly split the data into 90\% training and 10\% test clusters, and use the following simple architecture for semi-supervised learning. We use four permutation-equivariant layers with 128, 128, 128 and 1 output channels respectively, where the output of the last layer is used as red-shift estimate. The squared loss of the prediction for available spectroscopic red-shifts is minimized.\footnote{We use mini-batches of size 128, Adam~\cite{kingma2014adam}, with learning rate of .001, $\beta_1=.9$ and $\beta_2=.999$. All layers except for the last layer use Tanh units and simultaneous dropout with 50\% dropout rate.} \reffig{fig:cluster_results}(c) shows the agreement of our estimates with spectroscopic readings on the galaxies in the test-set with spectroscopic readings. The figure also compares the photometric estimates provided by the catalogue \cite{rozo2014redmapper}, to the ground-truth. As it is customary in cosmology literature, we report the average  \textbf{scatter} $\frac{|z_{\mathrm{spec}} - z|}{1 + z_{\mathrm{spec}}}$, where $z_{\mathrm{spec}}$ is the accurate spectroscopic measurement and $z$ is a photometric estimate. The average scatter using \textbf{our model}  is $.023$ compared to the scatter of $.025$ in the \textbf{original photometric estimates} for the redMaPPer catalog. Both of these values are averaged over all the galaxies with spectroscopic measurements in the test-set.
+
+We repeat this experiment, replacing the permutation-equivariant layers with fully connected layers (with the same number of parameters) and only use the individual galaxies with available spectroscopic estimate for training. The resulting average scatter for \textbf{multi-layer Perceptron} is $.026$, demonstrating that using clustering information indeed improves photometric red-shift estimates. 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/cosmology.pdf} 
+  \caption{\small Application of permutation-equivariant layer to semi-supervised red-shift prediction using clustering information: (a) distribution of cluster (set) size; (b) distribution of reliable red-shift estimates per cluster; (c) prediction of red-shift on test-set (versus ground-truth) using clustering information as well as RedMaPPer photometric estimates (also using clustering information). }
+  \label{fig:cluster_results}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth,trim={0 5em 0 0},clip]{figures/modelnet2} 
+  \caption{Examples for 8 out of 40 object classes (column) in the ModelNet40. Each point-cloud is produces by sampling 1000 particles from the mesh representation of the original MeodelNet40 instances. Two point-clouds in the same column are from the same class. The projection of particles into xy, zy and xz planes are added for better visualization.}
+  \label{fig:modelnet_dataset}
+\end{figure}
+
+\section{Point Cloud Classification}\label{app:point_cloud}
+\reftab{table:point_cloud-app} presents a more detailed result on classification performance, using different techniques. \reffig{fig:modelnet_dataset} shows examples of the dataset used for training. \reffig{fig:activations} shows the features learned by the first and second layer of our deep model.
+Here, we review the details of architectures used in the experiments.
+
+\begin{table}[b]
+\scalebox{.78}{
+ \begin{tabular}{||l | c c c ||} 
+ \hline
+ model & instance size &  representation & accuracy \\ [0.5ex] 
+ \hline
+  \textbf{\deepsets} + transformation (ours) & \textbf{$\mathbf{5000 \times 3}$} &  point-cloud  &$90 \pm .3 \%$ \\ [0.5ex] 
+  \textbf{\deepsets} (ours) & \textbf{$\mathbf{1000 \times 3}$} &  point-cloud  &$87 \pm 1 \%$ \\ [0.5ex] 
+  \textbf{Deep-Sets w. pooling only} (ours) & \textbf{$\mathbf{1000 \times 3}$} &  point-cloud  &$83 \pm 1 \%$ \\ [0.5ex] 
+  \textbf{\deepsets} (ours) & \textbf{$\mathbf{100 \times 3}$} &  point-cloud  &$82 \pm 2 \%$ \\ [0.5ex] 
+  {KNN graph-convolution} (ours) & $1000 \times (3 + 8)$ &  directed 8-regular graph &$58 \pm 2 \%$ \\ [0.5ex] 
+  3DShapeNets \cite{wu20153d} & $30^3$ &  voxels (using convolutional deep belief net) &$77\%$ \\ [0.5ex] 
+  DeepPano \cite{shi2015deeppano} & $64 \times 160$ &  panoramic image  (2D CNN + angle-pooling)  &$77.64\%$ \\ [0.5ex] 
+  VoxNet \cite{maturana2015voxnet} & $32^3$ &  voxels  (voxels from point-cloud + 3D CNN)  &$83.10\%$ \\ [0.5ex] 
+  MVCNN \cite{su2015multi} & $164 \times 164 \times 12$ &  multi-vew images  (2D CNN + view-pooling)  &$90.1\%$ \\ [0.5ex] 
+  VRN Ensemble \cite{brock2016generative} & $32^3$ &  voxels  (3D CNN, variational autoencoder)  &$95.54\%$ \\ [0.5ex] 
+  3D GAN \cite{wu2016learning} & $64^3$ &  voxels  (3D CNN, generative adversarial training)  &$83.3\%$ \\ [0.5ex] 
+ \hline
+\end{tabular}
+}
+\vspace{1mm}
+\caption{\small Classification accuracy and the (size of) representation used by different methods on the ModelNet40 dataset.}\label{table:point_cloud-app}
+\end{table}
+
+
+\textbf{\deepsets}
+We use a network comprising of 3 permutation-equivariant layers with 256 channels followed by max-pooling over the set structure. The resulting vector representation of the set is then fed to a fully connected layer with 256 units followed by a 40-way softmax unit. We use Tanh activation at all layers and dropout on the layers after set-max-pooling (\ie two dropout operations) with 50\% dropout rate. Applying dropout to permutation-equivariant layers for point-cloud data deteriorated the performance. We observed that using different types of permutation-equivariant layers (see \refapp{app:model}) and as few as 64 channels for set layers changes the result by less than $5\%$ in classification accuracy.
+
+For the setting with 5000 particles, we increase the number of units to 512 in all layers and randomly rotate the input around the $z$-axis. We also randomly scale the point-cloud by $s \sim \mathcal{U}(.8,1./.8)$. For this setting only, we use Adamax~\cite{kingma2014adam} instead of Adam and reduce learning rate from $.001$ to $.0005$.
+
+\textbf{Graph convolution.} For each point-cloud instance with 1000 particles, we build a sparse K-nearest neighbor graph and use the three point coordinates as input features. We normalized all graphs at the preprocessing step. For direct comparison with set layer, we use the exact architecture of 3 graph-convolution layer followed by set-pooling (global graph pooling) and dense layer with 256 units. We use exponential linear activation function instead of Tanh as it performs better for graphs. Due to over-fitting, we use a heavy dropout of 50\% after graph-convolution and dense layers. Similar to dropout for sets, all the randomly selected features are simultaneously dropped across the graph nodes. the  We use a mini-batch size of 64 and Adam for optimization where the learning rate is .001 (the same as that of permutation-equivariant counter-part).
+
+Despite our efficient sparse implementation using Tensorflow, graph-convolution is significantly slower than the set layer. This prevented a thorough search for hyper-parameters and it is quite possible that better hyper-parameter tuning would improve the results that we report here.
+
+\reftab{table:point_cloud-app} compares our method against the competition.\footnote{The error-bar on our results is due to variations depending on the choice of particles during test time and it is estimated over three trials.}  Note that we achieve our best accuracy using $5000\times3$ dimensional representation of each object, which is much smaller than most other methods. All other techniques use either voxelization or multiple view of the 3D object for classification. Interestingly, variations of view/angle-pooling, as in ~\cite{su2015multi,shi2015deeppano}, can be interpreted as set-pooling where the class-label is invariant to permutation of different views. The results also shows that using fully-connected layers with set-pooling alone (without max-normalization over the set) works relatively well.
+
+We see that reducing the number of particles to only 100, still produces comparatively good results. Using graph-convolution is computationally more challenging and produces inferior results in this setting. The results using 5000 particles is also invariant to small changes in scale and rotation around the $z$-axis.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,trim={5em 4em 5em 0},clip]{figures/1and3_smaller_smaller.png} 
+  \caption{\small Each box is the particle-cloud maximizing the activation of a unit at the firs (\textbf{top}) and second (\textbf{bottom}) permutation-equivariant layers of our model. Two images of the same column are two different views of the same point-cloud.}
+  \label{fig:activations}
+\end{figure}
+
+\textbf{Features.}
+To visualize the features learned by the set layers, we used Adamax~\cite{kingma2014adam} to locate 1000 particle coordinates maximizing the activation of each unit.\footnote{We started from uniformly distributed set of particles and used a learning rate of .01 for Adamax, with  first and second order moment of $.1$ and $.9$ respectively. We optimized the input in $10^5$ iterations. The results of \reffig{fig:activations} are limited to instances where tanh units were successfully activated. Since the input at the first layer of our deep network is normalized to have a zero mean and unit standard deviation, we do not need to constrain the input while maximizing unit's activation.} Activating the tanh units beyond the second layer proved to be difficult. \ref{fig:activations} shows the particle-cloud-features learned at the first and second layers of our deep network. We observed that the first layer learns simple localized (often cubic) point-clouds at different $(x,y,z)$ locations, while the second layer learns more complex surfaces with different scales and orientations.
+
+\section{Set Anomaly Detection}\label{app:celeb}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/more_instances} 
+\caption{\small Each row shows a set, constructed from CelebA dataset, such that all set members except for an outlier, share at least two attributes (on the right). The \textbf{outlier is identified with a red frame}. The model is trained by observing examples of sets and their anomalous members, \textbf{without access to the attributes}. The probability assigned to each member by the outlier detection network is visualized using a \textbf{red bar} at the bottom of each image.}
+\label{fig:more2}
+\end{figure}
+Our model has 9 convolution layers with $3\times 3$ receptive fields. The model has convolution layers with $32,32,64$ feature-maps followed by max-pooling followed by 2D convolution layers with $64,64,128$ feature-maps followed by another max-pooling layer. The final set of convolution layers have $128,128,256$ feature-maps, followed by a max-pooling layer with pool-size of $5$ that reduces the output dimension to $\textsf{batch-size} . M \times 256$, where the set-size $M = 16$. This is then forwarded to three permutation-equivariant layers with $256, 128$ and $1$ output channels. The output of final layer is fed to the Softmax, to identify the outlier. We use exponential linear units~\cite{clevert2015fast}, drop out with 20\% dropout rate at convolutional layers and 50\% dropout rate at the first two set layers. When applied to set layers, the selected feature (channel) is simultaneously dropped in all the set members of that particular set. We use Adam~\cite{kingma2014adam} for optimization and use batch-normalization only in the convolutional layers. We use mini-batches of $8$ sets, for a total of $128$ images per batch.
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{figures/more_images} 
+\caption{\small Each row of the images shows a set, constructed from CelebA dataset images, such that all set members except for an outlier, share at least two attributes. The \textbf{outlier is identified with a red frame}. The model is trained by observing examples of sets and their anomalous members and \textbf{without access to the attributes}. The probability assigned to each member by the outlier detection network is visualized using a \textbf{red bar} at the bottom of each image. The probabilities in each row sum to one.}
+\label{fig:more}
+\end{figure}
+
+\end{document}

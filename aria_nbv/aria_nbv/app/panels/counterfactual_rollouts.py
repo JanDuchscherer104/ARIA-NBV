@@ -1,8 +1,7 @@
-"""Streamlit panel for live and stored counterfactual rollout inspection."""
+"""Streamlit panel for live counterfactual rollout generation and evaluation."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
@@ -11,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 import torch
 
@@ -23,6 +23,7 @@ from ...data_handling import (
     VinOfflineDatasetConfig,
     VinOfflineSample,
     VinOfflineStoreConfig,
+    target_gt_obb_world,
 )
 from ...pose_generation import (
     CandidateGenerationRuntimeContext,
@@ -41,14 +42,9 @@ from ...pose_generation import (
 )
 from ...pose_generation.plotting import CounterfactualPlotBuilder, plot_counterfactual_paths_simple
 from ...rendering import CandidateDepthRendererConfig
-from ...rollouts import RolloutZarrStoreReader
+from ...rri_metrics import summarize_target_rollout_metrics
 from ...utils import Console, Verbosity
-from ..rerun_launch import (
-    build_rerun_rollout_spawn_command,
-    format_command,
-    repo_root,
-    spawn_background_command,
-)
+from ..scene_view import ROLLOUT_SCENE_DEFAULTS, apply_scene_plot_options, scene_plot_options_ui
 from ..state_types import config_signature
 from .common import _info_popover, _pretty_label, _report_exception, _strip_ansi
 
@@ -94,10 +90,10 @@ Target table fields:
 _ACTIVE_TARGET_INFO = """
 The active target is the object conditioned into target-RRI rollout generation.
 
-Label format: `target 0 · 28 · sem=28 inst=51297 · score=0.000 · valid`.
+Label format: `target 0 · window · sem=28 inst=51297 · score=... · valid`.
 
 - `target 0`: target row id.
-- `28`: class label as exposed by the current target record; numeric labels appear when no class name is resolved.
+- `window`: class name resolved from the EFM semantic-id map.
 - `sem=... inst=...`: semantic and instance ids used to identify the actor-visible target.
 - `score=...`: target-selection score; it is not an RRI reward.
 - `valid`: GT-only matching succeeded, so target-RRI labels/evaluation crops can be computed.
@@ -110,7 +106,7 @@ This block defines the finite-candidate rollout tree.
 
 - `Scoring mode`: `target_rri` is thesis-core; `scene_rri` and `geometry` are diagnostics.
 - `Candidates per step`: requested valid candidate budget regenerated at each rollout step.
-- `Generator device`: local live rendering uses CPU because PyTorch3D GPU support is not guaranteed here.
+- `Generator device`: CUDA is the preferred default when available; a preflight catches PyTorch3D builds without GPU rasterization support.
 - `Horizon` (`H`): maximum rollout length.
 - `Branch factor` (`B`): number of child actions retained per expanded state.
 - `Beam width`: optional cap on retained partial trajectories.
@@ -153,17 +149,6 @@ Result table and plots:
 - `Logs`: captured Console output from generation/scoring.
 """
 
-_STORED_ROLLOUTS_INFO = """
-Stored rollouts inspect a standalone `rollouts.zarr` shard without recomputation.
-
-- Validation metadata checks table/mask consistency before inspection.
-- The manifest records source/config lineage and source coverage.
-- Target summary separates actor target validity from GT-label validity.
-- Candidate rows show `actor_action`, `q_train`, target/scene RRI labels, and strategy/mixture provenance.
-- `q_train` marks rows usable for finite-candidate `Q_H` training views.
-- Rerun launch opens the selected rollout row in the 3D inspector.
-"""
-
 
 class LiveRolloutScoringMode(StrEnum):
     """Available scoring modes for live rollout generation."""
@@ -183,12 +168,31 @@ class LiveRolloutScoreContext:
 
 
 def _live_rollout_device_options() -> list[str]:
-    """Return UI device choices after verifying PyTorch3D CUDA rasterization."""
+    """Return UI device choices with CUDA first when Torch can see a GPU."""
 
-    options = ["cpu"]
-    if _pytorch3d_cuda_rasterization_available():
-        options.append("cuda")
-    return options
+    return ["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]
+
+
+def _validate_live_rollout_device(device: str) -> None:
+    """Fail fast when CUDA is selected but PyTorch3D cannot rasterize on GPU."""
+
+    if str(device) != "cuda":
+        return
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA was selected, but torch.cuda.is_available() is false. Select CPU or fix CUDA.")
+    if not _pytorch3d_cuda_rasterization_available():
+        raise RuntimeError(
+            "CUDA was selected, but the installed PyTorch3D rasterizer is not compiled with GPU support. "
+            "Select CPU for this session or install a CUDA-enabled PyTorch3D build.",
+        )
+
+
+def _candidate_config_device(config: CandidateViewGeneratorConfig | CandidateMixtureViewGeneratorConfig) -> str:
+    """Return the explicit runtime device stored in a live candidate config."""
+
+    if isinstance(config, CandidateMixtureViewGeneratorConfig):
+        return str(config.base.device)
+    return str(config.device)
 
 
 @lru_cache(maxsize=1)
@@ -446,6 +450,7 @@ def _run_live_rollout(
 
     if sample.efm_snippet_view is None:
         raise ValueError("Live rollout generation requires sample.efm_snippet_view.")
+    _validate_live_rollout_device(_candidate_config_device(candidate_config))
     _validate_policy_for_scoring_mode(
         scoring_mode=scoring_mode,
         selection_policy=rollout_config.selection_policy,
@@ -486,19 +491,77 @@ def _counterfactual_trajectory_rows(
     rows: list[dict[str, int | float | bool | None]] = []
     for traj_idx, trajectory in enumerate(rollouts.trajectories):
         final_pos = trajectory.final_pose_world().t.detach().cpu().reshape(-1).tolist()
-        rows.append(
-            {
-                "trajectory": traj_idx,
-                "steps": len(trajectory.steps),
-                "cumulative_score": float(trajectory.cumulative_score),
-                "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
-                "terminated_early": bool(trajectory.terminated_early),
-                "final_x": float(final_pos[0]),
-                "final_y": float(final_pos[1]),
-                "final_z": float(final_pos[2]),
-            }
-        )
+        metric_summary = summarize_target_rollout_metrics([step.selected_metrics for step in trajectory.steps])
+        rows.append({
+            "trajectory": traj_idx,
+            "steps": len(trajectory.steps),
+            "cumulative_score": float(trajectory.cumulative_score),
+            "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
+            "G_target": metric_summary.cumulative_return,
+            "J_endpoint": metric_summary.endpoint_gain,
+            "log_gain": metric_summary.log_gain,
+            "terminated_early": bool(trajectory.terminated_early),
+            "final_x": float(final_pos[0]),
+            "final_y": float(final_pos[1]),
+            "final_z": float(final_pos[2]),
+        })
     return rows
+
+
+def _trajectory_metric_rows(rollouts: CounterfactualRolloutResult) -> pd.DataFrame:
+    """Return selected-step and fanout metric rows for rollout dashboard plots."""
+
+    rows: list[dict[str, object]] = []
+    for traj_idx, trajectory in enumerate(rollouts.trajectories):
+        cumulative = 0.0
+        for step in trajectory.steps:
+            selected_target_rri = _metric_float(
+                step.selected_metrics.get("target_rri", step.selected_metrics.get("rri"))
+            )
+            if selected_target_rri is not None:
+                cumulative += selected_target_rri
+            valid_target_rri = _valid_step_metric_values(step, "target_rri")
+            fanout_min = float(np.min(valid_target_rri)) if valid_target_rri.size else None
+            fanout_mean = float(np.mean(valid_target_rri)) if valid_target_rri.size else None
+            fanout_max = float(np.max(valid_target_rri)) if valid_target_rri.size else None
+            top_values = sorted(valid_target_rri.tolist(), reverse=True)[:5]
+            rows.append({
+                "trajectory": traj_idx,
+                "step": int(step.step_index) + 1,
+                "selected_target_rri": selected_target_rri,
+                "G_target": cumulative if selected_target_rri is not None else None,
+                "fanout_min": fanout_min,
+                "fanout_mean": fanout_mean,
+                "fanout_max": fanout_max,
+                "valid_candidates": int(step.candidates.mask_valid.sum().item()),
+                "top_target_rri": top_values,
+            })
+    return pd.DataFrame(rows)
+
+
+def _valid_step_metric_values(step: object, metric_name: str) -> np.ndarray:
+    metric_vectors = getattr(step, "metric_vectors", {})
+    values = metric_vectors.get(metric_name)
+    if values is None and metric_name == "target_rri":
+        values = metric_vectors.get("rri")
+    if values is None:
+        return np.asarray([], dtype=float)
+    values_np = values.detach().cpu().numpy().reshape(-1)
+    finite = np.isfinite(values_np)
+    return values_np[finite].astype(float, copy=False)
+
+
+def _metric_float(value: object) -> float | None:
+    try:
+        value_float = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value_float if np.isfinite(value_float) else None
+
+
+def _format_optional_metric(value: object) -> str:
+    value_float = _metric_float(value)
+    return "n/a" if value_float is None else f"{value_float:.4f}"
 
 
 def _target_rows_table(rows: tuple[TargetCandidateRow, ...]) -> list[dict[str, object]]:
@@ -548,6 +611,79 @@ def _format_target_option(row: TargetCandidateRow) -> str:
     return (
         f"target {row.target_row_id} · {row.class_name} · sem={row.sem_id} inst={row.inst_id} · "
         f"score={row.score:.3f} · {status}"
+    )
+
+
+def _add_target_overlays(
+    builder: CounterfactualPlotBuilder,
+    sample: VinOfflineSample,
+    target: TargetCandidateRow | None,
+    *,
+    show_actor_target: bool,
+    show_gt_target: bool,
+) -> None:
+    """Add actor-visible and GT-only target OBB overlays to a rollout plot."""
+
+    if target is None:
+        return
+    if show_actor_target:
+        builder.add_actor_visible_target_obb(target)
+    if not show_gt_target:
+        return
+    if not target.gt_label_valid:
+        st.warning(
+            "The active target has no valid matched GT crop; only the actor-visible target OBB can be shown.",
+        )
+        return
+    try:
+        builder.add_matched_gt_target_obb(sample, target)
+    except ValueError as exc:
+        st.warning(f"Matched GT target OBB unavailable: {exc}")
+
+
+def _add_target_semidense_crop(
+    builder: CounterfactualPlotBuilder,
+    sample: VinOfflineSample,
+    target: TargetCandidateRow | None,
+    *,
+    crop_basis: str,
+    max_points: int = 12000,
+) -> None:
+    """Overlay semidense points cropped to the actor-visible or GT target OBB."""
+
+    if target is None:
+        return
+    if crop_basis == "GT/evaluation OBB":
+        if not target.gt_label_valid:
+            st.warning("GT semidense crop unavailable because the active target has no valid GT match.")
+            return
+        try:
+            gt_obb = target_gt_obb_world(target, sample)
+        except ValueError as exc:
+            st.warning(f"GT semidense crop unavailable: {exc}")
+            return
+        extents = (gt_obb.bb3_max_object - gt_obb.bb3_min_object).detach().cpu().numpy()
+        builder.add_semidense_in_oriented_box(
+            pose_world_object=gt_obb.T_world_object,
+            extents=extents,
+            name="Target semidense crop / GT evaluation",
+            max_points=max_points,
+            last_frame_only=False,
+            color="cyan",
+            size=3,
+            opacity=0.85,
+        )
+        return
+
+    builder.add_semidense_in_oriented_box(
+        pose_world_object=target.pose_world_object,
+        extents=target.extents,
+        name="Target semidense crop / actor-visible",
+        max_points=max_points,
+        last_frame_only=False,
+        color="gold",
+        size=3,
+        opacity=0.85,
     )
 
 
@@ -663,8 +799,10 @@ def _render_live_rollouts_tab() -> None:
                 index=0,
                 key="cf_generator_device",
             )
-            if torch.cuda.is_available() and "cuda" not in _live_rollout_device_options():
-                st.caption("CUDA is hidden because the PyTorch3D rasterization smoke check failed.")
+            if str(device) == "cuda":
+                st.caption(
+                    "CUDA is preflighted before rollout generation; select CPU if this environment lacks GPU PyTorch3D."
+                )
         with cfg_col2:
             horizon = int(st.slider("Horizon", min_value=1, max_value=5, value=3, step=1, key="cf_horizon"))
             branch_factor = int(
@@ -685,7 +823,7 @@ def _render_live_rollouts_tab() -> None:
             selection_policy = st.selectbox(
                 "Selection policy",
                 options=policy_options,
-                index=0,
+                index=policy_options.index(CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX),
                 format_func=lambda policy: policy.value,
                 key="cf_selection_policy",
             )
@@ -788,17 +926,15 @@ def _render_live_rollouts_tab() -> None:
         backprojection_stride=int(backprojection_stride),
     )
 
-    run_key = "|".join(
-        [
-            load_key,
-            scoring_mode.value,
-            "" if selected_target is None else selected_target.target_id,
-            config_signature(candidate_config),
-            config_signature(rollout_cfg),
-            config_signature(target_scorer_cfg),
-            config_signature(scene_scorer_cfg),
-        ]
-    )
+    run_key = "|".join([
+        load_key,
+        scoring_mode.value,
+        "" if selected_target is None else selected_target.target_id,
+        config_signature(candidate_config),
+        config_signature(rollout_cfg),
+        config_signature(target_scorer_cfg),
+        config_signature(scene_scorer_cfg),
+    ])
     rollout_cache = st.session_state.setdefault("cf_live_rollout_cache", {})
     if st.button("Run / refresh live rollouts", key="cf_run_live_rollouts"):
         try:
@@ -827,13 +963,20 @@ def _render_live_rollouts_tab() -> None:
 
     rollouts = cached_rollout["rollouts"]
     log_text = cached_rollout["logs"]
-    _render_rollout_result(sample, rollouts, log_text=log_text, scoring_mode=scoring_mode)
+    _render_rollout_result(
+        sample,
+        rollouts,
+        target=selected_target,
+        log_text=log_text,
+        scoring_mode=scoring_mode,
+    )
 
 
 def _render_rollout_result(
     sample: VinOfflineSample,
     rollouts: CounterfactualRolloutResult,
     *,
+    target: TargetCandidateRow | None,
     log_text: str,
     scoring_mode: LiveRolloutScoringMode,
 ) -> None:
@@ -851,23 +994,75 @@ def _render_rollout_result(
         st.info("Geometry mode does not compute RRI; cumulative_rri is intentionally empty.")
 
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    _render_live_rollout_metric_dashboard(rollouts, rows=rows, scoring_mode=scoring_mode)
 
     plot_tab, step_tab, log_tab = st.tabs(["Paths", "Step Shell", "Logs"])
     snippet = sample.efm_snippet_view
     with plot_tab:
-        show_selected_frusta = st.checkbox("Overlay selected frusta", value=True, key="cf_show_selected_frusta")
         if snippet is not None:
-            builder = (
-                CounterfactualPlotBuilder.from_rollouts(
-                    snippet,
-                    rollouts,
-                    title=_pretty_label("Counterfactual rollout paths"),
-                )
-                .add_mesh()
-                .add_counterfactual_paths(show_step_markers=True)
+            scene_camera, scene_options = scene_plot_options_ui(
+                snippet,
+                key_prefix="cf_path_scene",
+                title="3D rollout scene",
+                defaults=ROLLOUT_SCENE_DEFAULTS,
             )
+            target_col1, target_col2, target_col3, frustum_col = st.columns(4)
+            show_actor_target = target_col1.checkbox(
+                "Show actor-visible target OBB",
+                value=target is not None,
+                key="cf_path_actor_target_obb",
+            )
+            show_gt_target = target_col2.checkbox(
+                "Show matched GT target OBB",
+                value=bool(target is not None and target.gt_label_valid),
+                key="cf_path_gt_target_obb",
+            )
+            show_target_crop = target_col3.checkbox(
+                "Show target semidense crop",
+                value=target is not None,
+                key="cf_path_target_semidense_crop",
+            )
+            show_selected_frusta = frustum_col.checkbox(
+                "Overlay selected frusta",
+                value=True,
+                key="cf_show_selected_frusta",
+            )
+            crop_basis = st.selectbox(
+                "Target crop basis",
+                options=["Actor-visible OBB", "GT/evaluation OBB"],
+                index=0,
+                key="cf_path_target_crop_basis",
+                disabled=not show_target_crop,
+            )
+            selected_frustum_scale = float(
+                st.slider(
+                    "Selected frustum scale",
+                    min_value=0.1,
+                    max_value=2.0,
+                    value=0.45,
+                    step=0.05,
+                    key="cf_selected_frustum_scale",
+                    disabled=not show_selected_frusta,
+                )
+            )
+            builder = CounterfactualPlotBuilder.from_rollouts(
+                snippet,
+                rollouts,
+                title=_pretty_label("Counterfactual rollout paths"),
+            )
+            apply_scene_plot_options(builder, snippet, camera=scene_camera, options=scene_options)
+            _add_target_overlays(
+                builder,
+                sample,
+                target,
+                show_actor_target=show_actor_target,
+                show_gt_target=show_gt_target,
+            )
+            if show_target_crop:
+                _add_target_semidense_crop(builder, sample, target, crop_basis=str(crop_basis))
+            builder.add_counterfactual_paths(show_step_markers=True)
             if show_selected_frusta:
-                builder = builder.add_counterfactual_selected_frusta(scale=0.45)
+                builder = builder.add_counterfactual_selected_frusta(scale=selected_frustum_scale)
             st.plotly_chart(builder.finalize(), width="stretch")
         else:
             st.plotly_chart(plot_counterfactual_paths_simple(rollouts), width="stretch")
@@ -900,230 +1095,224 @@ def _render_rollout_result(
                 if snippet is None:
                     st.info("Step-shell plot requires the attached EFM snippet.")
                 else:
-                    step_fig = (
-                        CounterfactualPlotBuilder.from_rollouts(
-                            snippet,
-                            rollouts,
-                            title=_pretty_label(f"Counterfactual step {step_display_index}"),
-                        )
-                        .add_mesh()
-                        .add_counterfactual_step_shell(
-                            trajectory_index=int(trajectory_index),
-                            step_index=int(step_display_index - 1),
-                            include_rejected=include_rejected,
-                            show_frusta=True,
-                        )
-                        .finalize()
+                    step_camera, step_scene_options = scene_plot_options_ui(
+                        snippet,
+                        key_prefix="cf_step_scene",
+                        title="3D step-shell scene",
+                        defaults=ROLLOUT_SCENE_DEFAULTS,
                     )
+                    step_target_col1, step_target_col2, step_target_col3, step_frustum_col = st.columns(4)
+                    show_step_actor_target = step_target_col1.checkbox(
+                        "Show actor-visible target OBB",
+                        value=target is not None,
+                        key="cf_step_actor_target_obb",
+                    )
+                    show_step_gt_target = step_target_col2.checkbox(
+                        "Show matched GT target OBB",
+                        value=bool(target is not None and target.gt_label_valid),
+                        key="cf_step_gt_target_obb",
+                    )
+                    show_step_target_crop = step_target_col3.checkbox(
+                        "Show target semidense crop",
+                        value=target is not None,
+                        key="cf_step_target_semidense_crop",
+                    )
+                    show_candidate_frusta = step_frustum_col.checkbox(
+                        "Show candidate frusta",
+                        value=True,
+                        key="cf_step_candidate_frusta",
+                    )
+                    step_crop_basis = st.selectbox(
+                        "Step target crop basis",
+                        options=["Actor-visible OBB", "GT/evaluation OBB"],
+                        index=0,
+                        key="cf_step_target_crop_basis",
+                        disabled=not show_step_target_crop,
+                    )
+                    step_builder = CounterfactualPlotBuilder.from_rollouts(
+                        snippet,
+                        rollouts,
+                        title=_pretty_label(f"Counterfactual step {step_display_index}"),
+                    )
+                    apply_scene_plot_options(step_builder, snippet, camera=step_camera, options=step_scene_options)
+                    _add_target_overlays(
+                        step_builder,
+                        sample,
+                        target,
+                        show_actor_target=show_step_actor_target,
+                        show_gt_target=show_step_gt_target,
+                    )
+                    if show_step_target_crop:
+                        _add_target_semidense_crop(step_builder, sample, target, crop_basis=str(step_crop_basis))
+                    step_builder.add_counterfactual_step_shell(
+                        trajectory_index=int(trajectory_index),
+                        step_index=int(step_display_index - 1),
+                        include_rejected=include_rejected,
+                        show_frusta=show_candidate_frusta,
+                    )
+                    step_fig = step_builder.finalize()
                     st.plotly_chart(step_fig, width="stretch")
 
     with log_tab:
-        if log_text.strip():
-            st.code(log_text, language="text")
-        else:
-            st.caption("No Console output was emitted during this rollout run.")
+        st.caption("No implemented content yet.")
 
 
-def _render_stored_rollouts_tab() -> None:
-    st.header("Stored Rollout Zarr")
-    st.caption("Load a standalone rollouts.zarr store, validate row contracts, and open selected rows in Rerun.")
-    _info_popover("stored rollouts", _STORED_ROLLOUTS_INFO)
-    default_store = repo_root() / ".data" / "offline_cache" / "rollouts_v1_smoke.zarr"
-    default_config = repo_root() / ".configs" / "rerun_offline.toml"
-    store_path = Path(
-        st.text_input("rollouts.zarr path", value=str(default_store), key="rollout_store_path")
-    ).expanduser()
-    config_path = Path(
-        st.text_input("Rerun inspector config", value=str(default_config), key="rollout_rerun_config_path")
-    ).expanduser()
+def _render_live_rollout_metric_dashboard(
+    rollouts: CounterfactualRolloutResult,
+    *,
+    rows: list[dict[str, int | float | bool | None]],
+    scoring_mode: LiveRolloutScoringMode,
+) -> None:
+    """Render branch-summary RRI plots for live rollout evidence."""
 
-    if not store_path.exists():
-        st.info("Enter an existing rollouts.zarr path to inspect generated rollout rows.")
+    if scoring_mode is LiveRolloutScoringMode.GEOMETRY:
         return
 
-    try:
-        reader = RolloutZarrStoreReader(store_path)
-        manifest_bundle = reader.manifest()
-        validation = reader.validate()
-    except Exception as exc:  # pragma: no cover - UI guard
-        _report_exception(exc, context="Failed to load rollout store")
+    rows_df = pd.DataFrame(rows)
+    step_df = _trajectory_metric_rows(rollouts)
+    metric_cols = st.columns(4)
+    if rows_df.empty:
+        metric_cols[0].metric("Best branch", "n/a")
+        metric_cols[1].metric("Best G_t^(H)", "n/a")
+        metric_cols[2].metric("Best J_e^(H)", "n/a")
+        metric_cols[3].metric("Mean valid fanout", "n/a")
         return
 
-    root_attrs = dict(reader.root.attrs)
-    meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
-    meta_col1.metric("Rollouts", validation.num_rollouts)
-    meta_col2.metric("Steps", validation.num_steps)
-    meta_col3.metric("Candidates", validation.num_candidates)
-    meta_col4.metric("Validation", "OK" if validation.ok else "FAILED")
-    if validation.ok:
-        st.success("Store validation passed.")
+    cumulative_score = pd.to_numeric(rows_df["cumulative_score"], errors="coerce")
+    g_target = pd.to_numeric(rows_df["G_target"], errors="coerce")
+    j_endpoint = pd.to_numeric(rows_df["J_endpoint"], errors="coerce")
+    best_idx = int(cumulative_score.idxmax())
+    metric_cols[0].metric("Best branch", int(rows_df.loc[best_idx, "trajectory"]))
+    metric_cols[1].metric("Best G_t^(H)", _format_optional_metric(g_target.max()))
+    metric_cols[2].metric("Best J_e^(H)", _format_optional_metric(j_endpoint.max()))
+    mean_fanout = None if step_df.empty else step_df["valid_candidates"].mean()
+    metric_cols[3].metric("Mean valid fanout", _format_optional_metric(mean_fanout))
+
+    if step_df.empty:
+        st.info("No selected rollout steps are available for metric plots.")
+        return
+
+    rri_fig = go.Figure()
+    for traj_idx, traj_df in step_df.groupby("trajectory", sort=True):
+        rri_fig.add_trace(
+            go.Scatter(
+                x=traj_df["step"],
+                y=traj_df["selected_target_rri"],
+                mode="lines+markers",
+                name=f"traj {traj_idx} selected r_t^e",
+            )
+        )
+        rri_fig.add_trace(
+            go.Scatter(
+                x=traj_df["step"],
+                y=traj_df["G_target"],
+                mode="lines+markers",
+                name=f"traj {traj_idx} G_t^(H)",
+                line={"dash": "dash"},
+            )
+        )
+    rri_fig.update_layout(
+        title="Selected target-RRI return by rollout step",
+        xaxis_title="rollout step",
+        yaxis_title="target RRI / cumulative return",
+    )
+
+    fanout_fig = go.Figure()
+    for traj_idx, traj_df in step_df.groupby("trajectory", sort=True):
+        fanout_fig.add_trace(
+            go.Scatter(
+                x=traj_df["step"],
+                y=traj_df["fanout_max"],
+                mode="lines",
+                name=f"traj {traj_idx} candidate max",
+                line={"width": 1},
+            )
+        )
+        fanout_fig.add_trace(
+            go.Scatter(
+                x=traj_df["step"],
+                y=traj_df["fanout_mean"],
+                mode="lines+markers",
+                name=f"traj {traj_idx} candidate mean",
+            )
+        )
+        fanout_fig.add_trace(
+            go.Scatter(
+                x=traj_df["step"],
+                y=traj_df["fanout_min"],
+                mode="lines",
+                name=f"traj {traj_idx} candidate min",
+                line={"width": 1, "dash": "dot"},
+            )
+        )
+    fanout_fig.update_layout(
+        title="Valid-candidate target-RRI fanout",
+        xaxis_title="rollout step",
+        yaxis_title="candidate target RRI",
+    )
+
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.plotly_chart(rri_fig, width="stretch")
+    with chart_col2:
+        st.plotly_chart(fanout_fig, width="stretch")
+
+    top_rows = []
+    for row in step_df.itertuples(index=False):
+        for rank, value in enumerate(row.top_target_rri, start=1):
+            top_rows.append({
+                "trajectory": int(row.trajectory),
+                "step": int(row.step),
+                "rank": rank,
+                "top_target_rri": float(value),
+            })
+    if top_rows:
+        top_df = pd.DataFrame(top_rows)
+        top_fig = go.Figure()
+        for (traj_idx, rank), rank_df in top_df.groupby(["trajectory", "rank"], sort=True):
+            top_fig.add_trace(
+                go.Scatter(
+                    x=rank_df["step"],
+                    y=rank_df["top_target_rri"],
+                    mode="lines+markers",
+                    name=f"traj {traj_idx} top-{rank}",
+                )
+            )
+        top_fig.update_layout(
+            title="Top-k valid candidate target RRI per step",
+            xaxis_title="rollout step",
+            yaxis_title="target RRI",
+        )
+        st.plotly_chart(top_fig, width="stretch")
+
+    if rows_df["J_endpoint"].notna().any() or rows_df["log_gain"].notna().any():
+        endpoint_fig = go.Figure()
+        endpoint_fig.add_trace(go.Bar(x=rows_df["trajectory"], y=rows_df["J_endpoint"], name="J_e^(H)"))
+        endpoint_fig.add_trace(go.Bar(x=rows_df["trajectory"], y=rows_df["log_gain"], name="log gain"))
+        endpoint_fig.update_layout(
+            title="Endpoint target-quality metrics",
+            xaxis_title="trajectory",
+            yaxis_title="gain",
+            barmode="group",
+        )
+        st.plotly_chart(endpoint_fig, width="stretch")
     else:
-        st.error("Store validation failed.")
-        st.dataframe([{"error": error} for error in validation.errors], width="stretch", hide_index=True)
-
-    with st.expander("Root metadata", expanded=False):
-        st.json(root_attrs)
-    with st.expander("Generation manifest", expanded=False):
-        st.json(manifest_bundle["manifest"])
-
-    _render_rollout_store_summaries(reader, manifest=manifest_bundle["manifest"])
-    rollout_ids = reader.array("rollouts/rollout_row_id").astype(int).tolist()
-    if not rollout_ids:
-        st.info("No rollout rows are present.")
-        return
-    selected_rollout = int(
-        st.selectbox(
-            "Rollout row",
-            options=rollout_ids,
-            format_func=lambda row_id: _format_rollout_option(reader, row_id),
-            key="rollout_row_selector",
+        st.caption(
+            "Endpoint `J_e^(H)` and log-gain are unavailable for this run because selected target point-mesh before/after fields were not emitted."
         )
-    )
-    st.dataframe(_candidate_rows_for_rollout(reader, selected_rollout), width="stretch", hide_index=True)
-    command = build_rerun_rollout_spawn_command(
-        config_path=config_path,
-        rollout_store=store_path,
-        rollout_row_id=selected_rollout,
-    )
-    st.code(format_command(command), language="bash")
-    if st.button("Open selected rollout in Rerun", key="rollout_open_rerun"):
-        try:
-            process = spawn_background_command(command)
-        except Exception as exc:  # pragma: no cover - UI guard
-            _report_exception(exc, context="Failed to spawn Rerun inspector")
-        else:
-            st.success(f"Spawned Rerun inspector with pid {process.pid}.")
-
-
-def _render_rollout_store_summaries(reader: RolloutZarrStoreReader, *, manifest: dict[str, object]) -> None:
-    target_rows = reader.array("targets/target_row_id")
-    rollout_rows = reader.array("rollouts/rollout_row_id")
-    step_rows = reader.array("steps/step_row_id")
-    candidate_rows = reader.array("candidates/candidate_row_id")
-    q_h = reader.q_h_view()
-    q_train = q_h["q_train_mask"]
-    valid_action = q_h["valid_action_mask"]
-    actor_action = reader.array("candidates/actor_action_mask")
-    oracle_label = reader.array("candidates/oracle_label_mask")
-    summary = [
-        {"table": "targets", "rows": int(target_rows.shape[0])},
-        {"table": "rollouts", "rows": int(rollout_rows.shape[0])},
-        {"table": "steps", "rows": int(step_rows.shape[0])},
-        {"table": "candidates", "rows": int(candidate_rows.shape[0])},
-        {"table": "actor_action candidates", "rows": int(actor_action.sum())},
-        {"table": "oracle_label candidates", "rows": int(oracle_label.sum())},
-        {"table": "q_h valid actions", "rows": int(valid_action.sum())},
-        {"table": "q_h train cells", "rows": int(q_train.sum())},
-    ]
-    st.dataframe(summary, width="stretch", hide_index=True)
-    coverage = manifest.get("source_coverage", {})
-    if isinstance(coverage, dict) and coverage:
-        st.markdown("**Source coverage**")
-        st.json(coverage)
-    target_summary = []
-    target_valid = reader.array("targets/target_valid_mask")
-    gt_valid = reader.array("targets/gt_label_valid_mask")
-    for row_id, valid, gt_label in zip(target_rows, target_valid, gt_valid, strict=True):
-        target_summary.append(
-            {
-                "target_row_id": int(row_id),
-                "target_valid": bool(valid),
-                "gt_label_valid": bool(gt_label),
-            }
-        )
-    if target_summary:
-        st.dataframe(target_summary, width="stretch", hide_index=True)
-
-
-def _candidate_rows_for_rollout(reader: RolloutZarrStoreReader, rollout_row_id: int) -> list[dict[str, object]]:
-    rollout_ids = reader.array("candidates/rollout_row_id")
-    mask = rollout_ids == int(rollout_row_id)
-    candidate_row_ids = reader.array("candidates/candidate_row_id")
-    step_indices = reader.array("candidates/step_index")
-    shell_indices = reader.array("candidates/shell_index")
-    selected_mask = reader.array("candidates/selected_mask")
-    actor_action_mask = reader.array("candidates/actor_action_mask")
-    q_train_mask = reader.array("candidates/q_train_mask")
-    target_rri = reader.array("candidates/target_rri")
-    scene_rri = reader.array("candidates/scene_rri")
-    strategy_id = reader.array("candidates/strategy_id")
-    mixture_id = reader.array("candidates/mixture_id")
-    rows: list[dict[str, object]] = []
-    for index in np.nonzero(mask)[0].tolist():
-        rows.append(
-            {
-                "candidate_row_id": int(candidate_row_ids[index]),
-                "step_index": int(step_indices[index]),
-                "shell_index": int(shell_indices[index]),
-                "selected": bool(selected_mask[index]),
-                "actor_action": bool(actor_action_mask[index]),
-                "q_train": bool(q_train_mask[index]),
-                "target_rri": _finite_or_none(target_rri[index]),
-                "scene_rri": _finite_or_none(scene_rri[index]),
-                "strategy_id": int(strategy_id[index]),
-                "mixture_id": int(mixture_id[index]),
-            }
-        )
-    return rows
-
-
-def _format_rollout_option(reader: RolloutZarrStoreReader, rollout_row_id: int) -> str:
-    rollout_rows = reader.array("rollouts/rollout_row_id")
-    matches = np.nonzero(rollout_rows == int(rollout_row_id))[0]
-    if matches.size != 1:
-        return f"rollout {rollout_row_id}"
-    index = int(matches[0])
-    policies = _string_list(reader, "dictionaries/policy")
-    scenes = _string_list(reader, "dictionaries/scene")
-    policy = _dict_value(policies, int(reader.array("rollouts/policy_id")[index]))
-    scene = _dict_value(scenes, int(reader.array("rollouts/scene_id")[index]))
-    target_row = int(reader.array("rollouts/target_row_id")[index])
-    chain = int(reader.array("rollouts/chain_id")[index])
-    horizon = int(reader.array("rollouts/horizon")[index])
-    branch_factor = int(reader.array("rollouts/branch_factor")[index])
-    beam = _format_stored_beam_width(int(reader.array("rollouts/beam_width")[index]))
-    return (
-        f"{rollout_row_id} · scene {scene} · target {target_row} · {policy} · "
-        f"chain {chain} · H={horizon} · B={branch_factor} · beam={beam}"
-    )
-
-
-def _format_stored_beam_width(value: int) -> str:
-    return "NaN" if int(value) < 0 else str(int(value))
-
-
-def _string_list(reader: RolloutZarrStoreReader, path: str) -> list[str]:
-    try:
-        return json.loads(bytes(reader.array(path).tolist()).decode("utf-8"))
-    except Exception:
-        return []
-
-
-def _dict_value(values: list[str], index: int) -> str:
-    if index < 0 or index >= len(values):
-        return ""
-    return values[index]
-
-
-def _finite_or_none(value: object) -> float | None:
-    value_float = float(value)
-    return value_float if np.isfinite(value_float) else None
 
 
 def render_counterfactual_rollouts_page() -> None:
-    """Render live target-RRI generation and stored rollout inspection."""
+    """Render live target-RRI rollout generation and evaluation."""
 
-    live_tab, stored_tab = st.tabs(["Live Rollouts", "Stored Rollouts"])
-    with live_tab:
-        _info_popover(
-            "live target-rri rollouts",
-            "Target-RRI mode loads a VIN offline sample, selects an actor-visible target, "
-            "uses GT only for matching/evaluation crops, and scores selected rollout branches "
-            "with target-specific oracle RRI.",
-        )
-        _render_live_rollouts_tab()
-    with stored_tab:
-        _render_stored_rollouts_tab()
+    _info_popover(
+        "live target-rri rollouts",
+        "Target-RRI mode loads a VIN offline sample, selects an actor-visible target, "
+        "uses GT only for matching/evaluation crops, and scores selected rollout branches "
+        "with target-specific oracle RRI. Persisted rollout-Zarr inspection now lives on "
+        "the VIN Offline Dataset page.",
+    )
+    _render_live_rollouts_tab()
 
 
 __all__ = [

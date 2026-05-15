@@ -1,0 +1,7 @@
+\begin{figure*}
+  \centering
+  %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+  \includegraphics[width=\linewidth]{supp_mat/images/surface_coverage_gain_module.png}
+  \caption{{\bf Architecture of the surface coverage gain module, inspired by~\cite{guedon-nips22-scone-surface-coverage}.} which predicts a visibility gain for a sequence of 3D points $p_i$ in the field of view of camera $c$. To make this prediction, the model encodes the points $p_i$ concatenated with their occupancy probability $\sigma_t(p_i)$. We use an attention mechanism to take into account occlusion effects in the volume between the 3D points and their consequences on the visibility gains. We finally use a Monte Carlo integration to compute the coverage gain $G_t(c)$ of camera $c$.}
+  \label{fig:supp-mat-coverage-module}
+\end{figure*}

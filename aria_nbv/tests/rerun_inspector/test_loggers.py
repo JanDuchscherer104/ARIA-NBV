@@ -527,12 +527,12 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     cfg.primitives.log_candidate_centers = False
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(
-        obbs=_obb_tensor(0.0, sem_id=3, inst_id=8, prob=0.7),
-        sem_id_to_name=["table", "sofa", "shelf", "chair"],
+        obbs=_obb_tensor(0.0, sem_id=28, inst_id=8, prob=0.7),
+        sem_id_to_name={28: "window"},
     )
     sample.detected_obbs = SimpleNamespace(
         obbs=_obb_tensor(1.0, sem_id=99, inst_id=2, prob=0.4),
-        sem_id_to_name=["table"],
+        sem_id_to_name={0: "table"},
     )
     fake = _FakeRerun()
 
@@ -544,7 +544,7 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
 
     gt_label = fake.logged[ENTITY_GT_OBBS].kwargs["labels"][0]
     detected_labels = fake.logged_extras[ENTITY_DETECTED_OBBS][0].kwargs["obb_label"]
-    assert gt_label == "class=chair | sem_id=3 | inst_id=8 | prob=0.700"  # noqa: S101
+    assert gt_label == "class=window | sem_id=28 | inst_id=8 | prob=0.700"  # noqa: S101
     assert detected_labels == ["class=<unknown> | sem_id=99 | inst_id=2 | prob=0.400"]  # noqa: S101
     assert "labels" not in fake.logged[ENTITY_DETECTED_OBBS].kwargs  # noqa: S101
     assert fake.logged[ENTITY_GT_OBBS].kwargs["colors"][0] == TARGET_OBB_RGBA.tolist()  # noqa: S101
@@ -562,7 +562,7 @@ def test_target_obb_hint_accepts_rollout_target_id_tokens() -> None:
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(
         obbs=_obb_tensor(0.0, sem_id=28, inst_id=34, prob=1.0),
-        sem_id_to_name=[],
+        sem_id_to_name={},
     )
     fake = _FakeRerun()
 
@@ -580,22 +580,25 @@ def test_target_obb_hint_accepts_rollout_target_id_tokens() -> None:
 
 
 def test_efm_voxel_fields_log_thresholded_points() -> None:
-    """Curated EFM voxel fields should be spatialized under world/efm."""
+    """Curated EFM voxel fields should map tensor axes as D->z, H->y, W->x."""
 
     cfg = RerunOfflineInspectorConfig()
     cfg.primitives.log_semidense = False
     cfg.primitives.log_reference_pose = False
     cfg.primitives.log_candidate_frusta = False
     cfg.primitives.log_candidate_centers = False
+    cfg.efm_voxels.log_occ_pr = True
     cfg.efm_voxels.occ_threshold = 0.5
     cfg.efm_voxels.cent_threshold = 0.5
     cfg.efm_voxels.cent_nms_threshold = 0.5
-    cfg.efm_voxels.max_points_per_field = 2
-    field = torch.tensor([[[[[0.1, 0.9], [0.8, 0.0]], [[0.2, 0.7], [0.6, 0.3]]]]], dtype=torch.float32)
+    cfg.efm_voxels.max_points_per_field = 10
+    field = torch.zeros((1, 1, 2, 3, 4), dtype=torch.float32)
+    field[0, 0, 0, 1, 3] = 0.9
+    field[0, 0, 1, 2, 0] = 0.7
     sample = _sample()
     sample.backbone_out = SimpleNamespace(
-        t_world_voxel=_poses([[1.0, 0.0, 0.0]]),
-        voxel_extent=torch.tensor([0.0, 2.0, 0.0, 2.0, 0.0, 2.0], dtype=torch.float32),
+        t_world_voxel=_poses([[1.0, 2.0, 3.0]]),
+        voxel_extent=torch.tensor([10.0, 18.0, 20.0, 26.0, 30.0, 34.0], dtype=torch.float32),
         occ_pr=field,
         cent_pr=field,
         cent_pr_nms=field,
@@ -611,12 +614,15 @@ def test_efm_voxel_fields_log_thresholded_points() -> None:
     for name in ("occ_pr", "cent_pr", "cent_pr_nms"):
         entity = f"{ENTITY_EFM_VOXELS}/{name}"
         assert entity in fake.logged  # noqa: S101
-        assert np.asarray(fake.logged[entity].args[0]).shape == (2, 3)  # noqa: S101
+        np.testing.assert_allclose(
+            np.asarray(fake.logged[entity].args[0]),
+            np.asarray([[18.0, 25.0, 34.0], [12.0, 27.0, 36.0]], dtype=np.float32),
+        )
     assert ENTITY_EFM_VOXEL_EXTENT in fake.logged  # noqa: S101
 
 
 def test_efm_voxel_extent_logs_posed_native_box() -> None:
-    """The EFM voxel extent should be a local box posed by T_world_voxel."""
+    """The EFM voxel extent should be logged as a world-space oriented box."""
 
     cfg = RerunOfflineInspectorConfig()
     cfg.primitives.log_semidense = False
@@ -639,12 +645,13 @@ def test_efm_voxel_extent_logs_posed_native_box() -> None:
         selection="sample_key=sample-0",
     )
 
-    transform = fake.logged[ENTITY_EFM_VOXEL_EXTENT]
-    box = fake.logged_extras[ENTITY_EFM_VOXEL_EXTENT][0]
-    assert transform.kwargs["translation"] == [1.0, 2.0, 3.0]  # noqa: S101
-    assert transform.kwargs["relation"] == "ParentFromChild"  # noqa: S101
-    np.testing.assert_allclose(np.asarray(box.kwargs["centers"]), np.asarray([[1.0, 0.0, 6.0]], dtype=np.float32))
+    box = fake.logged[ENTITY_EFM_VOXEL_EXTENT]
+    assert fake.logged_extras[ENTITY_EFM_VOXEL_EXTENT] == ()  # noqa: S101
+    np.testing.assert_allclose(np.asarray(box.kwargs["centers"]), np.asarray([[2.0, 2.0, 9.0]], dtype=np.float32))
     np.testing.assert_allclose(np.asarray(box.kwargs["half_sizes"]), np.asarray([[1.0, 2.0, 2.0]], dtype=np.float32))
+    np.testing.assert_allclose(
+        np.asarray(box.kwargs["quaternions"]), np.asarray([[0.0, 0.0, 0.0, 1.0]], dtype=np.float32)
+    )
 
 
 def test_ase_keyframes_are_rotated_and_logged_outside_world_tree() -> None:

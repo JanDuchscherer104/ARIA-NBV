@@ -1,0 +1,7 @@
+\begin{figure*}
+  \centering
+  % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+  \includegraphics[width=.8\linewidth]{supp_mat/images/depth_module.png}
+  \caption{{\bf Architecture of the depth prediction module.} The depth prediction module relies on a cost volume to predict depth from multiple RGB inputs: Features extracted from previous images $I_{t-1}, ..., I_{t-m}$ are warped into the view space of image $I_t$ for multiple depth planes, and compared to the features extracted from $I_t$ using L1-distance.}
+  \label{fig:supp-mat-depth-module}
+\end{figure*}

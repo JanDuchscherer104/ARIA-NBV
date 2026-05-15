@@ -1,0 +1,137 @@
+\section{Experiments}
+\label{sec:exp}
+
+\subsection{Main Properties}
+\label{sec:ablation}
+We perform an ablation study on PTv3, focusing on module design and scalability. We report the performance using the \prettyul{mean} results from the ScanNet semantic segmentation validation and measure the latencies using the \prettyul{average} values obtained from the full ScanNet validation set (with a batch size of 1) on a single RTX 4090. If not specified, default settings are presented in \prettyul{Appendix}. All of our designs are enabled by default. Default settings are marked in \marktext{gray}{gray}.
+
+\begin{table}[t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{1.5pt}{1.05}
+        \input{table/ablation_patch_interaction}
+        \vspace{-2.5mm}
+        \caption{\textbf{Serialization patterns and patch interaction.}  The first column indicates serialization patterns: Z for Z-order, TZ for Trans Z-order, H for Hilbert, and TH for Trans Hilbert. In the first row, S.O. represents Shift Order, which is the default setting also applied to other interaction strategies. S.D. stands for Shift Dilation, and S.P. signifies Shift Patch.}\label{tab:ablation_serialization_interaction}
+        \vspace{2mm}
+    \end{minipage} \\
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{1.5pt}{1.05}
+        \input{table/ablation_positional_encoding}
+        \vspace{-2.5mm}
+        \caption{\textbf{Positional encoding.} We compare the proposed CPE+ with APE, RPE, cRPE, and CPE. RPE and CPE are discussed in OctFormer~\cite{Wang2023OctFormer}, while cRPE is deployed by Swin3D~\cite{yang2023swin3d}.}\label{tab:ablation_positional_encoding}
+        \vspace{2mm}
+    \end{minipage} \\
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{2pt}{1.05}
+        \input{table/ablation_patch_size}
+        \vspace{-2.5mm}
+        \caption{\textbf{Patch size.} Leveraging the inherent simplicity and efficiency of our approach, we expand the receptive field of attention well beyond the conventional scope, surpassing sizes used in previous works such as PTv2~\cite{wu2022point}, which adopts a size of 16, and OctFormer~\cite{Wang2023OctFormer}, which uses 24.}\label{tab:ablation_patch_size} 
+        \vspace{-5mm}
+    \end{minipage}
+\end{table}
+
+\mypara{Serialization patterns.}
+In \tabref{tab:ablation_serialization_interaction}, we explore the impact of various combinations of serialization patterns. Our experiments demonstrate that mixtures incorporating a broader range of patterns yield superior results when integrated with our Shuffle Order strategies. Furthermore, the additional computational overhead from introducing more serialization patterns is negligible. 
+It is observed that relying on a single Shift Order cannot completely harness the potential offered by the four serialization patterns.
+
+
+\mypara{Patch interaction.}
+In \tabref{tab:ablation_serialization_interaction}, we also assess the effectiveness of each alternative patch interaction design. The default setting enables Shift Order, but the first row represents the baseline scenario using a single serialization pattern, indicative of the vanilla configurations of Shift Patch and Shift Dilation (one single serialization order is not shiftable). The results indicate that while Shift Patch and Shift Dilation are indeed effective, their latency is somewhat hindered by the dependency on attention masks, which compromises efficiency. Conversely, Shift Code, which utilizes multiple serialization patterns, offers a simple and efficient alternative that achieves comparable results to these traditional methods. Notably, when combined with Shuffle Order and all four serialization patterns, our strategy not only shows further improvement but also retains its efficiency.
+
+\begin{table}[t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{2.9pt}{1.08}
+        \input{table/indoor_sem_seg}
+        \vspace{-3mm}
+        \caption{\textbf{Indoor semantic segmentation.}}\label{tab:indoor_sem_seg}
+        \vspace{2mm}
+    \end{minipage} \\
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{3pt}{1.08}
+        \input{table/s3dis_6fold}
+        \vspace{-3mm}
+        \caption{\textbf{S3DIS 6-fold cross-validation.}}\label{tab:s3dis_6fold}
+        \vspace{-4mm}
+    \end{minipage}
+\end{table}
+
+\mypara{Positional encoding.}
+In \tabref{tab:ablation_positional_encoding}, we benchmark our proposed CPE+ against conventional positional encoding, such as APE and RPE, as well as recent advanced solutions like cRPE and CPE. The results confirm that while RPE and cRPE are significantly more effective than APE, they also exhibit the inefficiencies previously discussed. Conversely, CPE and CPE+ emerge as superior alternatives. Although CPE+ incorporates slightly more parameters than CPE, it does not compromise our method's efficiency too much. Since CPEs operate prior to the attention phase rather than during it, they benefit from optimization like flash attention~\cite{dao2022flashattention, dao2023flashattention2}, which can be advantageous for our PTv3.
+
+\mypara{Patch size.}
+In \tabref{tab:ablation_patch_size}, we explore the scaling of the receptive field of attention by adjusting patch size. Beginning with a patch size of 16, a standard in prior point transformers, we observe that increasing the patch size significantly enhances performance. Moreover, as indicated in \tabref{tab:outdoor_model_efficiency} (benchmarked with NuScenes dataset), benefits from optimization techniques such as flash attention~\cite{dao2022flashattention, dao2023flashattention2}, the speed and memory efficiency are effectively managed.
+
+\begin{table}[t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{4.1pt}{1.08}
+        \input{table/outdoor_sem_seg}
+        \vspace{-3mm}
+        \caption{\textbf{Outdoor semantic segmentation.}}\label{tab:outdoor_sem_seg}
+        \vspace{2mm}
+    \end{minipage} \\
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{3.78pt}{1.08}
+        \input{table/indoor_ins_seg}
+        \vspace{-3mm}
+        \caption{\textbf{Indoor instance segmentation.}}\label{tab:indoor_ins_seg}
+        \vspace{2mm}
+    \end{minipage} \\
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{3.4pt}{1.08}
+        \input{table/indoor_data_efficient}
+        \vspace{-3mm}
+        \caption{\textbf{Data efficiency.}}\label{tab:data_efficient}
+        \vspace{-4mm}
+    \end{minipage}
+\end{table}
+
+\begin{table}[t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{0pt}{1.08}
+        \input{table/outdoor_obj_det}
+        \vspace{-3mm}
+        \caption{\textbf{Waymo object detection.} The colume with head name ``\#'' denotes the number of input frames.}\label{tab:outdoor_obj_det}
+        \vspace{-4mm}
+    \end{minipage}
+\end{table}
+
+\subsection{Results Comparision}
+\label{sec:results}
+
+We benchmark the performance of PTv3 against previous SOTA backbones and present the\prettyul{highest} results obtained for each benchmark. In our tables, Marker \scratch refers to a model trained from scratch, and \pretrain refers to a model trained with multi-dataset joint training (PPT~\cite{wu2023ppt}). An exhaustive comparison with earlier works is available in the\prettyul{Appendix}.
+
+\mypara{Indoor semantic segmentation.}
+In \tabref{tab:indoor_sem_seg}, we showcase the validation and test performance of PTv3 on the ScanNet v2~\cite{dai2017scannet} and ScanNet200~\cite{rozenberszki2022language} benchmarks, along with the Area 5 and 6-fold cross-validation~\cite{qi2017pointnet} on S3DIS~\cite{armeni2016s3dis} (details see \tabref{tab:s3dis_6fold}). We report the mean Intersection over Union (mIoU) percentages and benchmark these results against previous backbones. Even without pre-training, PTv3 outperforms PTv2 by 3.7\% on the ScanNet test split and by 4.2\% on the S3DIS 6-fold CV. The advantage of PTv3 becomes even more pronounced when scaling up the model with multi-dataset joint training~\cite{wu2023ppt}, widening the margin to 5.2\% on ScanNet and 7.3\% on S3DIS.
+
+\mypara{Outdoor semantic segmentation.}
+In \tabref{tab:outdoor_sem_seg}, we detail the validation and test results of PTv3 for the nuScenes~\cite{caesar2020nuscenes, fong2022panoptic} and SemanticKITTI~\cite{behley2019semantickitti} benchmarks and also include the validation results for the Waymo benchmark~\cite{sun2020waymo}. Performance metrics are presented as mIoU percentages by default, with a comparison to prior models. PTv3 demonstrates enhanced performance over the recent state-of-the-art model, SphereFormer, with a 2.0\% improvement on nuScenes and a 3.0\% increase on SemanticKITTI, both in the validation context. When pre-trained, PTv3's lead extends to 2.8\% for nuScenes and 4.5\% for SemanticKITTI.
+
+\mypara{Indoor instance segmentation.}
+In \tabref{tab:indoor_ins_seg}, we present PTv3's validation results on the ScanNet v2~\cite{dai2017scannet} and ScanNet200~\cite{rozenberszki2022language} instance segmentation benchmarks. We present the performance metrics as mAP, mAP$_{25}$, and mAP$_{50}$ and compare them against several popular backbones. To ensure a fair comparison, we standardize the instance segmentation framework by employing PointGroup~\cite{jiang2020pointgroup} across all tests, varying only the backbone. Our experiments reveal that integrating PTv3 as a backbone significantly enhances PointGroup, yielding a 4.9\% increase in mAP over MinkUNet. Moreover, fine-tuning a PPT pre-trained PTv3 provides an additional gain of 1.2\% mAP.
+
+\mypara{Indoor data efficient.} In \tabref{tab:data_efficient}, we evaluate the performance of PTv3 on the ScanNet data efficient~\cite{hou2021exploring} benchmark. This benchmark tests models under constrained conditions with limited percentages of available reconstructions (scenes) and restricted numbers of annotated points. Across various settings, from 5\% to 20\% of reconstructions and from 20 to 200 annotations, PTv3 demonstrates strong performance. Moreover, the application of pre-training technologies further boosts PTv3's performance across all tasks.
+
+\mypara{Outdoor object detection.}
+In \tabref{tab:outdoor_obj_det}, we benchmark PTv3 against leading single-stage 3D detectors on the Waymo Object Detection benchmark. All models are evaluated using either anchor-based or center-based detection heads~\cite{yan2018second, yin2021center}, with a separate comparison for varying numbers of input frames. Our PTv3, engaged with CenterPoint, consistently outperforms both sparse convolutional~\cite{shi2022pillarnet, yin2021center} and transformer-based~\cite{fan2022embracing, he2022voxset} detectors, achieving significant gains even when compared with the recent state-of-the-art, FlatFormer~\cite{liu2023flatformer}. Notably, PTv3 surpasses FlatFormer by 3.3\% with a single frame as input and maintains a superiority of 1.0\% in multi-frame settings.
+
+
+\mypara{Model efficiency.} We evaluate model efficiency based on average latency and memory consumption across real-world datasets. Efficiency metrics are measured on a single RTX 4090, excluding the first iteration to ensure steady-state measurements. We compared our PTv3 with multiple previous SOTAs. Specifically, we use the NuScenes dataset to assess outdoor model efficiency (see \tabref{tab:outdoor_model_efficiency}) and the ScanNet dataset for indoor model efficiency (see \tabref{tab:indoor_model_efficiency}). Our results demonstrate that PTv3 not only exhibits the lowest latency across all tested scenarios but also maintains reasonable memory consumption.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{4pt}{1.08}
+        \input{table/indoor_model_efficiency}
+        \vspace{-3mm}
+        \caption{\textbf{Indoor model efficiency.} }\label{tab:indoor_model_efficiency}
+        \vspace{-4mm}
+    \end{minipage}
+\end{table}

@@ -1,0 +1,284 @@
+\section{Experiments}
+\label{sec:experiments}
+
+To evaluate the Set Transformer, we apply it to a suite of tasks involving sets of data points.
+%We applied the Set Transformer to various problems that use sets of data.
+We repeat all experiments five times and report performance metrics evaluated on corresponding test datasets.
+Along with baselines, we compared various architectures arising from the combination of the choices of having attention in encoders and decoders. %, each of which roughly represents existing works as its special cases.
+Unless specified otherwise, ``simple pooling" means average pooling.
+\begin{itemize}
+\setlength\itemsep{-0.4em}
+\item rFF + Pooling \citep{Zaheer2017}: rFF layers in encoder and simple pooling + rFF layers in decoder.
+\item rFFp-mean/rFFp-max + Pooling \citep{Zaheer2017}: rFF layers with permutation equivariant variants in encoder \citep[\eqref{eq:multihead1}]{Zaheer2017} and simple pooling + rFF layers in decoder.
+\item rFF + Dotprod \citep{Yang2018,Ilse2018}: rFF layers in encoder and dot product attention based weighted sum pooling + rFF layers in decoder.
+\item SAB (ISAB) + Pooling (ours):  Stack of SABs (ISABs) in encoder and simple pooling + rFF layers in decoder.
+\item rFF + PMA (ours): rFF layers in encoder and PMA (followed by stack of SABs) in decoder.
+\item SAB (ISAB) + PMA (ours): Stack of SABs (ISABs) in encoder and PMA (followed by stack of SABs) in decoder.
+\end{itemize}
+
+\subsection{Toy Problem: Maximum Value Regression}
+\begin{table}[t]
+\centering
+\small
+\caption{Mean absolute errors on the max regression task.}
+\vspace{5pt}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+Architecture & MAE \\\midrule
+rFF + Pooling ($\mathrm{mean}$) & 2.133 $\pm$ 0.190 \\
+rFF + Pooling ($\mathrm{sum}$) & 1.902 $\pm$ 0.137 \\
+rFF + Pooling ($\mathrm{max}$) & \bf 0.1355 $\pm$ 0.0074\\
+\midrule
+SAB + PMA (ours) & 0.2085 $\pm$ 0.0127\\
+\bottomrule
+\label{table:max}
+\end{tabular}
+\end{table}
+\label{subsec:max_regression}
+To demonstrate the advantage of attention-based set aggregation over simple pooling operations, we consider a toy problem: regression to the maximum value of a given set.
+Given a set of real numbers $\{ x_1, \ldots, x_n\}$, the goal is to return $\mathrm{max}(x_1, \cdots, x_n)$.
+Given prediction $p$, we use the mean absolute error $|p - \mathrm{max}(x_1, \cdots, x_n)|$ as the loss function. We constructed simple pooling architectures with three different pooling operations: $\operatorname{max}$, $\operatorname{mea}$n, and $\operatorname{sum}$. We report loss values after training in Table~\ref{table:max}.
+%Note that even though the max pooling architecture only has to learn the identity function to predict the output perfectly, Set Transformers achieve comparable performance.
+%This is likely because Set Transformers can learn to find and attend to the maximum element.
+%Note that the mean- and sum-pooling architectures have far higher mean absolute errors (MAE), which indicates
+Mean- and sum-pooling architectures result in a high mean absolute error (MAE).
+%The model with max-pooling only has to learn the identity function as its encoder to predict the output perfectly, and thus achieves the highest performance.
+The model with max-pooling can predict the output perfectly by learning its encoder to be an identity function, and thus achieves the highest performance.
+Notably, the Set Transformer achieves performance comparable to the max-pooling model, which underlines the importance of additional flexibility granted by attention mechanisms --- it can learn to find and attend to the maximum element.
+
+%Our analysis of this is that learning interactions among items is difficult for aggregation functions such as sum and mean.
+%The max regression problem requires knowledge of such interactions because the maximum value of a set $\{ x_1, \cdots, x_n\}$ only depends on one maximum element and thus the network must at least learn how to compare items.
+%We would like to point out that most pooling architectures for sets use mean-pooling.
+
+
+\begin{figure}[t]
+\centering\includegraphics[width=\columnwidth]{figs/omni20.png}
+\caption{Counting unique characters: this is a randomly sampled set of 20 images from the Omniglot dataset. There are 14 different characters inside this set.}
+\label{fig:omni_try}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Accuracy on the unique character counting task.}
+\vspace{5pt}
+\begin{tabular}{@{}cc@{}} \toprule
+Architecture & Accuracy \\ \midrule
+rFF + Pooling & 0.4382 $\pm$ 0.0072 \\
+rFFp-mean + Pooling & 0.4617 $\pm$ 0.0076 \\
+rFFp-max + Pooling & 0.4359 $\pm$ 0.0077 \\
+rFF + Dotprod & 0.4471 $\pm$ 0.0076 \\
+\midrule
+rFF + PMA (ours) & 0.4572 $\pm$ 0.0076\\
+SAB + Pooling (ours) & 0.5659 $\pm$ 0.0077 \\
+SAB + PMA (ours) & \bf 0.6037 $\pm$ 0.0075 \\
+\bottomrule
+\label{table:unique}
+\end{tabular}
+\end{table}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.90\linewidth]{figs/isab_n.pdf}
+\caption{
+Accuracy of $\mathrm{ISAB}_n + \mathrm{PMA}$ on the unique character counting task.
+x-axis is $n$ and y-axis is accuracy.
+}
+\label{fig:isab_n}
+\end{figure}
+
+\begin{table*}[h]
+	\centering
+	\small
+	\caption{Meta clustering results.
+	The number inside parenthesis indicates the number of inducing points used in ISABs of encoders.
+	We show average likelihood per data for the synthetic dataset and the adjusted rand index (ARI) for the CIFAR-100 experiment.
+	LL1/data, ARI1 are the evaluation metrics after a single EM update step.
+	The oracle for the synthetic dataset is the log likelihood of the actual parameters used to generate the set, and the CIFAR oracle was computed by running EM until convergence.
+	%The results measured from function outputs (LL0/data, ARI0) and the results after single EM update (LL1/data, ARI1) are presented.
+	}
+	\vspace{5pt}
+	\begin{tabular}{@{}ccccc@{}}\toprule
+		& \multicolumn{2}{c}{Synthetic} & \multicolumn{2}{c}{CIFAR-100} \\
+		\cmidrule{2-3}
+		\cmidrule{4-5}
+	Architecture & LL0/data & LL1/data & ARI0 & ARI1  \\
+	\midrule
+	Oracle & -1.4726 & & 0.9150 &\\
+	rFF + Pooling & -2.0006 $\pm$ 0.0123 &-1.6186 $\pm$ 0.0042 & 0.5593 $\pm$ 0.0149 & 0.5693 $\pm$ 0.0171 \\
+	rFFp-mean + Pooling & -1.7606 $\pm$ 0.0213 &-1.5191 $\pm$ 0.0026 & 0.5673 $\pm$ 0.0053 &0.5798 $\pm$ 0.0058 \\
+	rFFp-max + Pooling & -1.7692 $\pm$ 0.0130 &-1.5103 $\pm$ 0.0035 & 0.5369 $\pm$ 0.0154 &0.5536 $\pm$ 0.0186 \\
+	rFF + Dotprod & -1.8549 $\pm$ 0.0128 &-1.5621 $\pm$ 0.0046 & 0.5666 $\pm$ 0.0221 &0.5763 $\pm$ 0.0212 \\
+    \midrule
+	SAB + Pooling (ours) & -1.6772 $\pm$ 0.0066 &-1.5070 $\pm$ 0.0115 & 0.5831 $\pm$ 0.0341 &0.5943 $\pm$ 0.0337\\
+	ISAB (16) + Pooling (ours) & -1.6955 $\pm$ 0.0730 &-1.4742 $\pm$ 0.0158 & 0.5672 $\pm$ 0.0124 &0.5805 $\pm$ 0.0122\\
+	rFF + PMA (ours) & -1.6680 $\pm$ 0.0040 &-1.5409 $\pm$ 0.0037 &  0.7612 $\pm$ 0.0237 &0.7670 $\pm$ 0.0231\\
+	SAB + PMA (ours) & -1.5145 $\pm$ 0.0046 &-1.4619 $\pm$ 0.0048 &  0.9015 $\pm$ 0.0097 &0.9024 $\pm$ 0.0097\\
+	ISAB (16) + PMA (ours) & \bf -1.5009 $\pm$ 0.0068 & \bf -1.4530 $\pm$ 0.0037 & \bf 0.9210 $\pm$ 0.0055 &\bf 0.9223 $\pm$ 0.0056 \\
+	\bottomrule
+	\end{tabular}
+	\label{tab:meta_clustering}
+\end{table*}
+
+\begin{figure*}[t]
+	\centering
+	\includegraphics[width=0.4\linewidth]{figs/ff.pdf}
+	\includegraphics[width=0.4\linewidth]{figs/sab_ff.pdf}
+	\includegraphics[width=0.4\linewidth]{figs/ff_sab.pdf}
+	\includegraphics[width=0.4\linewidth]{figs/sab.pdf}
+	\caption{
+    Clustering results for 10 test datasets, along with centers and covariance matrices.
+    rFF+Pooling (top-left), SAB+Pooling (top-right), rFF+PMA (bottom-left), Set Transformer (bottom-right).
+    Best viewed magnified in color.}
+	\label{fig:synthetic_clustering}
+\end{figure*}
+
+\subsection{Counting Unique Characters}
+\label{subsec:unique}
+In order to test the ability of modelling interactions between objects in a set, we introduce a new task of counting unique elements in an input set.
+We use the Omniglot~\citep{Lake2015} dataset, which consists of 1,623 different handwritten characters from various alphabets, where each character is represented by 20 different images.
+
+We split all characters (and corresponding images) into train, validation, and test sets and only train using images from the train character classes.
+We generate input sets by sampling between 6 and 10 images and we train the model  to predict the number of different characters inside the set.
+We used a Poisson regression model to predict this number, with the rate $\lambda$ given as the output of a neural network.
+We maximized the log likelihood of this model using stochastic gradient ascent.
+
+We evaluated model performance using sets of images sampled from the test set of characters.
+%Therefore, not only has the network not seen any of the images inside a given test input, but it has not even seen any image of the same character class during training.
+Table~\ref{table:unique} reports accuracy, measured as the frequency at which the mode of the Poisson distribution chosen by the network is equal to the number of characters inside the input set.
+
+We additionally performed experiments to see how the number of incuding points affects performance.
+We trained $\mathrm{ISAB}_n + \mathrm{PMA}$ on this task while varying the number of inducing points ($n$).
+Accuracies are shown in Figure \ref{fig:isab_n}, where other architectures are shown as horizontal lines for comparison.
+Note first that even the accuracy of $\mathrm{ISAB}_1 + \mathrm{PMA}$ surpasses that of both $\mathrm{rFF} + \mathrm{Pooling}$ and $\mathrm{rFF} + \mathrm{PMA}$, and that performance tends to increase as we increase $n$.
+
+\subsection{Amortized Clustering with Mixture of Gaussians}
+%We ran all the algorithms five times and measured the averages.
+We applied the set-input networks to the task of maximum likelihood of mixture of Gaussians (MoGs).
+The log-likelihood of a dataset $X = \{x_1, \dots, x_n\}$ generated from an MoG with $k$ components is
+{
+\[
+\log p(X; \theta)
+= \sum_{i=1}^n  \log \sum_{j=1}^k \pi_j \gN ( x_i ; \mu_j, \mathrm{diag}(\sigma^2_j)).
+\]}
+The goal is to learn the optimal parameters $\theta^*(X) = \argmax_\theta \log p(X;\theta)$.
+The typical approach to this problem is to run an iterative algorithm such as Expectation-Maximisation (EM) until convergence.
+Instead, we aim to learn a generic meta-algorithm that directly maps the input set $X$ to $\theta^*(X)$.
+One can also view this as amortized maximum likelihood learning.
+Specifically, given a dataset $X$, we train a neural network to output parameters $f(X;\lambda) = \{\pi(X), \{\mu_j(X), \sigma_j(X)\}_{j=1}^k\}$ which maximize
+{\small
+\[
+\E_X \left[ \sum_{i=1}^{|X|} \log \sum_{j=1}^k \pi_j(X) \gN(x_i ; \mu_j(X), \mathrm{diag}(\sigma_j^2(X)))\right].
+\]}
+We structured $f(\cdot;\lambda)$ as a set-input neural network and learned its parameters $\lambda$ using stochastic gradient ascent, where we approximate gradients using minibatches of \emph{datasets}.
+
+We tested Set Transformers along with other set-input networks on two datasets.
+We used four seed vectors for the PMA ($S\in\R^{4\times d}$) so that each seed vector generates the parameters of a cluster.
+
+\textbf{Synthetic 2D mixtures of Gaussians}:  Each dataset contains $n \in [100, 500]$ points on a 2D plane, each sampled from one of four Gaussians.
+%Average log-likelihhod/data over 1,000 test sets were compared.
+%The oracle was computed by measuring log-likelihood w.r.t. the true parameters used to generate test sets.
+
+\textbf{CIFAR-100}: Each dataset contains $n \in [100, 500]$ images sampled from four random classes in the CIFAR-100 dataset.
+Each image is represented by a 512-dim vector obtained from a pretrained VGG network~\citep{Simonyan2014}.
+%Adjusted Rand Index (ARI) over 1,000 test sets were compared, and the oracle was computed by running EM for each test set independently.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{
+Test accuracy for the point cloud classification task using $100, 1000, 5000$ points.
+}
+\vspace{5pt}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+Architecture & 100 pts & 1000 pts & 5000 pts \\
+\midrule
+rFF + Pooling \citep{Zaheer2017} & - & 0.83 $\pm$ 0.01 & - \\
+rFFp-max + Pooling \citep{Zaheer2017} & 0.82 $\pm$ 0.02  & 0.87 $\pm$ 0.01& \bf 0.90 $\pm$ 0.003 \\
+\midrule
+rFF + Pooling& 0.7951 $\pm$ 0.0166  & 0.8551 $\pm$ 0.0142 & 0.8933 $\pm$ 0.0156  \\
+\midrule
+rFF + PMA (ours) & 0.8076 $\pm$ 0.0160 & 0.8534 $\pm$ 0.0152  & 0.8628 $\pm$ 0.0136\\
+ISAB (16) + Pooling (ours) & 0.8273 $\pm$ 0.0159 & \bf 0.8915 $\pm$ 0.0144 & \bf 0.9040 $\pm$ 0.0173  \\
+ISAB (16) + PMA (ours) & \bf 0.8454 $\pm$ 0.0144 & 0.8662 $\pm$ 0.0149 & 0.8779 $\pm$ 0.0122  \\
+\bottomrule
+\end{tabular}
+\label{table:pointcloud}
+\end{table*}
+
+We report the performance of the oracle along with the set-input neural networks in Table~\ref{tab:meta_clustering}.
+We additionally report scores of all models after a single EM update.
+Overall, the Set Transformer found accurate parameters and even outperformed the oracles after a single EM update.
+This may be due to the relatively small size of the input sets; some clusters have fewer than 10 points.
+In this regime, sample statistics can differ substantially from population statistics,
+which limits the performance of the oracle while the Set Transformer can adapt accordingly.
+Notably, the Set Transformer with only 16 inducing points showed the best performance, even outperforming the full Set Transformer.
+We believe this is due to the knowledge transfer and regularization via inducing points, helping the network to learn global structures.
+Our results also imply that the improvement from using the PMA is more significant than that of the SAB, supporting our claim of the importance of attention-based decoders.
+We provide detailed generative processes, network architectures, and training schemes along with additional experiments with various numbers of inducing points in the supplementary material.
+
+\subsection{Set Anomaly Detection}
+\label{subsec:meta_anomaly}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.90\linewidth]{figs/celeba.pdf}
+\caption{
+Sampled datasets.
+Each row is a dataset, consisting of 7 normal images and 1 anomaly (red box).
+In each subsampled dataset, a normal image has two attributes (rightmost column) which anomalies do not.
+}
+\label{fig:celeba_figures}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Meta set anomaly results.
+Each architecture is evaluated using average of test AUROC and test AUPR.
+%Random guess shows AUROC as 0.5 and AUPR as 0.125.
+%Other describing methods are same with the above description.
+%200 test datasets are used to measure the performance of each model and all experiments are repeated 5 times.
+}
+\vspace{5pt}
+\begin{tabular}{@{}ccccc@{}}\toprule
+Architecture & Test AUROC & Test AUPR  \\
+\midrule
+Random guess & 0.5 & 0.125 \\
+rFF + Pooling & 0.5643 $\pm$ 0.0139 & 0.4126 $\pm$ 0.0108 \\
+rFFp-mean + Pooling & 0.5687 $\pm$ 0.0061 & 0.4125 $\pm$ 0.0127 \\
+rFFp-max + Pooling & 0.5717 $\pm$ 0.0117 & 0.4135 $\pm$ 0.0162 \\
+rFF + Dotprod & 0.5671 $\pm$ 0.0139 & 0.4155 $\pm$ 0.0115 \\
+\midrule
+SAB + Pooling (ours) & 0.5757 $\pm$ 0.0143 & 0.4189 $\pm$ 0.0167 \\
+%ISAB (4) + Pooling & 0.5679 $\pm$ 0.0155 & 0.4202 $\pm$ 0.0166 \\
+rFF + PMA (ours) & 0.5756 $\pm$ 0.0130 & 0.4227 $\pm$ 0.0127 \\
+SAB + PMA (ours) & \bf 0.5941 $\pm$ 0.0170 & \bf 0.4386 $\pm$ 0.0089 \\
+%Set Transformer (4) & 0.5629 $\pm$ 0.0167 & 0.4122 $\pm$ 0.0151 \\
+\bottomrule
+\end{tabular}
+\label{tab:meta_anomaly}
+\end{table}
+We evaluate our methods on the task of meta-anomaly detection within a set using the CelebA dataset.
+The dataset consists of 202,599 images with the total of 40 attributes.
+We randomly sample 1,000 sets of images.
+For every set, we select two attributes at random and construct the set by selecting seven images containing both attributes and one image with neither.
+The goal of this task is to find the image that does not belong to the set.
+We give a detailed description of the experimental setup in the supplementary material.
+We report the area under receiver operating characteristic curve (AUROC) and area under precision-recall curve (AUPR) in Table~\ref{tab:meta_anomaly}.
+Set Transformers outperformed all other methods by a significant margin.
+
+\subsection{Point Cloud Classification}
+
+We evaluated Set Transformers on a classification task using the ModelNet40~\citep{Chang2015} dataset\footnote{The point-cloud dataset used in this experiment was obtained directly from the authors of \citet{Zaheer2017}.}, which contains three-dimensional objects in $40$ different categories.
+Each object is represented as a point cloud, which we treat as a set of $n$ vectors in $\R^3$.
+We performed experiments with input sets of size $n \in \{100, 1000, 5000\}$.
+Because of the large set sizes, MABs are prohibitively time-consuming due to their $\calO(n^2)$ time complexity.
+
+Table~\ref{table:pointcloud} shows classification accuracies.
+We point out that \citet{Zaheer2017} used significantly more engineering for the $5000$ point experiment.
+For this experiment only, they augmented data (scaling, rotation) and used a different optimizer (Adamax) and learning rate schedule.
+Set Transformers were superior when given small sets, but were outperformed by ISAB (16) + Pooling on larger sets.
+First note that classification is harder when given fewer points.
+We think Set Transformers were outperformed in the problems with large sets because such sets already had sufficient information for classification, diminishing the need to model complex interactions among points.
+We point out that PMA outperformed simple pooling in all other experiments.

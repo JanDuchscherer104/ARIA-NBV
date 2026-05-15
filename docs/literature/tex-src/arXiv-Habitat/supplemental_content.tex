@@ -1,0 +1,228 @@
+\section{Habitat Platform Details}
+
+As described in the main paper, Habitat consists of the following components:
+\begin{compactitem}
+  \item \habitatsim: a flexible, high-performance 3D simulator with configurable agents, multiple sensors, and generic 3D dataset handling (with built-in support for Matterport3D~\cite{Chang2017}, Gibson~\cite{Xia2018}, and other datasets). \habitatsim is fast -- when rendering a realistic scanned scene from the Matterport3D dataset, \habitatsim achieves several thousand frames per second (fps) running single-threaded, and can reach over $10@000$ fps multi-process on a single GPU.
+
+  \item \habitatapi: a modular high-level library for end-to-end development of embodied AI -- defining embodied AI tasks (\eg navigation~\cite{Anderson2018-Evaluation}, instruction following~\cite{Anderson2018-Language}, question answering~\cite{embodiedqa}), 
+  configuring embodied agents (physical form, sensors, capabilities), training these agents (via imitation or reinforcement learning, or via classic SLAM), and benchmarking their performance on the defined tasks using standard metrics~\cite{Anderson2018-Evaluation}. 
+  \habitatapi currently uses \habitatsim as the core simulator, 
+  but is designed with a modular abstraction for the simulator 
+  backend to maintain compatibility over multiple simulators.
+\end{compactitem}
+
+\xhdr{Key abstractions.}
+The Habitat platform relies on a number of key abstractions that model the domain of embodied agents and tasks that can be carried out in three-dimensional indoor environments.
+Here we provide a brief summary of key abstractions:
+\begin{compactitem}
+    \item \texttt{Agent}: a physically embodied agent with a suite of \texttt{Sensors}. Can observe the environment and is capable of taking actions that change agent or environment state.
+    \item \texttt{Sensor}: associated with a specific \texttt{Agent}, capable of returning observation data from the environment at a specified frequency.
+    \item \texttt{SceneGraph}: a hierarchical representation of a 3D environment that organizes the environment into regions and objects which can be programmatically manipulated.
+    \item \texttt{Simulator}: an instance of a simulator backend. Given actions for a set of configured \texttt{Agents} and \texttt{SceneGraphs}, can update the state of the \texttt{Agents} and \texttt{SceneGraphs}, and provide observations for all active \texttt{Sensors} possessed by the \texttt{Agents}.
+\end{compactitem}
+
+These abstractions connect the different layers of the platform. They also enable generic and portable specification of embodied AI tasks.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+  \centering
+  \includegraphics[width=0.9\textwidth]{fig/sim_architecture.pdf}
+  \caption{Architecture of \habitatsim main classes. The Simulator delegates management of all resources related to 3D environments to a ResourceManager that is responsible for loading and caching 3D environment data from a variety of on-disk formats. These resources are used within SceneGraphs at the level of individual SceneNodes that represent distinct objects or regions in a particular Scene. Agents and their Sensors are instantiated by being attached to SceneNodes in a particular SceneGraph.}
+\label{fig:sim_architecture}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\xhdr{Habitat-Sim.}
+The architecture of the \habitatsim backend module is illustrated in \Cref{fig:sim_architecture}.
+The design of this module ensures a few key properties:
+\begin{compactitem}
+  \item Memory-efficient management of 3D environment resources (triangle mesh geometry, textures, shaders) ensuring shared resources are cached and reused.
+  \item Flexible, structured representation of 3D environments using \texttt{SceneGraphs}, allowing for programmatic manipulation of object state, and combination of objects from different environments.
+  \item High-efficiency rendering engine with multi-attachment render pass to reduce overhead for multiple sensors.
+  \item Arbitrary numbers of \texttt{Agents} and corresponding \texttt{Sensors} that can be linked to a 3D environment by attachment to a \texttt{SceneGraph}.
+\end{compactitem}
+The performance of the simulation backend surpasses that of prior work operating on realistic reconstruction datasets by a large margin. \Cref{tab:performance} reports performance statistics on a test scene from the Matterport3D dataset.
+Single-thread performance reaches several thousand frames per second (fps), 
+while multi-process operation with several simulation backends can reach over $10@000$ fps on a single GPU.
+In addition, by employing OpenGL-CUDA interoperation we enable direct sharing of rendered image frames with ML frameworks such as PyTorch without a measurable impact on performance as the image resolution is increased (see \Cref{fig:benchmark_plots}).
+
+\begin{table*}
+  \centering
+  \begin{tabular}{@{}lrrrrrrrrr@{}}
+      \toprule
+      & \multicolumn{3}{c}{GPU$\rightarrow$CPU$\rightarrow$GPU} & \multicolumn{3}{c}{GPU$\rightarrow$CPU} & \multicolumn{3}{c}{GPU$\rightarrow$GPU}\\
+      \cmidrule(l){2-4} \cmidrule(l){5-7} \cmidrule(l){8-10}
+      Sensors / number of processes & $1$ & $3$ & $5$ & $1$ & $3$ & $5$ & $1$ & $3$ & $5$ \\
+      \midrule
+      RGB & $2@346$ & $6@049$ & $7@784$ & $3@919$ & $8@810$ & $11@598$ & $4@538$ & $8@573$ & $7@279$\\
+      RGB + depth & $1@260$ & $3@025$ & $3@730$ & $1@777$ & $4@307$ & $5@522$ & $2@151$ & $3@557$ & $3@486$\\
+      RGB + depth + semantics\footnotemark{} 
+      & $378$ & $463$ & $470$ & $396$ & $465$ & $466$ & $464$ & $455$ & $453$\\
+      \bottomrule
+  \end{tabular}
+  \vspace{1mm}
+  \caption{Performance of \habitatsim in frames per second for an example Matterport3D scene (id 17DRP5sb8fy) on a Xeon E5-2690 v4 CPU and Nvidia Titan Xp GPU, measured at a frame resolution of 128x128, under different frame memory transfer strategies and with a varying number of concurrent simulator processes sharing the GPU.
+  `GPU-CPU-GPU' indicates passing of rendered frames from OpenGL context to CPU host memory and back to GPU device memory for use in optimization, `GPU-CPU' only reports copying from OpenGL context to CPU host memory, whereas `GPU-GPU' indicates direct sharing through OpenGL-CUDA interoperation.}
+  \label{tab:performance}
+\end{table*}
+
+% \begin{table*}
+%   \centering
+%   \begin{tabular}{@{}lrrrrrrrrr@{}}
+%       \toprule
+%       & \multicolumn{3}{c}{$1$ proc} & \multicolumn{3}{c}{$3$ procs} & \multicolumn{3}{c}{$5$ procs}\\
+%       \cmidrule(l){2-4} \cmidrule(l){5-7} \cmidrule(l){8-10}
+%       Sensors / Resolution & $128$ & $256$ & $512$ & $128$ & $256$ & $512$ & $128$ & $256$ & $512$\\
+%       \midrule
+%       RGB & $4@093$ & $1@987$ & $848$ & $10@638$ & $3@428$ & $2@068$ & $10@592$ & $3@574$ & $2@629$\\
+%       RGB + depth & $2@050$ & $1@042$ & $423$ & $5@024$ & $1@715$ & $1@042$ & $5@223$ & $1@774$ & $1@348$\\
+%       RGB + depth + semantics\footnotemark{} 
+%       & $439$ & $346$ & $185$ & $502$ & $385$ & $336$ & $500$ & $390$ & $367$\\
+%       \bottomrule
+%   \end{tabular}
+%   \vspace{1mm}
+%   \caption{Performance of \habitatsim in frames per second for an example Matterport3D scene (id 17DRP5sb8fy) on a Xeon E5-2690 v4 CPU and Nvidia Titan Xp GPU, measured at different frame resolutions and with a varying number of concurrent simulator processes sharing the GPU. By comparison, AI2-THOR~\cite{Kolve2017} and CHALET~\cite{Yan2018} run at tens of fps, MINOS~\cite{Savva2017} and Gibson~\cite{Xia2018} run at about a hundred, and House3D~\cite{Wu2018} runs at about $300$ fps. \habitatsim is $2$-$3$ orders of magnitude faster. \todo{Update with gpu2gpu}}
+%   \label{tab:performance}
+% \end{table*}
+
+\footnotetext{Note: The semantic sensor in Matterport3D requires using additional 3D meshes with significantly more geometric complexity, leading to reduced performance. We expect this to be addressed in future versions, leading to speeds comparable to RGB + depth.}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth]{fig/benchmark_plots.png}
+  \caption{Performance of \habitatsim under different sensor frame memory transfer strategies for increasing image resolution. We see that `GPU->GPU' is unaffected by image resolution while other strategies degrade rapidly.}
+\label{fig:benchmark_plots}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\xhdr{Habitat-API.}
+The second layer of the Habitat platform (\habitatapi) focuses on creating a general and flexible API for defining embodied agents, tasks that they may carry out, and evaluation metrics for those tasks.
+When designing such an API, a key consideration is to allow for easy extensibility of the defined abstractions.
+This is particularly important since many of the parameters of embodied agent tasks, specific agent configurations, and 3D environment setups can be varied in interesting ways.
+Future research is likely to propose new tasks, new agent configurations, and new 3D environments.
+
+The API allows for alternative simulator backends to be used, beyond the \habitatsim module that we implemented.
+This modularity has the advantage of allowing incorporation of existing simulator backends to aid in transitioning from experiments that previous work has performed using legacy frameworks.
+The architecture of \habitatapi is illustrated in \Cref{fig:api_architecture}, indicating core API functionality and functionality implemented as extensions to the core.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig/api_architecture.pdf}
+  \caption{Architecture of \habitatapi. The core functionality defines fundamental building blocks such as the API for interacting with the simulator backend and receiving observations through \texttt{Sensors}. Concrete simulation backends, 3D datasets, and embodied agent baselines are implemented as extensions to the core API.}
+\label{fig:api_architecture}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Above the API level, we define a concrete embodied task such as visual navigation.
+This involves defining a specific dataset configuration, specifying the structure of episodes (\eg number of steps taken, termination conditions), training curriculum (progression of episodes, difficulty ramp), and evaluation procedure (\eg test episode sets and task metrics).
+An example of loading a pre-configured task (PointNav)
+and stepping through the environment with a random agent 
+%running a PointGoal~\cite{Anderson2018-Evaluation} navigation task 
+is shown in the code below.
+
+\section{Additional Dataset Statistics}
+
+In \Cref{tab:dataset_stats} we summarize the train, validation and test split sizes for all three datasets used in our experiments.
+We also report the average geodesic distance along the shortest path (\gdsp) between starting point and goal position.
+As noted in the main paper, Gibson episodes are significantly shorter than Matterport3D ones.
+\Cref{fig:dataset_stats} visualizes the episode distributions over geodesic distance (\gdsp), Euclidean distance between start and goal position, and the ratio of the two (an approximate measure of complexity for the episode).
+We again note that Gibson episodes have more episodes with shorter distances, leading to the dataset being overall easier than the Matterport3D dataset.
+
+\inputpython{api-example_single_col.py}{1}{17}
+
+\input{table/dataset_stats.tex}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig/dataset_stats.png}
+  \caption{Statistics of PointGoal navigation episodes. From left: distribution over Euclidean distance between start and goal, distribution over geodesic distance along shortest path between start and goal, and distribution over the ratio of geodesic to Euclidean distance.
+  }
+\label{fig:dataset_stats}
+\end{figure*}
+
+\section{Additional Experimental Results}
+
+In order to confirm that the trends we observe for the experimental results presented in the paper hold for much larger amounts of experience, we scaled our experiments to 800M steps.
+We found that (1) the ordering of the visual inputs stays \depth $>$ \rgbd $>$ \rgb $>$ \blind; (2) \rgb is consistently better than \blind (by $0.06$/$0.03$ \spl on Gibson/Matterport3D), and (3) \rgbd outperforms SLAM on Matterport3D (by $0.16$ \spl). 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{fig/collisions.pdf}
+  \caption{Average number of collisions during successful navigation episodes for the different sensory configurations of the RL (PPO) baseline agent on test set episodes for the Gibson and Matterport3D datasets. The \blind agent experiences the highest number of collisions, while agents possessing depth sensors (\depth and \rgbd) have the fewest collisions on average.}
+  \label{fig:collisions}
+  \vspace{\captionReduceBot}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Analysis of Collisions}
+
+To further characterize the behavior of learned agents during navigation we plot the average number of collisions in \Cref{fig:collisions}.
+We see that \blind incurs a much larger number of collisions than other agents, providing evidence for `wall-following' behavior.
+Depth-equipped agents have the lowest number of collisions, while \rgb agents are in between.
+
+\subsection{Noisy Depth}
+
+To investigate the impact of noisy depth measurements on agent performance, we re-evaluated depth agents (without re-training) on noisy depth generated using a simple noise model: iid Gaussian noise ($\mu=0$, $\sigma=0.4$) at each pixel in inverse depth (larger depth = more noise).
+We observe a drop of $0.13$ and $0.02$ SPL for depth-RL and SLAM on Gibson-val (depth-RL still outperforms SLAM).
+Note that SLAM from ~\cite{mishkin2019benchmarking} utilizes ORB-SLAM2, which is quite robust to noise, while depth-RL was trained without noise.
+If we increase $\sigma$ to $0.1$, depth-RL gets $0.12$ SPL whereas SLAM suffers catastrophic failures.
+
+\section{Gibson Dataset Curation}
+
+We manually curated the full dataset of Gibson 3D textured meshes~\cite{Xia2018} to select meshes that do not exhibit significant reconstruction artifacts such as holes or texture quality issues.
+A key issue that we tried to avoid is the presence of holes or cracks in floor surfaces.
+This is particularly problematic for navigation tasks as it divides seemingly connected navigable areas into non-traversable disconnected components.
+We manually annotated the scenes (using the $0$ to $5$ quality scale shown in \Cref{fig:gibson-ratings}) and only use scenes with a rating of $4$ or higher, i.e., no holes, good reconstruction, and negligible texture issues to generate the dataset episodes.
+
+\section{Reproducing Experimental Results}
+Our experimental results can be reproduced using the \habitatapi (commit \href{https://github.com/facebookresearch/habitat-api/tree/ec9557a3623991208a80f836fe557f8028209297}{ec9557a}) and \habitatsim (commit \href{https://github.com/facebookresearch/habitat-sim/tree/d383c2011bf1baab2ce7b3cd40aea573ad2ddf71}{d383c20}) repositories. The code for running experiments is present under the folder \texttt{habitat-api/habitat\_baselines}. Below is the shell script we used for our RL experiments:
+
+\inputpython{ppo_train.sh}{1}{17}
+
+For running SLAM please refer to \href{https://github.com/facebookresearch/habitat-api/tree/ec9557a3623991208a80f836fe557f8028209297/habitat_baselines/slambased}{habitat-api/habitat\_baselines/slambased}.
+
+% Specifically the code for running experiments is present under \texttt{habitat-api/habitat_baselines} folder. PPO experiments were run using the \texttt{train_ppo.py} script with the below command line parameters:
+
+\begin{figure*}
+    \centering
+    \captionsetup[subfigure]{justification=centering,labelformat=empty}
+    \begin{subfigure}[b]{0.49\textwidth}
+      \includegraphics[width=\textwidth]{fig/gibson/gibson_0.png}
+      \caption{$0$: critical reconstruction artifacts, holes, or texture issues}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{fig/gibson/gibson_1.png}
+        \caption{$1$: big holes or significant texture issues and reconstruction artifacts}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{fig/gibson/gibson_2.png}
+        \caption{$2$: big holes or significant texture issues, but good reconstruction}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{fig/gibson/gibson_3.png}
+        \caption{$3$: small holes, some texture issues, good reconstruction}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{fig/gibson/gibson_4.png}
+        \caption{$4$: no holes, some texture issues, good reconstruction}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=\textwidth]{fig/gibson/gibson_5.png}
+        \caption{$5$: no holes, uniform textures, good reconstruction}
+    \end{subfigure}
+    \caption{Rating scale used in curation of 3D textured mesh reconstructions from the Gibson dataset. We use only meshes with ratings of $4$ or higher for the Habitat Challenge dataset.}
+    \label{fig:gibson-ratings}
+\end{figure*}
+
+
+\section{Example Navigation Episodes}
+
+\Cref{fig:nav_episodes} visualizes additional example navigation episodes for the different sensory configurations of the RL (PPO) agents that we describe in the main paper.
+\blind agents have the lowest performance, colliding much more frequently with the environment and adopting a `wall hugging' strategy for navigation.
+\rgb agents are less prone to collisions but still struggle to navigate to the goal position successfully in some cases.
+In contrast, depth-equipped agents are much more efficient, exhibiting fewer collisions, and navigating to goals more successfully (as indicated by the overall higher \spl values).
+
+\input{nav_episodes.tex}

@@ -27,6 +27,8 @@ generic context, treat it as advisory and inspect the concrete owner directly.
   `make kg-route KG_TASK="<task>"`
 - Search indexed context quickly:
   `make kg-search KG_QUERY="<terms>"`
+- Limit search to exact graph modalities:
+  `make kg-search KG_QUERY="<terms>" KG_MODALITY="literature,docs"`
 - Claim-check advisor-facing or thesis claims:
   `make kg-claim-check KG_CLAIM="<claim>"`
 - Propose memory/backlog consolidation:
@@ -114,6 +116,8 @@ and code become current truth.
   `.agents/external/litkg-rs/target/debug/litkg-cli context-pack --config .configs/litkg.toml --repo-root . --task "<task>" --profile thesis-coding --format json`
 - Inspect a broad source/backlog query:
   `make kg-search KG_QUERY="<terms>" KG_FORMAT=json KG_LIMIT=10`
+- Search only literature/paper nodes:
+  `make kg-search KG_QUERY="<terms>" KG_MODALITY="literature"`
 
 Question-answer synthesis is deferred until there is a real synthesis layer.
 Use `kg-search` for fast retrieval and `kg-route` when an agent needs a context

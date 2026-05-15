@@ -1,0 +1,61 @@
+---
+config:
+  theme: base
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 22
+    rankSpacing: 34
+    curve: basis
+  layout: elk
+  themeVariables:
+    background: "#ffffff"
+    fontFamily: "Inter, DejaVu Sans, Arial, sans-serif"
+    fontSize: "18px"
+    primaryTextColor: "#1f2937"
+    lineColor: "#64748b"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart LR
+  subgraph Vin["Immutable VIN offline store"]
+    VinRoot["$$\\begin{array}{c}\\textbf{\\texttt{vin\\_offline/}}\\\\\\text{strict version gate}\\end{array}$$"]
+    VinManifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\text{version, blocks, shards}\\end{array}$$"]
+    VinIndex["$$\\begin{array}{c}\\texttt{sample\\_index.jsonl}\\\\\\text{global row -> shard row}\\end{array}$$"]
+    VinSplits["$$\\begin{array}{c}\\texttt{splits/*.npy}\\\\\\texttt{train}\\ /\\ \\texttt{val}\\ /\\ \\texttt{all}\\end{array}$$"]
+    VinShard["$$\\begin{array}{c}\\texttt{shards/shard-XXXXXX/}\\\\\\texttt{numeric\\_blocks.zarr}\\ +\\ \\text{records}\\end{array}$$"]
+  end
+
+  subgraph Rollout["Manifest-backed rollout shard"]
+    RollRoot["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr/}}\\\\\\text{schema 0.4 manifested shard}\\end{array}$$"]
+    RollZarr["$$\\begin{array}{c}\\texttt{zarr.json}\\\\\\text{compact attrs + manifest hash}\\end{array}$$"]
+    RollManifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\text{resolved config + provenance}\\end{array}$$"]
+    RollDict["$$\\begin{array}{c}\\texttt{dictionaries/}\\\\\\text{string dictionaries}\\end{array}$$"]
+    RollTables["$$\\begin{array}{c}\\texttt{sources, targets, rollouts}\\\\\\texttt{steps, candidates, lineage}\\end{array}$$"]
+    RollDerived["$$\\begin{array}{c}\\texttt{q\\_h\\_view()}\\\\\\text{derived, not persisted}\\end{array}$$"]
+  end
+
+  VinRoot --> VinManifest
+  VinRoot --> VinIndex
+  VinRoot --> VinSplits
+  VinRoot --> VinShard
+  RollRoot --> RollZarr
+  RollRoot --> RollManifest
+  RollRoot --> RollDict
+  RollRoot --> RollTables
+  RollTables -. "read-time tensorization" .-> RollDerived
+  VinIndex -->|"$$\\texttt{source\\_row\\_id}\\ +\\ \\text{hashes}$$"| RollTables
+  VinShard -. "referenced, not copied" .-> RollTables
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class VinRoot,RollRoot,VinManifest,VinIndex,VinSplits,VinShard,RollZarr,RollManifest,RollDict,RollTables data;
+  class RollDerived output;
+
+  style Vin fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style Rollout fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12

@@ -1,0 +1,9 @@
+\begin{tabular}{lccccccccc}\toprule
+Data Efficient~\cite{hou2021exploring} &\multicolumn{4}{c}{Limited Reconstruction} &\multicolumn{4}{c}{Limited Annotation} \\\cmidrule(lr){2-5} \cmidrule(lr){6-9}
+Methods &1\% &5\% &10\% &20\% &20 &50 &100 &200 \\\midrule
+\scratch MinkUNet~\cite{choy20194d} &26.0 &47.8 &56.7 &62.9 &41.9 &53.9 &62.2 &65.5 \\
+\scratch PTv2~\cite{wu2022point} &24.8 &48.1 &59.8 &66.3 &58.4 &66.1 &70.3 &71.2 \\
+\cellcolor[HTML]{efefef}\scratch PTv3~(Ours) &\cellcolor[HTML]{efefef}25.8 &\cellcolor[HTML]{efefef}48.9 &\cellcolor[HTML]{efefef}61.0 &\cellcolor[HTML]{efefef}67.0 &\cellcolor[HTML]{efefef}60.1 &\cellcolor[HTML]{efefef}67.9 &\cellcolor[HTML]{efefef}71.4 &\cellcolor[HTML]{efefef}72.7 \\
+\cellcolor[HTML]{efefef}\pretrain PTv3~(Ours) &\cellcolor[HTML]{efefef}\textbf{31.3} &\cellcolor[HTML]{efefef}\textbf{52.6} &\cellcolor[HTML]{efefef}\textbf{63.3} &\cellcolor[HTML]{efefef}\textbf{68.2} &\cellcolor[HTML]{efefef}\textbf{62.4} &\cellcolor[HTML]{efefef}\textbf{69.1} &\cellcolor[HTML]{efefef}\textbf{74.3} &\cellcolor[HTML]{efefef}\textbf{75.5} \\
+\bottomrule
+\end{tabular}

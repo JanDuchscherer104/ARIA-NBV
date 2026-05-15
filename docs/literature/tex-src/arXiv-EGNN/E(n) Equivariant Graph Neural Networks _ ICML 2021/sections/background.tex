@@ -1,0 +1,33 @@
+
+\section{Background}
+In this section we introduce the relevant materials on equivariance and graph neural networks which will later complement the definition of our method.
+
+\subsection{Equivariance}
+\label{sec:background_equivariance}
+Let $T_g: X \xrightarrow{} X$ be a set of transformations on $X$ for the abstract group $g \in G$. We say a function $\phi: X \xrightarrow{} Y$ is equivariant to $g$ if there exists an equivalent transformation on its output space $S_g: Y \xrightarrow{} Y$  such that:
+\begin{equation} \label{eq:equivariance}
+    \phi(T_g(\rmx)) = S_g(\phi(\rmx)) 
+\end{equation}
+As a practical example, let $\phi(\cdot)$ be a non-linear function, $\rmx = (\rmx_1, \dots, \rmx_M) \in \mathbb{R}^{M \times n}$ an input set of $M$ point clouds embedded in a $n$-dimensional space, $\phi(\rmx) = \rmy \in \mathbb{R}^{M \times n}$ the transformed set of point clouds, $T_g$ a translation on the input set $T_g(\rmx) = \rmx + g$ and $S_g$ an equivalent translation on the output set $S_g(\rmy) = \rmy + g$. If our transformation $\phi: X \xrightarrow{} Y$ is translation equivariant, translating the input set $T_g(\rmx)$ and then applying the function $\phi(T_x(\rmx))$ on it, will deliver the same result as first running the function $y=\phi(\rmx)$ and then applying an equivalent translation to the output $T_g(\rmy)$ such that Equation \ref{eq:equivariance} is fulfilled and $\phi(\rmx + g) = \phi(\rmx) + g$. In this work we explore the following three types of equivariance on a set of particles $\rmx$:
+\begin{enumerate}[nolistsep]
+    \item Translation equivariance. Translating the input by $g \in \mathbb{R}^n$ results in an equivalent translation of the output. Let $\rmx + g$ be shorthand for $(\rmx_1 + g, \ldots, \rmx_M + g)$. Then $\rmy + g = \phi(\rmx + g)$ 
+    \item Rotation (and reflection) equivariance. For any orthogonal matrix $Q \in \mathbb{R}^{n \times n}$, let $Q\rmx$ be shorthand for $(Q\rmx_1, \ldots, Q\rmx_M)$. Then rotating the input results in an equivalent rotation of the output $Q\rmy = \phi(Q\rmx)$.
+    \item Permutation equivariance. Permuting the input results in the same permutation of the output $P(\rmy) = \phi(P(\rmx))$ where $P$ is a permutation on the row indexes.
+\end{enumerate}
+
+Note that velocities $\rmv 
+\in \mathbb{R}^{M \times n}$ are unaffected by translations, but they transform equivalently under rotation (2) and permutation~(3). Our method introduced in Section \ref{sec:method_main} will satisfy the three above mentioned equivariant constraints. 
+
+\subsection{Graph Neural Networks}
+\label{sec:background_gnn}
+Graph Neural Networks are permutation equivariant networks that operate on graph structured data \cite{bruna2013spectral, defferrard2016convolutional, kipf2016semi}. Given a graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ with nodes $v_i \in \mathcal{V}$ and edges $e_{ij} \in \mathcal{E}$ we define a graph convolutional layer following notation from \cite{gilmer2017neural} as:
+
+\begin{equation} \label{eq:gnn}
+\begin{aligned}
+\rmm_{ij} &= \phi_e(\rmh_i^l, \rmh_j^l, a_{ij}) \\
+    \rmm_i &= \sum_{j \in \mathcal{N}(i)} \rmm_{i j} \\
+    \rmh_i^{l+1} &= \phi_h(\rmh_i^l, \rmm_i) \\
+\end{aligned}
+\end{equation}
+
+Where $\rmh_i^l \in \mathbb{R}^{\text{nf}}$ is the nf-dimensional embedding of node $v_i$ at layer $l$. $a_{ij}$ are the edge attributes. $\mathcal{N}(i)$ represents the set of neighbors of node $v_i$. Finally, $\phi_e$ and $\phi_h$ are the edge and node operations respectively which are commonly approximated by Multilayer Perceptrons (MLPs).

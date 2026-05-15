@@ -1,0 +1,93 @@
+\begin{figure*}
+  \centering
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/pisa_rgb_path_planning_curve_macarons.png}
+    \caption{Pisa Cathedral}
+    \label{fig:coverage-a}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/liberty_rgb_path_planning_curve_macarons.png}
+    \caption{Statue of Liberty}
+    \label{fig:coverage-b}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/pantheon_rgb_path_planning_curve_macarons.png}
+    \caption{Pantheon}
+    \label{fig:coverage-c}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/fushimi_rgb_path_planning_curve_macarons.png}
+    \caption{Fushimi Castle}
+    \label{fig:coverage-d}
+  \end{subfigure} \\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/colosseum_rgb_path_planning_curve_macarons.png}
+    \caption{Colosseum}
+    \label{fig:coverage-e}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/dunnottar_rgb_path_planning_curve_macarons.png}
+    \caption{Dunnottar Castle}
+    \label{fig:coverage-f}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/redeemer_rgb_path_planning_curve_macarons.png}
+    \caption{Christ the Redeemer}
+    \label{fig:coverage-g}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/bannerman_rgb_path_planning_curve_macarons.png}
+    \caption{Bannerman Castle}
+    \label{fig:coverage-h}
+  \end{subfigure}
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/alhambra_rgb_path_planning_curve_macarons.png}
+    \caption{Alhambra Palace}
+    \label{fig:coverage-i}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/bavaria_rgb_path_planning_curve_macarons.png}
+    \caption{Neuschwanstein Castle}
+    \label{fig:coverage-j}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/coverage_curves/eiffel_rgb_path_planning_curve_macarons.png}
+    \caption{Eiffel Tower}
+    \label{fig:coverage-k}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+\includegraphics[width=\linewidth]{images/coverage_curves/bridge_rgb_path_planning_curve_macarons.png}
+    \caption{Manhattan Bridge}
+    \label{fig:coverage-l}
+  \end{subfigure} \\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+\includegraphics[width=\linewidth]{images/coverage_curves/all_path_planning_curve_macarons.png}
+    \caption{Average on all scenes}
+    \label{fig:coverage-m}
+  \end{subfigure}
+  \caption{{\bf Convergence speed of the surface coverage in large 3D scenes by MACARONS and several baselines from \cite{guedon-nips22-scone-surface-coverage}.} All methods use perfect depth maps as input except for MACARONS, which takes RGB images as input. We follow \cite{guedon-nips22-scone-surface-coverage} and plot the evolution of the total surface coverage during exploration, after 100 NBV iterations. We average surface coverage on several trajectories for each scene, starting from random camera poses. Standard deviations are shown on the figures. Our model MACARONS has been trained on a set of previous scenes; all weights are frozen and we only perform inference computation. Other methods are trained on ShapeNet~\cite{chang-15-shapenet} with 3D supervision. The first two rows depict scenes that were already seen by MACARONS during its online, self-supervised training. The third row depicts scenes the model has never seen before. Even if it only uses RGB images, our model MACARONS is able to outperform the baselines in large environments since, contrary to other methods, its self-supervised online training strategy allows it to scale its learning process to any kind of environment.
+  }
+  \label{fig:coverage_evolution}
+\end{figure*}

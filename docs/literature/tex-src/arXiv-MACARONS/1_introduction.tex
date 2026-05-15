@@ -1,0 +1,37 @@
+\section{Introduction}
+\label{sec:intro}
+
+
+By bringing together Unmanned Aerial Vehicles~(UAVs) and Structure-from-Motion algorithms, it is now possible to reconstruct 3D models of large outdoor scenes, for example for creating a Digital Twin of the scene. However, flying a UAV requires expertise, especially when capturing images with the goal of running a 3D reconstruction algorithm, as the UAV needs to capture images that together cover the entire scene from multiple points of view. Our goal with this paper is to make this capture automatic by developing a method that controls a UAV and ensures a coverage suitable to 3D reconstruction.
+
+
+This is often referenced in the literature as the ``Next Best View'' problem~(NBV)~\cite{connolly-father-paper}:  Given a set of already-captured images of a scene or an object, how should we move the camera to improve our coverage of the scene or object? Unfortunately, current NBV algorithms are still not suitable for three main reasons. First, most of them rely on a voxel-based representation and do not scale well with the size of the scene. Second, they also rely on a depth sensor, which is in practice not possible to use on a small UAV in outdoor conditions as it is too heavy and requires too much power. Simply replacing the depth sensor by a monocular depth prediction method~\cite{Ranftl2022, Wei2021CVPR, Miangoleh2021Boosting} would not work as such methods can predict depth only up to a scale factor. The third limitation is that they require 3D models for learning to predict how much a pose will increase the scene coverage. 
+
+
+% \input{fig-teaser}
+
+In this paper, we show that it is possible to simultaneously learn in a self-supervised fashion to efficiently explore a 3D scene and to reconstruct it using an RGB sensor only, without any 3D supervision. This makes it convenient for applications in real scenarios with large outdoor scenes.  We only assume the camera poses to be known, as done in past works on NBV~\cite{zeng-icirs20-pcnbv, hepp-corr18-learntoscore, mendoza-prl2020}. This is reasonable as NBV methods control the camera.
+
+
+The closest work to ours is probably the recent \cite{guedon-nips22-scone-surface-coverage}. \cite{guedon-nips22-scone-surface-coverage} proposed an approach that can scale to large scenes thanks to a Transformer-based architecture that predicts the visibility of 3D points from any viewpoint, rather than relying on an explicit representation of the scene such as voxels. However, this method still uses a depth sensor. It also uses 3D meshes for training the prediction of scene coverage. To solve this, \cite{guedon-nips22-scone-surface-coverage} relies on meshes from ShapeNet~\cite{chang-15-shapenet}, which is suboptimal when exploring large outdoor scenes, as our experiments show. This limitation can actually be seen in Figure~\ref{fig:teaser}: The trajectory recovered by \cite{guedon-nips22-scone-surface-coverage} mostly focuses on the main building and does not explore the rest of the scene. By contrast, we use a simple color sensor and do not need any 3D supervision. 
+
+
+
+As our experiments show, we nonetheless significantly outperform this method thanks to our architecture and joint learning strategy. As shown in Figure~\ref{fig:pipeline}, our architecture is made of three neural modules that communicate together:
+%
+\begin{enumerate}[align=left,labelsep=0cm,itemindent=-1mm,noitemsep]
+\item Our first module learns to predict depth maps from a sequence of images in a self-supervised fashion. 
+%
+\item Our second module predicts a ``volume occupancy field'' from a partial surface point cloud. This field is made of the probability for any input 3D point to be occupied or empty, given the previous observed images of the scene. We train this module from past experience, with partial surface point cloud as input and aiming to predict the occupancy field computed from the final point cloud.
+\item Our third module predicts for an input camera pose the ``surface coverage gain'', \ie, how much new surface will be visible from this pose. We improve the coverage estimation model introduced by \cite{guedon-nips22-scone-surface-coverage} and propose a novel, much simpler loss that yields better performance. We rely on this module to identify the NBV.
+\end{enumerate}
+
+
+While exploring a new scene and training our architecture, we repeat the three following steps:
+(1) We identify the Next Best View where to move the camera; 
+(2) We move the camera to this Next Best View, collect images along the way, and build a self-supervision signal from the collected images, which we store in the ``Memory'';
+\vincent{(3) We update the weights of all 3 modules using Memory Replay~\cite{Mnih13}. This avoids catastrophic forgetting and significantly speeds up training compared to a training procedure that uses only recent data, as such data is highly correlated. This last step establishes a synergy between the different parts of the model, each one providing inputs to the other parts.}
+
+We compare to recent work~\cite{guedon-nips22-scone-surface-coverage} on their dataset made of large scale 3D scenes under the CC license. We evaluate the evolution of total surface coverage by a sensor exploring several 3D scenes. Our online, self-supervised approach that learns from RGB images is able to have better results than state-of-the-art methods with a perfect depth sensor.
+
+To summarize, we propose the first deep-learning-based NBV approach for dense reconstruction of large 3D scenes from RGB images. We call this approach MACARONS, for Mapping And Coverage Anticipation with RGB Online Self-Supervision. Moreover, we provide a dedicated training procedure for online learning for scene mapping and automated exploration based on coverage optimization in any kind of environment, with no explicit 3D supervision. Consequently, our approach is also the first NBV method to learn in real-time to reconstruct and explore arbitrarily large scenes in a self-supervised fashion. We experimentally show that this greatly improves results for NBV exploration of 3D scenes. It makes our approach suitable for real-life applications on small drones with a simple color camera. More fundamentally, it shows that an autonomous system can learn to explore and reconstruct environments without any 3D information \emph{a priori}. We will make our code available on a dedicated webpage for allowing comparison with future methods.

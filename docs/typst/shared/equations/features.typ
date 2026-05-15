@@ -2,8 +2,8 @@
 
 #let features = (
   film: $
-    #(symb.vin.global)_i^"film"
-    = (1 + #(symb.vin.gamma)_i) dot.op #(symb.vin.global)_i + #(symb.vin.beta)_i
+    #(symb.vin.global) _i^"film"
+    = (1 + #(symb.vin.gamma) _i) dot.op #(symb.vin.global) _i + #(symb.vin.beta) _i
   $,
   semidense_validity: $
     m_(i,j)
@@ -37,9 +37,9 @@
     =
     1 -
     (
-      (bold(d)_(t,i) (bold(v)))^top
-      #symb.vin.dir_moment (bold(v))
-      bold(d)_(t,i) (bold(v))
+    (bold(d)_(t,i) (bold(v)))^top
+    #symb.vin.dir_moment (bold(v))
+    bold(d)_(t,i) (bold(v))
     )
     /
     (op("tr") (#symb.vin.dir_moment (bold(v))) + epsilon)
@@ -79,11 +79,11 @@
   candidate_query_local_frame: $
     bold(delta)_(j,i)^"p"
     =
-    (bold(R)_(t,i))^top (bold(p)_j - bold(c)_(t,i)),
+    bold(R)_(t,i)^top (bold(p)_j - bold(c)_(t,i)),
     quad
     bold(delta)_(j,i)^"R"
     =
-    (bold(R)_(t,i))^top bold(R)_j
+    bold(R)_(t,i)^top bold(R)_j
   $,
   candidate_query_rpe: $
     bold(eta)_(j,i)^"cand"
@@ -91,30 +91,27 @@
     op("concat") (bold(delta)_(j,i)^"p", norm(bold(delta)_(j,i)^"p")_2, op("enc")_R (bold(delta)_(j,i)^"R")) \
     bold(eta)_(e,i)^"target"
     &=
-    op("concat") ((bold(R)_(t,i))^top (bold(t)_e - bold(c)_(t,i)), alpha_(t,i)^e) \
+    op("concat") (bold(R)_(t,i)^top (bold(t)_e - bold(c)_(t,i)), alpha_(t,i)^e) \
     bold(eta)_(k,i)^"hist"
     &=
-    op("concat") ((bold(R)_(t,i))^top (bold(c)_k - bold(c)_(t,i)), t - k, r_k^e) \
+    op("concat") (bold(R)_(t,i)^top (bold(c)_k - bold(c)_(t,i)), t - k, r_k^e) \
     bold(r)_(a,i)^"rpe"
     &=
-    phi_R (op("Fourier") (bold(eta)_(a,i))),
+    phi_R (cal(F) (bold(eta)_(a,i))),
     quad a in {j, e, k}
   $,
   edge_conditioned_attention: $
-    bold(k)_(j,i), bold(v)_(j,i)
-    &=
-    f_(K,V) (op("concat") (bold(x)_(t,j), bold(r)_(j,i))) \
-    alpha_(i,j)
-    &=
-    op("softmax")_(j in #symb.rl.action_set_t)
-    (
-      ((bold(W)_Q bold(x)_(t,i))^top bold(k)_(j,i)) / sqrt(d)
-    ) \
-    bold(u)_(t,i)
-    &=
-    sum_(j in #symb.rl.action_set_t)
-    alpha_(i,j)
-    bold(v)_(j,i)
+    bold(k)_(j,i), bold(v)_(j,i) & =
+                                   f_(K,V) (op("concat") (bold(x)_(t,j), bold(r)_(j,i))) \
+                     alpha_(i,j) & =
+                                   op("softmax")_(j in #symb.rl.action_set_t)
+                                   (
+                                     ((bold(W)_Q bold(x)_(t,i))^top bold(k)_(j,i)) / sqrt(d)
+                                   ) \
+                   bold(u)_(t,i) & =
+                                   sum_(j in #symb.rl.action_set_t)
+                                   alpha_(i,j)
+                                   bold(v)_(j,i)
   $,
   candidate_pose_context: $
     bold(p)_(t,i)

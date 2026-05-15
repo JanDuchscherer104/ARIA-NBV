@@ -1,0 +1,108 @@
+% main method section
+\section{Set Transformer}
+\label{sec:set_transformer}
+
+In this section, we motivate and describe the \textit{Set Transformer}: an attention-based neural network 
+that is designed to process sets of data.
+Similar to other architectures, a Set Transformer consists of an encoder followed by a decoder (\textit{cf.} Section~\ref{subsec:pooling}), 
+but a distinguishing feature is that each layer in the encoder and decoder attends to their inputs to produce activations.
+Additionally, instead of a fixed pooling operation such as $\mathrm{mean}$, our aggregating function $\mathrm{pool}(\cdot)$ is parameterized and can thus adapt to the problem at hand.
+
+\subsection{Permutation Equivariant (Induced) Set Attention Blocks}
+We begin by defining our attention-based set operations, which we call SAB and ISAB.
+While existing pooling methods for sets obtain instance features independently of other instances, we use self-attention to concurrently encode the whole set.
+This gives the Set Transformer the ability to compute pairwise as well as higher-order interactions among instances during the encoding process.
+For this purpose, we adapt the multihead attention mechanism used in Transformer.
+We emphasize that all blocks introduced here are neural network blocks with their own parameters, and not fixed functions.
+
+Given matrices $X, Y \in \R^{n\times d}$ which represent two sets of $d$-dimensional vectors, we define the Multihead Attention Block (MAB) with parameters $\omega$ as follows:
+\[
+&\mathrm{MAB}(X, Y) = \mathrm{LayerNorm}(H + \mathrm{rFF}(H)), \label{eq:mab1}\\
+&\textrm{where} \ \ H = \mathrm{LayerNorm}(X + \mathrm{Multihead}(X, Y, Y; \omega)), \label{eq:mab2}
+\]
+$\mathrm{rFF}$ is any row-wise feedforward layer (i.e., it processes each instance independently and identically), and $\mathrm{LayerNorm}$ is layer normalization~\citep{Ba2016}.
+The MAB is an adaptation of the encoder block of the Transformer~\citep{Vaswani2017} without positional encoding and dropout.
+Using the MAB, we define the Set Attention Block (SAB) as
+\[
+\mathrm{SAB}(X) \coloneqq \mathrm{MAB}(X, X).
+\label{eq:sab}
+\]
+In other words, an SAB takes a set and performs self-attention between the elements in the set, resulting in a set of equal size.
+Since the output of SAB contains information about pairwise interactions among the elements in the input set $X$, we can stack multiple SABs to encode higher order interactions.
+Note that while the SAB \eqref{eq:sab} involves a multihead attention operation \eqref{eq:mab2}, where $Q=K=V=X$, it could reduce to applying a residual block on $X$.
+In practice, it learns more complicated functions due to linear projections of $X$ inside attention heads, \eqref{eq:att} and \eqref{eq:multihead2}.
+
+ A potential problem with using SABs for set-structured data is the quadratic time complexity $\calO(n^2)$, which may be too expensive for large sets ($n \gg 1$).
+We thus introduce the \textit{Induced Set Attention Block} (ISAB), which bypasses this problem. Along with the set $X\in\R^{n\times d}$, additionally define $m$ $d$-dimensional vectors $I \in \R^{m\times d}$, which we call \textit{inducing points}.
+Inducing points $I$ are part of the ISAB itself, and they are \emph{trainable parameters} which we train along with other parameters of the network.
+An ISAB with $m$ inducing points $I$ is defined as:
+\[
+\mathrm{ISAB}_m(X) &= \mathrm{MAB}(X, H) \in \R^{n \times d}, \label{eq:isab1}\\
+\textrm{where} \ \ H &= \mathrm{MAB}(I, X) \in \R^{m \times d}.\label{eq:isab2}
+\]
+The ISAB first transforms $I$ into $H$ by attending to the input set.
+The set of transformed inducing points $H$, which contains information about the input set $X$, is again attended to by the input set $X$ to finally produce a set of $n$ elements.
+This is analogous to low-rank projection or autoencoder models, where inputs ($X$) are first projected onto a low-dimensional object ($H$) and then reconstructed to produce outputs.
+The difference is that the goal of these methods is reconstruction whereas ISAB aims to obtain good features for the final task.
+We expect the learned inducing points to encode some global structure which helps explain the inputs $X$. For example, in the amortized clustering problem on a 2D plane, the inducing points could be appropriately distributed points on the 2D plane so that the encoder can compare elements in the query dataset indirectly through their proximity to these grid points.
+
+Note that in \eqref{eq:isab1} and \eqref{eq:isab2}, attention was computed between a set of size $m$ and a set of size $n$.
+Therefore, the time complexity of $\mathrm{ISAB}_m(X;\lambda)$ is $\calO(nm)$ where $m$ is a (typically small) hyperparameter --- an improvement over the quadratic complexity of the SAB.
+We also emphasize that both of our set operations (SAB and ISAB) are \emph{permutation equivariant} (definition in Section~\ref{subsec:pooling}):
+\begin{property}
+Both $\mathrm{SAB}(X)$ and $\mathrm{ISAB}_m(X)$ are permutation equivariant.
+\end{property}
+
+\subsection{Pooling by Multihead Attention}
+A common aggregation scheme in permutation invariant networks is a dimension-wise average or maximum of the feature vectors (\textit{cf.} Section~\ref{sec:introduction}).
+We instead propose to aggregate features by applying multihead attention on a learnable set of $k$ seed vectors $S \in \R^{k \times d}$.
+Let $Z \in \R^{n\times d}$ be the set of features constructed from an encoder.
+\textit{Pooling by Multihead Attention} (PMA) with $k$ seed vectors is defined as
+\[
+\mathrm{PMA}_k(Z) = \mathrm{MAB}(S, \mathrm{rFF}(Z)).
+\]
+Note that the output of $\mathrm{PMA}_k$ is a set of $k$ items.
+We use one seed vector ($k=1$) in most cases, but for problems such as amortized clustering which requires $k$ correlated outputs, the natural thing to do is to use $k$ seed vectors.
+To further model the interactions among the $k$ outputs, we apply an SAB afterwards:
+\[
+H = \mathrm{SAB}(\mathrm{PMA}_k(Z)).
+\]
+We later empirically show that such self-attention after pooling helps in modeling explaining-away (e.g., among clusters in an amortized clustering problem).
+
+Intuitively, feature aggregation using attention should be beneficial because the influence of each instance on the target is not necessarily equal.
+For example, consider a problem where the target value is the maximum value of a set of real numbers.
+Since the target can be recovered using only a single instance (the largest), finding and attending to that instance during aggregation will be advantageous.
+
+\subsection{Overall Architecture}
+Using the ingredients explained above, we describe how we would construct a set transformer consists of an encoder and a decoder.
+The encoder $\mathrm{Encoder}: X \mapsto Z \in \R^{n\times d}$ is a stack of SABs or ISABs, for example:
+\[
+\mathrm{Encoder}(X) &= \mathrm{SAB}(\mathrm{SAB}(X))\label{eq:enc_sab} \\
+\mathrm{Encoder}(X) &= \mathrm{ISAB}_{m}(\mathrm{ISAB}_{m}(X)). \label{eq:enc_isab}
+\]
+We point out again that the time complexity for $\ell$ stacks of SABs and ISABs are $\calO(\ell n^2)$ and $\calO(\ell nm)$, respectively.
+This can result in much lower processing times when using ISAB (as compared to SAB), while still maintaining high representational power.
+After the encoder transforms data $X \in \R^{n \times d_x}$ into features $Z \in \R^{n\times d}$,
+the decoder aggregates them into a single or a set of vectors which is fed into a feed-forward network to get final outputs.
+Note that PMA with $k > 1$ seed vectors should be followed by SABs to model the correlation between $k$ outputs.
+\[
+&\mathrm{Decoder}(Z;\lambda) = \mathrm{rFF}(\mathrm{SAB}(\mathrm{PMA}_k(Z))) \in \R^{k \times d} \\
+&\textrm{where} \ \ \mathrm{PMA}_k(Z) = \mathrm{MAB}(S, \mathrm{rFF}(Z)) \in \R^{k \times d},
+\]
+
+\subsection{Analysis}
+\label{subsec:analysis}
+Since the blocks used to construct the encoder (i.e., SAB, ISAB) are permutation equivariant, the mapping of the encoder $X \rightarrow Z$ is permutation equivariant as well.
+Combined with the fact that the PMA in the decoder is a permutation invariant transformation, we have the following:
+\begin{proposition}
+The Set Transformer is permutation invariant.
+\end{proposition}
+
+Being able to approximate any function is a desirable property, especially for black-box models such as deep neural networks.
+Building on previous results about the universal approximation of permutation invariant functions, we prove the universality of Set Transformers:
+\begin{proposition}
+The Set Transformer is a universal approximator of permutation invariant functions.
+\end{proposition}
+\begin{proof}
+See supplementary material.
+\end{proof}

@@ -1,0 +1,15 @@
+\begin{tabular}{lx{8mm}x{8mm}x{9mm}x{9mm}x{8mm}x{8mm}}
+\toprule
+Indoor Sem. Seg.&\multicolumn{2}{c}{ScanNet~\cite{dai2017scannet}} &\multicolumn{2}{c}{ScanNet200~\cite{rozenberszki2022language}} &\multicolumn{2}{c}{S3DIS~\cite{armeni2016s3dis}} \\\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Methods &Val &Test &Val &Test &Area5 &6-fold \\\midrule
+\scratch MinkUNet~\cite{choy20194d} &72.2 &73.6 &25.0 &25.3 &65.4 &65.4 \\
+\scratch ST~\cite{lai2022stratified} &74.3 &73.7 &- &- &72.0 &- \\
+\scratch PointNeXt~\cite{qian2022pointnext} &71.5 &71.2 &- &- &70.5 &74.9 \\
+\scratch OctFormer~\cite{Wang2023OctFormer} &75.7 &76.6 &32.6 &32.6 &- &- \\
+\scratch Swin3D~\cite{yang2023swin3d} &76.4 &- &- &- &72.5 &76.9 \\
+\scratch PTv1~\cite{zhao2021point} &70.6 &- &27.8 &- &70.4 &65.4 \\
+\scratch PTv2~\cite{wu2022point} &75.4 &74.2 &30.2 &- &71.6 &73.5 \\
+\cellcolor[HTML]{efefef}\scratch PTv3~(Ours) &\cellcolor[HTML]{efefef}77.5 &\cellcolor[HTML]{efefef}77.9 &\cellcolor[HTML]{efefef}35.2 &\cellcolor[HTML]{efefef}37.8 &\cellcolor[HTML]{efefef}73.4 &\cellcolor[HTML]{efefef}77.7 \\
+\cellcolor[HTML]{efefef}\pretrain PTv3~(Ours) &\cellcolor[HTML]{efefef}\textbf{78.6} &\cellcolor[HTML]{efefef}\textbf{79.4}&\cellcolor[HTML]{efefef}\textbf{36.0} &\cellcolor[HTML]{efefef}\textbf{39.3}&\cellcolor[HTML]{efefef}\textbf{74.7} &\cellcolor[HTML]{efefef}\textbf{80.8} \\
+\bottomrule
+\end{tabular}

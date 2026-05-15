@@ -30,6 +30,16 @@ from .logging import (
     topk_accuracy_from_probs,
 )
 from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
+from .rollout import (
+    TargetRolloutMetricSummary,
+    endpoint_log_gain,
+    endpoint_target_gain,
+    finite_horizon_target_return,
+    selected_target_rri,
+    summarize_target_rollout_metrics,
+    target_point_mesh_error_after,
+    target_point_mesh_error_before,
+)
 from .rri_binning import RriOrdinalBinner, ordinal_labels_to_levels
 from .types import DistanceAggregation, DistanceBreakdown, RriResult
 
@@ -40,6 +50,7 @@ __all__ = [
     "Metric",
     "RriErrorStats",
     "RriOrdinalBinner",
+    "TargetRolloutMetricSummary",
     "VinMetrics",
     "VinMetricsConfig",
     "loss_key",
@@ -54,5 +65,12 @@ __all__ = [
     "coral_logits_to_prob",
     "coral_loss",
     "coral_random_loss",
+    "endpoint_log_gain",
+    "endpoint_target_gain",
+    "finite_horizon_target_return",
     "ordinal_labels_to_levels",
+    "selected_target_rri",
+    "summarize_target_rollout_metrics",
+    "target_point_mesh_error_after",
+    "target_point_mesh_error_before",
 ]

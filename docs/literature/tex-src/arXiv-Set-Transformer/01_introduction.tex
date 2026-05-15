@@ -1,0 +1,66 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Learning representations has proven to be an essential problem for deep learning and its many success stories.
+The majority of problems tackled by deep learning are \textit{instance-based} and take the form of mapping a fixed-dimensional input tensor to its corresponding target value~\citep{krizhevsky2012imagenet, graves2013speech}.
+\if{0}
+There are also \textit{sequential} problems, often treated by the means of recurrent neural networks (RNNs), which can process inputs of variable length.
+Learning long-range dependencies remains an issue, however, and often requires various engineering tricks~\citep{Le2015, Neil2016}.
+\fi
+
+For some applications, we are required to process \emph{set-structured data}.
+Multiple instance learning~\citep{Dietterich1997, Maron1998} is an example of such a \textit{set-input} problem, where a set of instances is given as an input and the corresponding target is a label for the entire set.
+Other problems such as 3D shape recognition~\citep{Wu2015, BaoguangShi2015, Su2015, Charles2017}, sequence ordering~\citep{Vinyals2016a}, and various set operations~\citep{muandet2012learning, oliva2013distribution, Edwards2017, Zaheer2017} can also be viewed as the set-input problems.
+Moreover, many meta-learning~\citep{ThrunS98book, SchmidhuberJ87phd} problems which learn using different, 
+but related tasks may also be treated as set-input tasks where an input set corresponds to the training dataset of a single task.
+For example, few-shot image classification~\citep{finn2017model, Snell2017, Lee2018} operates by building a classifier using a support set of images, which is evaluated with query images.
+
+A model for \textit{set-input} problems should satisfy two critical requirements.
+First, it should be \textit{permutation invariant} --- the output of the model should not change under any permutation of the elements in the input set.
+Second, such a model should be able to process input sets of any size.
+While these requirements stem from the definition of a set, they are not easily satisfied in neural-network-based models: classical feed-forward neural networks violate both requirements, and RNNs are sensitive to input order.
+
+Recently, \citet{Edwards2017} and \citet{Zaheer2017} propose neural network architectures which meet both criteria, which we call \emph{set pooling} methods.
+In this model, each element in a set is first independently fed into a feed-forward neural network that takes fixed-size inputs.
+Resulting feature-space embeddings are then aggregated using a \emph{pooling} operation ($\operatorname{mean}$, $\operatorname{sum}$, $\operatorname{max}$ or similar).
+The final output is obtained by further non-linear processing of the aggregated embedding.
+This remarkably simple architecture satisfies both aforementioned requirements, and more importantly, is proven to be a universal approximator for any set function~\citep{Zaheer2017}.
+Thanks to this property, it is possible to learn a complex mapping between input sets and their target outputs in a black-box fashion, much like with feed-forward or recurrent neural networks.
+
+Even though this set pooling approach is theoretically attractive, it remains unclear whether we can approximate complex mappings well using only instance-based feature extractors and simple pooling operations.
+Since every element in a set is processed independently in a set pooling operation, some information regarding interactions between elements has to be necessarily discarded.
+This can make some problems unnecessarily difficult to solve.
+
+Consider the problem of \emph{amortized clustering}, where we would like to learn a parametric mapping from an input set of points to the centers of clusters of points inside the set.
+Even for a toy dataset in 2D space, this is not an easy problem.
+The main difficulty is that the parametric mapping must assign each point to its corresponding cluster while modelling the explaining away pattern such that the resulting clusters do not attempt to explain overlapping subsets of the input set.
+Due to this innate difficulty, clustering is typically solved via iterative algorithms that refine randomly initialized clusters until convergence.
+Even though a neural network with a set poling operation can approximate such an amortized mapping by learning to quantize space, a crucial shortcoming is that this quantization cannot depend on the contents of the set.
+This limits the quality of the solution and also may make optimization of such a model more difficult;
+we show empirically in Section~\ref{sec:experiments} that such pooling architectures suffer from under-fitting.
+
+%\ak{I don't agree with the following. The instance-based mapping can learn a partitioning of space, think e.g. a voxel-based representation of a 3D space; the output embedding can place every point in a corresponding partition. Summing/pooling these points can recover the spatial structure of the input set. The fact that we don't really learn that might be an optimization issue}
+%\ljh{I would not say the instance-based mapping `cannot' learn a partitioning of space, but it would be much 'harder' to learn, just as the neural nets without attention in theory can learn any function that is learnable with attention. Is their any moderate way of saying this?}
+%\ak{a neural net yes, but not necessarily a neural net with a set-pooling op}
+%\textcolor{gray}{
+%Additionally, the simple pooling operation may cause considerable information loss.
+%For instance, think of a meta-clustering problem, where the goal is to learn a mapping from sets of data points to cluster centers.
+%Pairwise or higher-order interactions among data points should be crucial for learning a mapping from sets of data to cluster centers, but set pooling does not easily encode these.}
+
+
+In this paper, we propose a novel set-input deep neural network architecture called the \emph{Set Transformer}, (\textit{cf.} \emph{Transformer},~\cite{Vaswani2017}).
+The novelty of the Set Transformer is in three important design choices:
+\begin{enumerate}
+%1) We use a self-attention mechanism based on the Transformer to process every element in an input set, which allows our approach to naturally encode pairwise- or higher-order interactions between elements in the set.
+\item We use a self-attention mechanism to process every element in an input set, which allows our approach to naturally encode pairwise- or higher-order interactions between elements in the set.
+\item We propose a method to reduce the $\calO(n^2)$ computation time of full self-attention (e.g. the Transformer) to $\calO(nm)$ where $m$ is a fixed hyperparameter, allowing our method to scale to large input sets.
+\item We use a self-attention mechanism to aggregate features, which is especially beneficial when the problem requires multiple outputs which depend on each other, such as the problem of meta-clustering, where the meaning of each cluster center heavily depends its location relative to the other clusters.
+\end{enumerate}
+We apply the Set Transformer to several set-input problems and empirically demonstrate the  importance and effectiveness of these design choices, and show that we can achieve the state-of-the-art performances for the most of the tasks.
+
+\iffalse
+This paper is organized as follows. In Section~\ref{sec:background}, we briefly review the concept of set functions, existing architectures, and the self-attention mechanism.
+In Section~\ref{sec:set_transformer}, we introduce Set Transformers, our novel neural network architecture for set functions.
+We discuss related works in Section~\ref{sec:related_works} and present various experiments that demonstrate the benefits of the Set Transformer in Section~\ref{sec:experiments}.
+We conclude the paper in Section~\ref{sec:conclusion}.
+\fi

@@ -1,0 +1,19 @@
+\begin{tabular}{lclc}\toprule
+\multicolumn{2}{c}{Scratch} &\multicolumn{2}{c}{Joint Training~\cite{wu2023ppt}} \\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+Config &Value &Config &Value \\\midrule
+optimizer &AdamW &optimizer &AdamW \\
+scheduler &Cosine &scheduler &Cosine \\
+criteria &CrossEntropy~(1) &criteria &CrossEntropy~(1) \\
+&Lovasz~\cite{berman2018lovasz}~(1) & &Lovasz~\cite{berman2018lovasz}~(1) \\
+learning rate &2e-3 &learning rate &2e-3 \\
+block lr scaler &1e-1 &block lr scaler &1e-1 \\
+weight decay &5e-3 &weight decay &5e-3 \\
+batch size &12 &batch size &24 \\
+datasets &NuScenes / &datasets &NuScenes~(1) \\
+&Sem.KITTI / & &Sem.KITTI~(1) \\
+&Waymo & &Waymo~(1) \\
+warmup epochs &2 &warmup iters &9k \\
+epochs &50 &iters &180k \\
+\bottomrule
+\end{tabular}

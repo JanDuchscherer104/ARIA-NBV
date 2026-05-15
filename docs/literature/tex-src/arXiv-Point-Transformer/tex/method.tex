@@ -1,0 +1,80 @@
+\vspace{-2pt}
+We begin by briefly revisiting the general formulation of transformers and self-attention operators. Then we present the point transformer layer for 3D point cloud processing. Lastly, we present our network architecture for 3D scene understanding.
+
+\subsection{Background}
+Transformers and self-attention networks have revolutionized natural language processing~\cite{vaswani2017attention,wu2019pay,Devlin2018,dai2019transformer,Yang2019xlnet} and have demonstrated impressive results in 2D image analysis~\cite{hu2019local,ramachandran2019stand,zhao2020san,dosovitskiy2021image}. Self-attention operators can be classified into two types: scalar attention~\cite{vaswani2017attention} and vector attention~\cite{zhao2020san}.
+
+Let $\xX = \{\xx_i\}_i$ be a set of feature vectors. The standard scalar dot-product attention layer can be represented as follows:
+\begin{equation}\label{eq:scalar}
+\ve{y}_{i} = \sum_{\xx_j \in \xX} \rho\big(\varphi(\ve{x}_i)^\top \psi(\ve{x}_j) + \delta\big) \alpha(\ve{x}_{j}),
+\end{equation}
+where $\ve{y}_{i}$ is the output feature. $\varphi$, $\psi$, and $\alpha$ are pointwise feature transformations, such as linear projections or MLPs. $\delta$ is a position encoding function and $\rho$ is a normalization function such as \textit{softmax}. The scalar attention layer computes the scalar product between features transformed by $\varphi$ and $\psi$ and uses the output as an attention weight for aggregating features transformed by $\alpha$.
+
+In vector attention, the computation of attention weights is different. In particular, attention weights are \emph{vectors} that can modulate individual feature channels:
+\begin{equation}\label{eq:vector}
+\ve{y}_{i} = \sum_{\xx_j \in \xX} \rho\big(\gamma(\beta(\varphi(\ve{x}_i), \psi(\ve{x}_j))+\delta)\big) \odot \alpha(\ve{x}_{j}),
+\end{equation}
+where $\beta$ is a relation function (e.g., subtraction) and $\gamma$ is a mapping function (e.g., an MLP) that produces attention vectors for feature aggregation.
+
+Both scalar and vector self-attention are set operators. The set can be a collection of feature vectors that represent the entire signal (e.g., sentence or image)~\cite{vaswani2017attention,dosovitskiy2021image} or a collection of feature vectors from a local patch within the signal (e.g., an image patch)~\cite{hu2019local,ramachandran2019stand,zhao2020san}.
+
+\subsection{Point Transformer Layer}
+\label{sec:layer}
+Self-attention is a natural fit for point clouds because point clouds are essentially sets embedded irregularly in a metric space. Our point transformer layer is based on vector self-attention. We use the subtraction relation and add a position encoding $\delta$ to both the attention vector $\gamma$ and the transformed features $\alpha$:
+\begin{equation}\label{eq:pointtransformer}
+\ve{y}_{i} = \sum_{\xx_j \in \xX(i)} \rho\big(\gamma(\varphi(\ve{x}_i) - \psi(\ve{x}_j) + \delta)\big) \odot \big(\alpha(\ve{x}_{j}) + \delta\big)
+\end{equation}
+Here the subset $\xX(i) \subseteq \xX$ is a set of points in a local neighborhood (specifically, $k$ nearest neighbors) of $\xx_i$. Thus we adopt the practice of recent self-attention networks for image analysis in applying self-attention locally, within a local neighborhood around each datapoint~\cite{hu2019local,ramachandran2019stand,zhao2020san}. The mapping function $\gamma$ is an MLP with two linear layers and one ReLU nonlinearity. The point transformer layer is illustrated in Figure~\ref{fig:transformerlayer}.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.98\linewidth]{figure/transformerlayer.pdf} \\
+	\caption{Point transformer layer.}
+	\label{fig:transformerlayer}
+\end{figure}
+
+\begin{figure*}[t]
+	\includegraphics[width=1.0\linewidth]{figure/network.pdf}
+	\caption{Point transformer networks for semantic segmentation (top) and classification (bottom).}
+	\label{fig:network}
+\end{figure*}
+
+\begin{figure*}
+	\centering
+	\begin{tabular}{@{\hspace{8.0mm}}c@{\hspace{15.0mm}}c@{\hspace{8.0mm}}c@{\hspace{0.0mm}}}
+		\includegraphics[height=0.24\linewidth]{figure/transformerblock.pdf} &
+		\includegraphics[height=0.24\linewidth]{figure/transitiondown.pdf} & \includegraphics[height=0.24\linewidth]{figure/transitionup.pdf} \\
+	    \small (a) point transformer block & \small (b) transition down & \small (c) transition up \\
+	\end{tabular}
+	\vspace{4mm}
+	\caption{Detailed structure design for each module.}
+	\label{fig:detailedstructure}
+\end{figure*}
+
+\subsection{Position Encoding}
+Position encoding plays an important role in self-attention, allowing the operator to adapt to local structure in the data~\cite{vaswani2017attention}. Standard position encoding schemes for sequences and image grids are crafted manually, for example based on sine and cosine functions or normalized range values~\cite{vaswani2017attention,zhao2020san}. In 3D point cloud processing, the 3D point coordinates themselves are a natural candidate for position encoding. We go beyond this by introducing trainable, parameterized position encoding. Our position encoding function $\delta$ is defined as follows:
+\begin{equation}\label{eq:positionencoding}
+\delta = \theta(\ve{p}_i - \ve{p}_j).
+\end{equation}
+Here $\ve{p}_i$ and $\ve{p}_j$ are the 3D point coordinates for points $i$ and $j$. The encoding function $\theta$ is an MLP with two linear layers and one ReLU nonlinearity. Notably, we found that position encoding is important for both the attention generation branch and the feature transformation branch. Thus Eq.~\ref{eq:pointtransformer} adds the trainable position encoding in both branches. The position encoding $\theta$ is trained end-to-end with the other subnetworks.
+
+\subsection{Point Transformer Block}
+We construct a residual point transformer block with the point transformer layer at its core, as shown in Figure~\ref{fig:detailedstructure}(a). The transformer block integrates the self-attention layer, linear projections that can reduce dimensionality and accelerate processing, and a residual connection. The input is a set of feature vectors $\xx$ with associated 3D coordinates $\pp$. The point transformer block facilitates information exchange between these localized feature vectors, producing new feature vectors for all data points as its output. The information aggregation adapts both to the content of the feature vectors and their layout in 3D.
+
+\subsection{Network Architecture}
+We construct complete 3D point cloud understanding networks based on the point transformer block. Note that the point transformer is the primary feature aggregation operator throughout the network. We do not use convolutions for preprocessing or auxiliary branches: the network is based entirely on point transformer layers, pointwise transformations, and pooling. The network architectures are visualized in Figure~\ref{fig:network}.
+
+\mypara{Backbone structure.}
+The feature encoder in point transformer networks for semantic segmentation and classification has five stages that operate on progressively downsampled point sets. The downsampling rates for the stages are [1, 4, 4, 4, 4], thus the cardinality of the point set produced by each stage is [N, N/4, N/16, N/64, N/256], where N is the number of input points. Note that the number of stages and the downsampling rates can be varied depending on the application, for example to construct light-weight backbones for fast processing. Consecutive stages are connected by transition modules: transition down for feature encoding and transition up for feature decoding.
+
+\mypara{Transition down.}
+A key function of the transition down module is to reduce the cardinality of the point set as required, for example from N to N/4 in the transition from the first to the second stage. Denote the point set provided as input to the transition down module as $\pP_1$ and denote the output point set as $\pP_2$. We perform farthest point sampling~\cite{qi2017pointnet2} in $\pP_1$ to identify a well-spread subset $\pP_2 \subset \pP_1$ with the requisite cardinality. To pool feature vectors from $\pP_1$ onto $\pP_2$, we use a $k$NN graph on $\pP_1$. (This is the same $k$ as in Section~\ref{sec:layer}. We use $k=16$ throughout and report a controlled study of this hyperparameter in Section~\ref{sec:ablation}.) Each input feature goes through a linear transformation, followed by batch normalization and ReLU, followed by max pooling onto each point in $\pP_2$ from its $k$ neighbors in $\pP_1$. The transition down module is schematically illustrated in Figure~\ref{fig:detailedstructure}(b).
+
+\mypara{Transition up.}
+For dense prediction tasks such as semantic segmentation, we adopt a U-net design in which the encoder described above is coupled with a symmetric decoder~\cite{qi2017pointnet2,choy20194d}. Consecutive stages in the decoder are connected by transition up modules. Their primary function is to map features from the downsampled input point set $\pP_2$ onto its superset $\pP_1 \supset \pP_2$.
+To this end, each input point feature is processed by a linear layer, followed by batch normalization and ReLU, and then the features are mapped onto the higher-resolution point set $\pP_1$ via trilinear interpolation.
+These interpolated features from the preceding decoder stage are summarized with the features from the corresponding encoder stage, provided via a skip connection.
+The structure of the transition up module is illustrated in Figure~\ref{fig:detailedstructure}(c).
+
+\mypara{Output head.}
+For semantic segmentation, the final decoder stage produces a feature vector for each point in the input point set. We apply an MLP to map this feature to the final logits. For classification, we perform global average pooling over the pointwise features to get a global feature vector for the whole point set. This global feature is passed through an MLP to get the global classification logits.

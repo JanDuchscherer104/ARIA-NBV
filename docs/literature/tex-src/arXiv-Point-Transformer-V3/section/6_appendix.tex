@@ -1,0 +1,157 @@
+For a thorough understanding of our Point Transformer V3 (PTv3), we have compiled a detailed Appendix. The table of contents below offers a quick overview and will guide to specific sections of interest.
+
+\hypersetup{linkbordercolor=black,linkcolor=black}
+
+\setlength{\cftbeforesecskip}{0.5em}
+\cftsetindents{section}{0em}{1.8em}
+\cftsetindents{subsection}{1em}{2.5em}
+
+\etoctoccontentsline{part}{Appendix}
+\localtableofcontents
+\hypersetup{linkbordercolor=red,linkcolor=red}
+
+\section{Implementation Details}
+Our implementation primarily utilizes Pointcept~\cite{pointcept2023}, a specialized codebase focusing on point cloud perception and representation learning. For tasks involving outdoor object detection, we employ OpenPCDet~\cite{openpcdet2020}, which is tailored for LiDAR-based 3D object detection. The specifics of our implementation are detailed in this section.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{4pt}{1.08}
+        \input{table/appendix_indoor_sem_seg_settings}
+        \vspace{-3mm}
+        \caption{\textbf{Indoor semantic segmentation settings.} }\label{tab:indoor_sem_seg_settings}
+        \vspace{2mm}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{4pt}{1.08}
+        \input{table/appendix_outdoor_sem_seg_settings}
+        \vspace{-3mm}
+        \caption{\textbf{Outdoor semantic segmentation settings.} }\label{tab:outdoor_sem_seg_settings}
+        \vspace{2mm}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{4pt}{1.08}
+        \input{table/appendix_other_training_settings}
+        \vspace{-3mm}
+        \caption{\textbf{Other downstream tasks settings.} }\label{tab:other_downstream_tasks_settings}
+        \vspace{-4mm}
+    \end{minipage}
+\end{table}
+
+\subsection{Training Settings}
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{14pt}{1.08}
+        \input{table/appendix_model_settings}
+        \vspace{-3mm}
+        \caption{\textbf{Model settings.} }\label{tab:appendix_model_settings}
+        \vspace{2mm}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{1.5pt}{1.07}
+        \input{table/appendix_data_augmentations}
+        \vspace{-3mm}
+        \caption{\textbf{Data augmentations.} }\label{tab:appendix_data_augmentations}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+\mypara{Indoor semantic segmentation.} 
+The settings for indoor semantic segmentation are outlined in \tabref{tab:indoor_sem_seg_settings}. The two leftmost columns describe the parameters for training from scratch using a single dataset. To our knowledge, this represents the first initiative to standardize training settings across different indoor benchmarks with a unified approach. The two rightmost columns describe the parameters for multi-dataset joint training~\cite{wu2023ppt} with PTv3, maintaining similar settings to the scratch training but with an increased batch size. The numbers in brackets indicate the relative weight assigned to each dataset (criteria) in the mix.
+
+\mypara{Outdoor semantic segmentation.}
+The configuration for outdoor semantic segmentation, presented in \tabref{tab:outdoor_sem_seg_settings}, follows a similar format to that of indoor. We also standardize the training settings across three outdoor datasets. Notably, PTv3 operates effectively without the need for point clipping within a specific range, a step that is typically essential in current models. Furthermore, we extend our methodology to multi-dataset joint training with PTv3, employing settings analogous to scratch training but with augmented batch size. The numbers in brackets represent the proportional weight assigned to each dataset in the training mix.
+
+\mypara{Other Downstream Tasks.}
+We outline our configurations for indoor instance segmentation and outdoor object detection in \tabref{tab:other_downstream_tasks_settings}. For indoor instance segmentation, we use PointGroup~\cite{jiang2020pointgroup} as our foundational framework, a popular choice in 3D representation learning~\cite{xie2020pointcontrast, hou2021exploring, wu2023masked, wu2023ppt}. Our configuration primarily follows PointContrast~\cite{xie2020pointcontrast}, with necessary adjustments made for PTv3 compatibility. Regarding outdoor object detection, we adhere to the settings detailed in FlatFormer~\cite{liu2023flatformer} and implement CenterPoint as our base framework to assess PTv3's effectiveness. It's important to note that PTv3 is versatile and can be integrated with various other frameworks due to its backbone nature.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{13.5pt}{1.08}
+        \input{table/appendix_ablation_normalization}
+        \vspace{-3mm}
+        \caption{\textbf{Nomalization layer.} }\label{tab:appendix_ablation_normalization}
+        \vspace{2mm}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{11.5pt}{1.07}
+        \input{table/appendix_ablation_block}
+        \vspace{-3mm}
+        \caption{\textbf{Block structure.} }\label{tab:appendix_ablation_block}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+
+\subsection{Model Settings}
+As briefly described in \secref{subsec:network_details}, here we delve into the detailed model configurations of our PTv3, which are comprehensively listed in \tabref{tab:appendix_model_settings}. This table serves as a blueprint for components within serialization-based point cloud transformers, encapsulating models like OctFormer~\cite{Wang2023OctFormer} and FlatFormer~\cite{liu2023flatformer} within the outlined frameworks, except for certain limitations discussed in \secref{sec:related}. Specifically, OctFormer can be interpreted as utilizing a single z-order serialization with patch interaction enabled by Shift Dilation. Conversely, FlatFormer can be characterized by its window-based serialization approach, facilitating patch interaction through Shift Order.
+
+\vspace{-1mm}
+\subsection{Data Augmentations}
+\vspace{-1mm}
+The specific configurations of data augmentations implemented for PTv3 are detailed in \tabref{tab:appendix_data_augmentations}. We unify augmentation pipelines for both indoor and outdoor scenarios separately, and the configurations are shared by all tasks within each domain. Notably, we observed that PTv3 does not depend on point clipping within a specific range, a process often crucial for existing models.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{10pt}{1.08}
+        \input{table/appendix_scannet}
+        \vspace{-3mm}
+        \caption{\textbf{ScanNet V2 semantic segmentation.} }\label{tab:appendix_scannet}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+
+\section{Additional Ablations}
+In this section, we present further ablation studies focusing on macro designs of PTv3, previously discussed in \secref{subsec:network_details}.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{10pt}{1.08}
+        \input{table/appendix_s3dis}
+        \vspace{-3mm}
+        \caption{\textbf{S3DIS semantic segmentation.} }\label{tab:appendix_s3dis}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+
+\subsection{Nomalization Layer}
+Previous point transformers employ Batch Normalization (BN), which can lead to performance variability depending on the batch size. This variability becomes particularly problematic in scenarios with memory constraints that require small batch sizes or in tasks demanding dynamic or varying batch sizes. To address this issue, we have gradually transitioned to Layer Normalization (LN). Our final, empirically determined choice is to implement Layer Normalization in the attention blocks while retaining Batch Normalization in the pooling layers (see \tabref{tab:appendix_ablation_normalization}).
+
+\subsection{Block Structure}
+Previous point transformers use a traditional block structure that sequentially applies an operator, a normalization layer, and an activation function. While effective, this approach can sometimes complicate training deeper models due to issues like vanishing gradients or the need for careful initialization and learning rate adjustments~\cite{xiong2020layer}. Consequently, we explored adopting a more modern block structure, such as pre-norm and post-norm. The pre-norm structure, where a normalization layer precedes the operator, can stabilize training by ensuring normalized inputs for each layer~\cite{child2019generating}. In contrast, the post-norm structure places a normalization layer right after the operator, potentially leading to faster convergence but with less stability~\cite{vaswani2017attention}. Our experimental results (see \tabref{tab:appendix_ablation_block}) indicate that the pre-norm structure is more suitable for our PTv3, aligning with findings in recent transformer-based models~\cite{xiong2020layer}.
+
+\section{Additional Comparision}
+In this section, we expand upon the combined results table for semantic segmentation (\tabref{tab:indoor_sem_seg} and \tabref{tab:outdoor_sem_seg}) from our main paper, offering a more detailed breakdown of results alongside the respective publication years of previous works. This comprehensive result table is designed to assist readers in tracking the progression of research efforts in 3D representation learning. Marker \scratch refers to the result from a model trained from scratch, and \pretrain refers to the result from a pre-trained model.
+
+\subsection{Indoor Semantic Segmentation}
+
+We conduct a detailed comparison of pre-training technologies and backbones on the ScanNet v2~\cite{dai2017scannet} (see \tabref{tab:appendix_scannet}) and S3DIS~\cite{armeni2016s3dis} (see \tabref{tab:appendix_s3dis}) datasets. ScanNet v2 comprises 1,513 room scans reconstructed from RGB-D frames, divided into 1,201 training scenes and 312 for validation. In this dataset, model input point clouds are sampled from the vertices of reconstructed meshes, with each point assigned a semantic label from 20 categories (e.g., wall, floor, table). The S3DIS dataset for semantic scene parsing includes 271 rooms across six areas from three buildings. Following a common practice~\cite{tchapmi2017segcloud,qi2017pointnet++,zhao2021point}, we withhold area 5 for testing and perform a 6-fold cross-validation. Different from ScanNet v2, S3DIS densely sampled points on mesh surfaces, annotated into 13 categories. Consistent with standard practice~\citep{qi2017pointnet++}. We employ the mean class-wise intersection over union (mIoU) as the primary evaluation metric for indoor semantic segmentation.
+
+\begin{table}[!t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{15pt}{1.08}
+        \input{table/appendix_semantic_kitti}
+        \vspace{-3mm}
+        \caption{\textbf{SemanticKITTI semantic segmentation.} }\label{tab:appendix_semantic_kitti}
+        \vspace{2mm}
+    \end{minipage}
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \tablestyle{15pt}{1.08}
+        \input{table/appendix_nuscenes}
+        \vspace{-3mm}
+        \caption{\textbf{NuScenes semantic segmentation.} }\label{tab:appendix_nuscenes}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+
+
+\subsection{Outdoor Semantic Segmentation}
+We extend our comprehensive evaluation of pre-training technologies and backbones to outdoor semantic segmentation tasks, focusing on the SemanticKITTI~\cite{behley2019semantickitti}(see \tabref{tab:appendix_semantic_kitti}) and NuScenes~\cite{caesar2020nuscenes} (see \tabref{tab:appendix_nuscenes}) datasets. SemanticKITTI is derived from the KITTI Vision Benchmark Suite and consists of 22 sequences, with 19 for training and the remaining 3 for testing. It features richly annotated LiDAR scans, offering a diverse array of driving scenarios. Each point in this dataset is labeled with one of 28 semantic classes, encompassing various elements of urban driving environments. NuScenes, on the other hand, provides a large-scale dataset for autonomous driving, comprising 1,000 diverse urban driving scenes from Boston and Singapore. For outdoor semantic segmentation, we also employ the mean class-wise intersection over union (mIoU) as the primary evaluation metric for outdoor semantic segmentation.

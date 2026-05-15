@@ -16,13 +16,19 @@ pytest.importorskip("efm3d")
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import ENTITY_WORLD
 from aria_nbv.rerun_inspector._rollout_zarr import (
+    ENTITY_ROLLOUT_DIAGNOSTICS_ROOT,
     ENTITY_ROLLOUT_INVALID_ROOT,
     ENTITY_ROLLOUT_METADATA,
+    ENTITY_ROLLOUT_RRI_ROOT,
     ENTITY_ROLLOUT_SELECTED_PATH,
     ENTITY_ROLLOUT_SELECTED_ROOT,
     ENTITY_ROLLOUT_STEP_METADATA,
     ENTITY_ROLLOUT_VALID_ROOT,
     RerunRolloutZarrLogger,
+    _candidate_rri_summary,
+    _plot_step_payload,
+    _resolve_plot_rollout_rows,
+    _resolve_rollout_rows,
 )
 from aria_nbv.rollouts import write_rollout_zarr_store
 from tests.rollout_fixtures import build_rollout_records
@@ -46,6 +52,8 @@ class _FakeRerun:
     LineStrips3D = _Archetype
     TextDocument = _Archetype
     Scalars = _Archetype
+    SeriesLines = _Archetype
+    SeriesPoints = _Archetype
     Transform3D = _Archetype
     Pinhole = _Archetype
     AnyValues = _Archetype
@@ -78,6 +86,9 @@ class _FakeRerun:
     def connect_grpc(self, *args: Any, **kwargs: Any) -> None:
         self.calls.append(("connect_grpc", args, kwargs))
 
+    def set_time(self, *args: Any, **kwargs: Any) -> None:
+        self.calls.append(("set_time", args, kwargs))
+
     def set_time_sequence(self, *args: Any, **kwargs: Any) -> None:
         self.calls.append(("set_time_sequence", args, kwargs))
 
@@ -89,6 +100,9 @@ class _FakeRerun:
 
 def _fixture_rollout_store(tmp_path: Path) -> Path:
     records = build_rollout_records(horizon=2, num_samples=6, seed=13)
+    if len(records) > 1:
+        records[1].lineage.source_row_id = records[0].lineage.source_row_id
+        records[1].lineage.target_row_id = records[0].lineage.target_row_id
     for record in records:
         for trajectory in record.result.trajectories:
             for step in trajectory.steps:
@@ -163,8 +177,24 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
     assert any(path.startswith(f"{ENTITY_ROLLOUT_INVALID_ROOT}/candidate_") for path in fake.logged)
     assert any(path.startswith(f"{ENTITY_ROLLOUT_SELECTED_ROOT}/candidate_") for path in fake.logged)
 
-    timeline_calls = [call for call in fake.calls if call[0] == "set_time_sequence"]
-    assert [(call[1][0], call[1][1]) for call in timeline_calls] == [("rollout_step", 0), ("rollout_step", 1)]
+    timeline_calls = [call for call in fake.calls if call[0] == "set_time"]
+    assert ("rollout_step",) in [call[1] for call in timeline_calls]
+    assert [call[2]["sequence"] for call in timeline_calls[-2:]] == [0, 1]
+    assert not [call for call in fake.calls if call[0] == "set_time_sequence"]
+
+    plot_paths = [path for path in fake.logged if path.startswith("plots/rollout/")]
+    assert any(path.startswith(f"{ENTITY_ROLLOUT_RRI_ROOT}/") for path in plot_paths)
+    assert any(path.startswith(f"{ENTITY_ROLLOUT_DIAGNOSTICS_ROOT}/") for path in plot_paths)
+    assert any("/candidate_top_01" in path for path in plot_paths)
+    assert any("/candidate_fanout_mean" in path for path in plot_paths)
+    descriptor_calls = [
+        call
+        for call in fake.calls
+        if call[0] == "log" and str(call[1]).startswith("plots/rollout/") and call[3].get("static") is True
+    ]
+    assert descriptor_calls
+    assert isinstance(fake.logged[descriptor_calls[0][1]], _Archetype)
+    assert isinstance(descriptor_calls[0][2][0], _Archetype)
 
     camera_calls = [
         call for call in fake.calls if call[0] == "log" and str(call[1]).startswith(f"{ENTITY_ROLLOUT_VALID_ROOT}/")
@@ -176,6 +206,8 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
 
     metadata = json.loads(fake.logged[ENTITY_ROLLOUT_METADATA].args[0])
     assert metadata["validation"]["ok"]
+    assert metadata["manifest"]["schema_version"]
+    assert metadata["manifest"]["source_coverage"]["num_source_rows"] >= 1
     assert metadata["selected"]["rollout_row_id"] == 0
     assert metadata["context"]["mode"] == "off"
 
@@ -190,6 +222,64 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
     np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape, (2, 3))
     assert len(selected_path.kwargs["colors"]) == 2
     assert selected_path.kwargs["colors"][0] != selected_path.kwargs["colors"][1]
+
+
+def test_rollout_plot_helpers_resolve_sibling_branches_and_topk(tmp_path: Path) -> None:
+    store_dir = _fixture_rollout_store(tmp_path)
+    from aria_nbv.rollouts import RolloutZarrStoreReader
+
+    reader = RolloutZarrStoreReader(store_dir)
+    selected = _resolve_plot_rollout_rows(
+        reader,
+        selected_rows=_resolve_rollout_rows(reader, rollout_index=0, rollout_row_id=None),
+        branch_scope="same_source_target",
+    )
+
+    assert len(selected) > 1
+    assert selected[0].rollout_row_id == 0
+    first_step = _plot_step_payload(reader, step_row_position=int(selected[0].step_rows[0]), candidate_top_k=5)
+    assert first_step.valid_candidate_count > 0
+    assert len(first_step.top_candidate_target_rri) <= 5
+    assert np.isfinite(first_step.selected_target_rri)
+
+
+def test_candidate_rri_summary_keeps_invalid_nan_rows_out_of_fanout() -> None:
+    summary = _candidate_rri_summary(
+        target_rri=np.asarray([np.nan, 0.1, 0.3, np.nan], dtype=np.float32),
+        scene_rri=np.asarray([np.nan, 0.2, 0.4, np.nan], dtype=np.float32),
+        probabilities=np.asarray([0.0, 0.25, 0.75, 0.0], dtype=np.float32),
+        entropy=np.asarray([np.nan, 0.5, 0.5, np.nan], dtype=np.float32),
+        valid_mask=np.asarray([False, True, True, False]),
+        selected_mask=np.asarray([False, False, True, False]),
+        top_k=2,
+    )
+
+    assert summary.valid_candidate_count == 2
+    assert summary.selected_target_rri == pytest.approx(0.3)
+    assert summary.selected_scene_rri == pytest.approx(0.4)
+    assert summary.top_candidate_target_rri == pytest.approx((0.3, 0.1))
+    assert summary.candidate_min_target_rri == pytest.approx(0.1)
+    assert summary.candidate_mean_target_rri == pytest.approx(0.2)
+    assert summary.candidate_max_target_rri == pytest.approx(0.3)
+
+
+def test_candidate_rri_summary_all_invalid_has_no_fake_low_rri() -> None:
+    summary = _candidate_rri_summary(
+        target_rri=np.asarray([np.nan, np.nan], dtype=np.float32),
+        scene_rri=np.asarray([np.nan, np.nan], dtype=np.float32),
+        probabilities=np.asarray([0.0, 0.0], dtype=np.float32),
+        entropy=np.asarray([np.nan, np.nan], dtype=np.float32),
+        valid_mask=np.asarray([False, False]),
+        selected_mask=np.asarray([False, False]),
+        top_k=5,
+    )
+
+    assert summary.valid_candidate_count == 0
+    assert summary.top_candidate_target_rri == ()
+    assert np.isnan(summary.candidate_min_target_rri)
+    assert np.isnan(summary.candidate_mean_target_rri)
+    assert np.isnan(summary.candidate_max_target_rri)
+    assert np.isnan(summary.selected_target_rri)
 
 
 def test_rollout_zarr_logger_logs_matching_static_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

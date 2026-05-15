@@ -47,9 +47,15 @@ subset_top_k      = 5
 subset_indices    = []
 selected_strategy = "top_valid_oracle"
 
+[rollout_plots]
+enabled          = true
+branch_scope     = "same_source_target"
+candidate_top_k  = 5
+log_all_candidates = false
+
 [efm_voxels]
 enabled              = true
-log_occ_pr           = true
+log_occ_pr           = false
 log_cent_pr          = true
 log_cent_pr_nms      = true
 occ_threshold        = 0.95

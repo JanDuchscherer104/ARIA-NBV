@@ -4,6 +4,7 @@
 
 import numpy as np
 import pandas as pd
+
 from aria_nbv.utils import wandb_utils
 
 

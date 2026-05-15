@@ -20,10 +20,15 @@ from aria_nbv.data_handling import (
 from aria_nbv.pose_generation.target_counterfactuals import TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
 from aria_nbv.rollouts import (
     INVALID_REASON_VERSION,
+    ROLLOUT_MANIFEST_FILENAME,
+    ROLLOUT_ZARR_SCHEMA_VERSION,
+    RolloutStoreManifestContext,
+    RolloutZarrStoreConfig,
     RolloutZarrStoreReader,
     validate_rollout_zarr_store,
     write_rollout_zarr_store,
 )
+from aria_nbv.rollouts.info_cli import main as rollouts_info_main
 from tests.rollout_fixtures import build_rollout_records
 
 
@@ -55,8 +60,21 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
 
     reader = RolloutZarrStoreReader(result.store_dir)
     assert reader.root.attrs["schema_id"] == "aria_nbv.rollout_zarr_q_invalidity"
-    assert reader.root.attrs["schema_version"] == "0.3-source-facts-derived-qh"
+    assert reader.root.attrs["schema_version"] == ROLLOUT_ZARR_SCHEMA_VERSION
     assert reader.root.attrs["return_semantics"] == "cumulative_target_rri"
+    assert reader.root.attrs["manifest_path"] == ROLLOUT_MANIFEST_FILENAME
+    assert result.manifest_path.exists()
+    assert result.manifest_sha256 == reader.root.attrs["manifest_sha256"]
+    assert "writer_config" not in reader.root.attrs
+    assert "generation_manifest_json" not in reader.root["metadata"]
+    manifest_bundle = reader.manifest()
+    manifest = manifest_bundle["manifest"]
+    assert manifest["schema_version"] == ROLLOUT_ZARR_SCHEMA_VERSION
+    assert manifest["counts"]["rollouts"] == result.num_rollouts
+    assert manifest["counts"]["steps"] == result.num_steps
+    assert manifest["counts"]["candidates"] == result.num_candidates
+    assert manifest["generation"]["invocation"]["mode"] == "programmatic"
+    assert manifest["source_coverage"]["scene_counts"] == {"fixture_box": 3}
     assert "splits" not in reader.root
     assert "sources" in reader.root
     assert "q_h" not in reader.root
@@ -385,3 +403,64 @@ def test_rollout_zarr_rejects_missing_root_lineage(tmp_path) -> None:
     validation = validate_rollout_zarr_store(result.store_dir)
     assert not validation.ok
     assert any("source_offline_store_version" in error for error in validation.errors)
+
+
+def test_rollout_zarr_validation_requires_top_level_manifest(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=29)[:1]
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    result.manifest_path.unlink()
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("manifest" in error for error in validation.errors)
+
+
+def test_rollout_zarr_validation_rejects_manifest_hash_mismatch(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=31)[:1]
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    payload = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    payload["counts"]["rollouts"] = 999
+    result.manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("manifest hash" in error for error in validation.errors)
+
+
+def test_rollouts_info_cli_prints_manifest_without_validation(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=37)[:1]
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    capsys.readouterr()
+
+    rollouts_info_main(["--store", str(result.store_dir), "--json"])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["manifest"]["schema_version"] == ROLLOUT_ZARR_SCHEMA_VERSION
+    assert payload["manifest"]["source_coverage"]["num_source_rows"] == 1
+    assert "validation" not in payload
+
+
+def test_rollout_manifest_preserves_cli_toml_and_resolved_config(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=41)[:1]
+    config_path = tmp_path / "build_rollouts.toml"
+    raw_toml = "max_samples = 1\n"
+    config_path.write_text(raw_toml, encoding="utf-8")
+    writer_config = RolloutZarrStoreConfig(store_dir=tmp_path / "rollouts.zarr")
+
+    result = write_rollout_zarr_store(
+        tmp_path / "rollouts.zarr",
+        records,
+        manifest_context=RolloutStoreManifestContext.from_cli(
+            writer_config=writer_config,
+            argv=["nbv-build-rollouts", "--config-path", str(config_path)],
+            config_path=config_path,
+        ),
+    )
+    manifest = RolloutZarrStoreReader(result.store_dir).manifest()["manifest"]
+
+    invocation = manifest["generation"]["invocation"]
+    assert invocation["mode"] == "cli"
+    assert invocation["raw_toml_text"] == raw_toml
+    assert invocation["raw_toml_sha256"]
+    assert manifest["generation"]["writer_config"]["store_dir"].endswith("rollouts.zarr")
+    assert manifest["generation"]["runtime"]["git"]["available"] in {True, False}

@@ -1,0 +1,107 @@
+\pdfoutput=1
+
+% CVPR 2023 Paper Template
+% based on the CVPR template provided by Ming-Ming Cheng (https://github.com/MCG-NKU/CVPR_Template)
+% modified and extended by Stefan Roth (stefan.roth@NOSPAMtu-darmstadt.de)
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
+%\usepackage[review]{cvpr}      % To produce the REVIEW version
+%\usepackage{cvpr}              % To produce the CAMERA-READY version
+\usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
+
+% Include other packages here, before hyperref.
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\usepackage[accsupp]{axessibility}  % Improves PDF readability for those with disabilities.
+
+
+\usepackage{comment}
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues, e.g. with the
+% file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete
+% ReviewTempalte.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you
+%  should be clear).
+\usepackage[pagebackref,breaklinks,colorlinks]{hyperref}
+
+% Custom packages
+\usepackage[export]{adjustbox}
+
+% Support for easy cross-referencing
+\usepackage[capitalize]{cleveref}
+\crefname{section}{Sec.}{Secs.}
+\Crefname{section}{Section}{Sections}
+\Crefname{table}{Table}{Tables}
+\crefname{table}{Tab.}{Tabs.}
+\graphicspath{{images/}}
+
+\input{vincents_commands}
+
+\addeditor{vincent}{VL}{0.0, 0.5, 0.0}
+\addeditor{antoine}{AG}{0.0, 0.0, 0.8}
+\addeditor{tom}{TM}{0.9, 0.5, 0.0}
+\addeditor{todo}{TODO}{1.0, 0.0, 0.0}
+\showeditsfalse
+
+\textvars{pos,rot}
+
+\newcommand{\vis}{v} % visibility
+\newcommand{\visgain}{\Bar{g}} % visibility gain
+
+%%%%%%%%% PAPER ID  - PLEASE UPDATE
+\def\cvprPaperID{10995}
+\def\confName{CVPR}
+\def\confYear{2023}
+
+
+\begin{document}
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{MACARONS: Mapping And Coverage Anticipation\\ with RGB Online Self-Supervision}
+
+\author{Antoine Guédon \qquad Tom Monnier \qquad Pascal Monasse \qquad Vincent Lepetit\\
+LIGM, Ecole des Ponts, Univ Gustave Eiffel, CNRS, France\\
+{\tt\small \url{https://imagine.enpc.fr/~guedona/MACARONS/}}
+% {\tt\small \{antoine.guedon,tom.monnier,pascal.monasse,vincent.lepetit\}@enpc.fr}
+% For a paper whose authors are all at the same institution,
+% omit the following lines up until the closing ``}''.
+% Additional authors and addresses can be added with ``\and'',
+% just like the second author.
+% To save space, use either the email address or home page, not both
+}
+
+% title + double column teaser
+\twocolumn[\maketitle\vspace{-3em}\input{figs/teaser}\bigbreak]
+% normal title
+% \maketitle
+
+%%%%%%%%% BODY
+
+\input{0b_abstract}
+\input{1_introduction}
+\input{2_relatedwork}
+\input{3_method}
+\input{4_experiments}
+\input{5_conclusion}
+
+%%%%%%%%% REFERENCES
+
+{\small
+
+\bibliographystyle{ieee_fullname}
+\bibliography{arxiv}
+}
+
+\newpage
+\input{7_appendix}
+\end{document}

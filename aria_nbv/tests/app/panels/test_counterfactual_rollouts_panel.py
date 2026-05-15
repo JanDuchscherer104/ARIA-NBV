@@ -13,8 +13,11 @@ import torch
 from efm3d.aria import CameraTW
 from efm3d.aria.pose import PoseTW
 
+from aria_nbv.app import scene_view
 from aria_nbv.app.config import RlPageConfig
 from aria_nbv.app.panels import counterfactual_rollouts as rollout_panel
+from aria_nbv.app.panels import data as data_panel
+from aria_nbv.app.panels import stored_rollouts as stored_rollouts_panel
 from aria_nbv.data_handling import TargetCandidateRow
 from aria_nbv.pose_generation import (
     CandidateMixtureViewGeneratorConfig,
@@ -126,21 +129,29 @@ def test_default_target_mixture_uses_requested_budget_16() -> None:
     }
 
 
-def test_live_rollout_device_options_stay_cpu_only_without_pytorch3d_cuda(
+def test_live_rollout_device_options_default_cuda_when_torch_cuda_is_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(rollout_panel.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(rollout_panel, "_pytorch3d_cuda_rasterization_available", lambda: False)
 
+    assert rollout_panel._live_rollout_device_options() == ["cuda", "cpu"]
+
+
+def test_live_rollout_device_options_stay_cpu_only_without_torch_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rollout_panel.torch.cuda, "is_available", lambda: False)
+
     assert rollout_panel._live_rollout_device_options() == ["cpu"]
 
 
-def test_live_rollout_device_options_include_cuda_after_pytorch3d_smoke(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(rollout_panel, "_pytorch3d_cuda_rasterization_available", lambda: True)
+def test_cuda_preflight_fails_with_actionable_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rollout_panel.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(rollout_panel, "_pytorch3d_cuda_rasterization_available", lambda: False)
 
-    assert rollout_panel._live_rollout_device_options() == ["cpu", "cuda"]
+    with pytest.raises(RuntimeError, match="PyTorch3D rasterizer"):
+        rollout_panel._validate_live_rollout_device("cuda")
 
 
 def test_live_depth_config_uses_explicit_cpu_device() -> None:
@@ -149,6 +160,24 @@ def test_live_depth_config_uses_explicit_cpu_device() -> None:
     assert str(cfg.device) == "cpu"
     assert str(cfg.renderer.device) == "cpu"
     assert cfg.max_candidates_final == 16
+
+
+def test_rollout_scene_defaults_are_minimal_evidence_view() -> None:
+    defaults = rollout_panel.ROLLOUT_SCENE_DEFAULTS
+
+    assert defaults.show_mesh is True
+    assert defaults.mesh_opacity <= 0.2
+    assert defaults.semidense_mode == "off"
+    assert defaults.show_trajectory is False
+    assert defaults.show_frustum is False
+    assert defaults.show_scene_bounds is False
+    assert defaults.show_crop_bounds is False
+    assert defaults.show_gt_obbs is False
+
+
+def test_data_and_rollout_pages_share_scene_control_helper() -> None:
+    assert data_panel.scene_plot_options_ui is scene_view.scene_plot_options_ui
+    assert rollout_panel.scene_plot_options_ui is scene_view.scene_plot_options_ui
 
 
 def test_loaded_sample_info_documents_target_table_columns() -> None:
@@ -164,6 +193,8 @@ def test_active_target_info_documents_actor_visible_and_gt_eval_boundary() -> No
     assert "actor-visible" in info
     assert "GT-only" in info
     assert "target 0" in info
+    assert "EFM semantic-id map" in info
+    assert "window" in info
     assert "sem=..." in info
 
 
@@ -183,9 +214,32 @@ def test_format_rollout_option_includes_context_and_nan_beam() -> None:
         }
     )
 
-    assert rollout_panel._format_rollout_option(reader, 0) == (
+    assert stored_rollouts_panel.format_rollout_option(reader, 0) == (
         "0 · scene 81286 · target 0 · random_valid · chain 0 · H=1 · B=1 · beam=NaN"
     )
+
+
+def test_stored_candidate_rows_decode_strategy_and_mixture_names() -> None:
+    reader = _FakeRolloutReader(
+        {
+            "candidates/rollout_row_id": np.asarray([4], dtype=np.int64),
+            "candidates/candidate_row_id": np.asarray([10], dtype=np.int64),
+            "candidates/step_index": np.asarray([0], dtype=np.int16),
+            "candidates/shell_index": np.asarray([3], dtype=np.int32),
+            "candidates/selected_mask": np.asarray([True]),
+            "candidates/actor_action_mask": np.asarray([True]),
+            "candidates/q_train_mask": np.asarray([True]),
+            "candidates/target_rri": np.asarray([0.25], dtype=np.float32),
+            "candidates/scene_rri": np.asarray([np.nan], dtype=np.float32),
+            "candidates/strategy_id": np.asarray([3], dtype=np.int32),
+            "candidates/mixture_id": np.asarray([2], dtype=np.int32),
+        }
+    )
+
+    rows = stored_rollouts_panel.candidate_rows_for_rollout(reader, 4)
+
+    assert rows[0]["strategy"] == "target_point"
+    assert rows[0]["mixture"] == "component_2"
 
 
 def test_target_rri_candidate_config_uses_target_aware_mixture() -> None:

@@ -1,0 +1,34 @@
+\begin{table}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+  \toprule
+  Dataset & scenes (\#) & episodes (\#) & average \gdsp (\text{m})\\
+  %\cmidrule(l){2-2} \cmidrule(l){3-3} \cmidrule(l){4-4}
+  \midrule
+  Matterport3D & 58 / 11 / 18 & 4.8M / 495 / 1008 & 11.5 / 11.1 / 13.2 \\
+  Gibson & 72 / 16 / 10        & 4.9M / 1000 / 1000   & 6.9 / 6.5 / 7.0 \\
+  \bottomrule
+\end{tabular}\\[3pt]
+\caption{Statistics of the PointGoal navigation datasets that we precompute for the Matterport3D and Gibson datasets: total number of scenes, total number of episodes, and average geodesic distance between start and goal positions. Each cell reports train / val / test split statistics.}
+\label{tab:dataset_stats}
+%\vspace{\captionReduceBot}
+\end{table}
+
+\begin{table}
+\centering
+\footnotesize
+%\resizebox{0.5\textwidth}{!}{
+\begin{tabular}{@{}lcccc@{}}
+  \toprule
+  Dataset & Min & Median & Mean & Max \\
+  \midrule
+  Matterport3D & 18 & 90.0 & 97.1 & 281 \\
+  Gibson & 15 & 60.0 & 63.3 & 207\\
+  \bottomrule
+\end{tabular}
+%}
+\caption{Statistics of path length (in actions) for an oracle which greedily fits actions to follow the negative of geodesic distance gradient on the PointGoal navigation validation sets.  This provides expected horizon lengths for a near-perfect agent and contextualizes the decision for a max-step limit of 500.}
+\label{tab:dataset_stats}
+%\vspace{\captionReduceBot}
+\end{table}

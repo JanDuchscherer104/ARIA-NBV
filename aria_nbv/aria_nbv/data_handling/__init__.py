@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 """Canonical data contracts for ASE/EFM snippets and derived NBV stores.
 
 `aria_nbv.data_handling` owns the typed boundary between upstream ASE/ATEK/EFM
@@ -18,8 +19,8 @@ be represented with masks and reason codes rather than low RRI values.
 
 from __future__ import annotations
 
-from importlib import import_module
-
+# Import order is intentional: raw view exports must be bound before dependent
+# modules that may indirectly import them back from ``aria_nbv.data_handling``.
 from ._raw import (
     AseEfmDataset,
     AseEfmDatasetConfig,
@@ -34,69 +35,52 @@ from ._raw import (
     is_efm_snippet_view_instance,
     is_vin_snippet_view_instance,
 )
-
-_LAZY_EXPORTS = {
-    "ActorVisibleTargetSelector": "._target_selection",
-    "DEFAULT_VIN_SNIPPET_PAD_POINTS": ".vin_adapter",
-    "CompactObbBlock": ".vin_oracle_types",
-    "CompactTrajectoryBlock": ".vin_oracle_types",
-    "MeshProcessSpec": ".mesh_cache",
-    "OFFLINE_DATASET_VERSION": "._offline_store",
-    "OfflineVisualInventory": "._offline_visual_inventory",
-    "OfflineVisualInventoryError": "._offline_visual_inventory",
-    "ProcessedMesh": ".mesh_cache",
-    "NumericSummary": "._offline_diagnostics",
-    "TARGET_INVALID_REASON_CODES": "._target_selection",
-    "TARGET_INVALID_REASON_VERSION": "._target_selection",
-    "TargetCandidateRow": "._target_selection",
-    "TargetSelectionPolicy": "._target_selection",
-    "TargetSelectionResult": "._target_selection",
-    "TargetSelectorConfig": "._target_selection",
-    "TargetSourceMode": "._target_selection",
-    "target_gt_obb_world": "._target_selection",
-    "VinDatasetSourceConfig": "._vin_sources",
-    "VinOfflineBackboneDiagnostic": "._offline_diagnostics",
-    "VinOfflineBlockDiagnostic": "._offline_diagnostics",
-    "VinOfflineCoverageSceneDiagnostic": "._offline_diagnostics",
-    "VinOfflineCoverageStats": "._offline_diagnostics",
-    "VinOfflineDataset": "._offline_dataset",
-    "VinOfflineDatasetConfig": "._offline_dataset",
-    "VinOfflineDatasetStats": "._offline_diagnostics",
-    "VinOfflineIndexRecord": "._offline_format",
-    "VinOfflineManifest": "._offline_format",
-    "VinOfflineMaterializedBlocks": "._offline_format",
-    "VinOfflineMemoryDiagnostic": "._offline_diagnostics",
-    "VinOfflineSample": "._offline_dataset",
-    "VinOfflineSampleDiagnostic": "._offline_diagnostics",
-    "VinOfflineSourceConfig": "._vin_sources",
-    "VinOfflineStoreConfig": "._offline_store",
-    "VinOfflineWriter": "._offline_writer",
-    "VinOfflineWriterConfig": "._offline_writer",
-    "VinOracleBatch": ".vin_oracle_types",
-    "VinOracleDatasetBase": ".vin_oracle_types",
-    "VinOracleOnlineDataset": "._vin_sources",
-    "VinOracleOnlineDatasetConfig": "._vin_sources",
-    "build_vin_snippet_view": ".vin_adapter",
-    "collect_vin_offline_dataset_coverage": "._offline_diagnostics",
-    "collect_vin_offline_dataset_stats": "._offline_diagnostics",
-    "collect_offline_visual_inventory": "._offline_visual_inventory",
-    "empty_vin_snippet": ".vin_adapter",
-    "flush_prepared_samples_to_shard": "._offline_writer",
-    "load_or_process_mesh": ".mesh_cache",
-    "prepare_vin_offline_sample": "._offline_writer",
-}
-
-
-def __getattr__(name: str) -> object:
-    """Lazily resolve non-raw exports to avoid package-root import cycles."""
-
-    module_name = _LAZY_EXPORTS.get(name)
-    if module_name is None:
-        msg = f"module {__name__!r} has no attribute {name!r}"
-        raise AttributeError(msg)
-    value = getattr(import_module(module_name, __name__), name)
-    globals()[name] = value
-    return value
+from .mesh_cache import MeshProcessSpec, ProcessedMesh, load_or_process_mesh
+from .vin_adapter import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view, empty_vin_snippet
+from .vin_oracle_types import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch, VinOracleDatasetBase
+from ._offline_dataset import VinOfflineDataset, VinOfflineDatasetConfig, VinOfflineSample
+from ._offline_diagnostics import (
+    NumericSummary,
+    VinOfflineBackboneDiagnostic,
+    VinOfflineBlockDiagnostic,
+    VinOfflineCoverageSceneDiagnostic,
+    VinOfflineCoverageStats,
+    VinOfflineDatasetStats,
+    VinOfflineMemoryDiagnostic,
+    VinOfflineSampleDiagnostic,
+    collect_vin_offline_dataset_coverage,
+    collect_vin_offline_dataset_stats,
+)
+from ._offline_format import VinOfflineIndexRecord, VinOfflineManifest, VinOfflineMaterializedBlocks
+from ._offline_store import OFFLINE_DATASET_VERSION, VinOfflineStoreConfig
+from ._offline_visual_inventory import (
+    OfflineVisualInventory,
+    OfflineVisualInventoryError,
+    collect_offline_visual_inventory,
+)
+from ._offline_writer import (
+    VinOfflineWriter,
+    VinOfflineWriterConfig,
+    flush_prepared_samples_to_shard,
+    prepare_vin_offline_sample,
+)
+from ._target_selection import (
+    TARGET_INVALID_REASON_CODES,
+    TARGET_INVALID_REASON_VERSION,
+    ActorVisibleTargetSelector,
+    TargetCandidateRow,
+    TargetSelectionPolicy,
+    TargetSelectionResult,
+    TargetSelectorConfig,
+    TargetSourceMode,
+    target_gt_obb_world,
+)
+from ._vin_sources import (
+    VinDatasetSourceConfig,
+    VinOfflineSourceConfig,
+    VinOracleOnlineDataset,
+    VinOracleOnlineDatasetConfig,
+)
 
 
 __all__ = [

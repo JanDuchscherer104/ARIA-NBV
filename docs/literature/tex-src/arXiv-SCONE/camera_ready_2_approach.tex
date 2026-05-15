@@ -1,0 +1,156 @@
+\section{Approach}
+% I reworked the intro to this part. A bit longer, but I think it is much easier to understand now.
+% Partial surface point cloud VS Proxy point cloud
+
+\antoine{Let us consider a depth sensor exploring a 3D scene, at time step $t \geq 0$. Using its observations at discrete time steps $j$ with $0 \leq j \leq t$, the sensor has gathered a cloud of points distributed on the surface of the scene. We refer to this cloud as the \emph{partial surface point cloud}, as it describes the part of the surface seen --or \emph{covered}-- by the sensor in the scene. To solve the NBV problem, we want to identify a camera pose that maximizes the coverage of previously unseen surface.
+
+To this end, our method takes as input the partial surface point cloud as well as the history of 6D camera poses at time steps $j \leq t$ (\ie all previous positions and orientations of the sensor). Our approach is built around two successive steps, each relying on a dedicated neural module as shown in figure~\ref{fig:entire_method}: First, we make a prediction about the geometry of the scene, to estimate where the uncovered points could be. Then, we predict the visibility gain of uncovered points from any new camera pose; The NBV is finally selected as the camera with the most new visible points in its field of view.
+
+\begin{figure}
+  \centering
+  %\fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+  \includegraphics[width=13.5cm, trim={0 0cm 0 0}, clip]{images/method_final_3.png}
+  \caption{\label{fig:entire_method} {\bf The main steps of our method \method}. At time $t$, the depth sensor has visited camera poses $H=\{c_j, j\leq t\}$ and gathered a partial surface point cloud $P_H$ on the true surface, shown in red in the left image. Using its first neural module, our model predicts from the real surface points $P_H$ an occupancy probability distribution over proxy points $(x_1, ..., x_N)$ shown in the middle. The points $(x_1, ..., x_N)$ are sampled uniformly in the scene; we refer to them as \emph{proxy points} because we use them to encode the volume. For readability, the figure does not show the proxy points with an occupancy value under $0.5$. To compute the coverage gain of any next camera pose $c_{t+1}$, the model samples a subset of proxy points $x_i$ in the field of view of $c_{t+1}$ and uses its second module to predict the visibility gain in direction $c_{t+1}-x_i$ for each point $x_i$, as shown on the right. The proxy points are sampled with probabilities proportional to their occupancy value. Moreover, for each proxy point $x_i$, the second module encodes the relative positions of previous cameras with specific features $h_H(x_i)$. We finally integrate visibility gains over proxy points in the field of view of $c_{t+1}$ to approximate the volumetric coverage gain integral appearing in Equation~\ref{eqn:volumetric_approximation_of_coverage}.}
+\end{figure}
+
+Although we seek to maximize a surface metric such as surface coverage gain, our method relies on a volumetric representation of the object or scene to reconstruct. In this regard, we show that we can maximize a surface metric by integrating over a volumetric representation with virtually infinite resolution. As we argue below, such a representation is not only useful for collision-free robot navigation but is also much more efficient for optimizing surface coverage gain than the alternative of identifying the 3D points lying on the surface, which is difficult in an unknown and occluded environment. More exactly, we derive a volumetric integral that is asymptotically proportional to the surface coverage gain metric, which is enough for our maximization problem. 
+
+In the following subsection, we first present this derivation considering volume represented as a perfect binary occupancy map. We then present the two neural modules of SCONE and explain how we use them to predict all terms involved in the volumetric integral, by leveraging neural models and self-attention mechanisms to predict occupancy and occlusions.}
+
+\subsection{Maximizing Surface Coverage Gain on a Binary Occupancy Map}
+
+Here, we consider a binary occupancy map $\occfield:\IR^3 \rightarrow \{0,1\}$ representing the volume of the target object or scene. We will relax our derivations to a probabilistic occupancy map when looking for the next best view in the next subsections. From the binary map $\occfield$, we can define the set $\chi$ of occupied points, \ie, the set of points $x$ verifying $\occfield(x) = 1$, its surface as the boundary $\partial\chi$, and the surface coverage $C(c)$ achieved by a camera pose $c=(c_\pos, c_\rot)\in\calC:=\IR^3\times SO(3)$ as the following surface integral:
+%
+\begin{equation}
+    \label{eqn:surface_coverage_definition}
+    C(c) = \frac{1}{|\partial\chi|_S} \int_{\partial\chi} \absvis_c(x)\,\text{d}x,
+\end{equation}
+%
+where $|\partial \chi|_S := \int_{\partial\chi}\text{d}x$ is the area of surface $\partial\chi$. $\chi_c \subset \chi$ is the subset of occupied points contained in the field of view of camera $c$, and $\absvis_c(x)$ is the visibility of point $x$ from camera $c$, \ie, $\absvis_c(x) = \mathbb{1}_{\chi_c}(x) \cdot \mathbb{1}\left(\occfield\left(\{(1-\lambda) c_\pos + \lambda x \text{ such that } \lambda\in[0,1)\}\right)=\{0\}\right)$. 
+
+Since we want to maximize the total coverage of the surface by all cameras during reconstruction, we are actually interested in maximizing the coverage of previously unobserved points rather than the absolute coverage.  Given a set of previous camera poses, which we call the \textit{camera history} $\camhist\subset \calC$, and a 3D point $x$, we introduce the \textit{knowledge indicator} $\gamma_H:\IR^3 \rightarrow \{0, 1\}$ such that $\gamma_H(x)=\max\{\absvis_c(x):c\in H\}$. We then define the \textit{coverage gain} $G_H(c)$ of camera pose $c$ as:
+%
+\begin{equation}
+    \label{eqn:coverage_gain_definition}
+    G_H(c) = \frac{1}{|\partial\chi|_S} \int_{\partial\chi} \vis^H_c(x)\,\text{d}x,
+\end{equation}
+%
+where $\vis^H_c(x) = (1-\gamma_H(x)) \cdot \absvis_c(x)$ is the \textit{visibility gain} of $x$ in $\chi_c$, for camera history $H$. This function is equal to 1 iff $x$ is visible at pose $c$ but was not observed by any camera pose in $H$. Given a camera history $H$, our goal is to identify a pose $c$ that maximizes $G_H(c)$.
+
+Given an occupancy map $\occfield$, we could evaluate the integral in Eq.~\eqref{eqn:coverage_gain_definition} by simply sampling points $p$ on surface $\partial\chi$. \antoine{However, in practice we will estimate the occupancy map iteratively in an unknown environment, and we will only have access to an occupancy probability distribution. Extracting surface points from such a probabilistic occupancy map gives results that can differ a lot from the true surface: Indeed, in 3D, a surface acts as a very concentrated set with zero-measure, and requires high confidence to give meaningful results. Instead of extracting surface points, we extend the properties of such points to a small spherical neighborhood of the surface. This will allow us to replace the maximization of a surface metric by the maximization of a volumetric integral, which is much easier to compute from our volumetric representation.}
+
+More exactly, we assume there exists a quantity $\mu_0 > 0$ such that any volume point in the spherical neighborhood $T(\partial\chi, \mu_0) := \left\{ p \in \IR^3 \ | \ \exists x \in \partial\chi, \|x-p\|_2 < \mu_0 \right\}$ keeps the same visibility property as its neighboring surface points. With such a hypothesis, we give a thickness to the surface, which makes sense when working with discrete points sampled in space to approximate a volume.
+
+
+To this end, we introduce a new visibility gain function $\newvis_c^H$ to adapt the definition of the former visibility gain $\vis_c^H$. For any $0<\mu<\mu_0$:
+%
+\begin{equation}
+        \newvis_{c}^H(\mu; x) = 
+        \begin{cases}
+            1 & \text{if } \exists x_0 \in \partial\chi, \lambda <\mu \text{ such that } x = x_0 + \lambda N(x_0) \text{ and } \vis_c^H(x_0) = 1,\\
+            0 & \text{otherwise} \> ,
+        \end{cases}
+\end{equation}
+%
+where $N$ is the inward normal vector field. With further regularity assumptions about the surface that are detailed in the appendix, such quantities are well defined. Assuming $\mu_0$ is small enough, the following explicit formula translates the surface approach into a volume integral for any camera pose $c \in \calC$ and $\mu < \mu_0$:
+%
+\begin{equation}
+    \label{eqn:link_volume_surface}
+    \int_{T(\partial\chi, \mu)}  g_c^H(\mu; x) \text{d}x
+    = \int_{\partial\chi} \int_{-\mu}^\mu g_c^H(\mu; x_0 + \lambda N(x_0))\,\det(I-\lambda W_{x_0})\,\text{d}\lambda\,\text{d}x_0,
+\end{equation}
+%
+%with $g_c^{H}(\mu,\cdot):x \mapsto \newvis_c^H(\mu;x)$ and 
+with $W_{x_0}$ the Weingarten map at $x_0$, that is, the Hessian of the signed distance function on the boundary of $\chi$, which is continuous on the scene surface, assumed to be compact~\cite{gilbarg}. 
+
+
+
+By developing the determinant, we find that $\det(I - \lambda W_{x_0}) = 1 + \lambda b(\lambda, x_0)$ where $b$ is a bounded function on the compact space $[-\mu, \mu] \times \partial \chi$. Moreover, for all $x_0\in \partial\chi$, we have by definition $g_c^H(\mu;x_0 + \lambda N(x_0)) = g_c^H(\mu;x_0) = \vis_c^H(x_0)$ when $0 \leq \lambda < \mu$, and $g_c^H(\mu;x_0 + \lambda N(x_0))= 0$ when $-\mu < \lambda < 0$. It follows that, for every $0<\mu<\mu_0$:
+%
+\begin{equation}
+\begin{split}
+    \int_{T(\partial\chi, \mu)}  g_c^H(\mu;x) \text{d}x & = \int_{\partial\chi} \int_{0}^\mu g_c^H(\mu;x_0)(1 + \lambda b(\lambda, x_0)) \,\text{d}\lambda \,\text{d}x_0\\
+    & = \mu \int_{\partial\chi} g_c^H(\mu;x_0) \,\text{d}x_0 + \int_{\partial\chi} \int_{0}^\mu \lambda g_c^H(\mu;x_0) b(\lambda, x_0)\,\text{d}\lambda \,\text{d}x_0\\
+    & = \mu |\partial\chi|_S G_H(c) + \int_{\partial\chi} \int_{0}^\mu \lambda g_c^H(\mu;x_0) b(\lambda, x_0)\,\text{d}\lambda \,\text{d}x_0.
+\end{split}
+\end{equation}
+%
+The complete derivations are given in the appendix.
+
+Function $g_c^H(\mu;\cdot)$ is naturally equal to 0 for every point outside $T(\partial\chi, \mu)$. Moreover, considering the regularity assumptions we made on the compact surface, if $\mu_0$ is chosen small enough then for all $x_0\in \partial \chi, \mu < \mu_0$, the point $x_0 + \mu N(x_0)$ is located inside the volume, such that $\int_{T(\partial\chi, \mu)}  g_c^H(\mu;x)\,\text{d}x = \int_{\chi}  g_c^H(\mu;x)\,\text{d}x$. Since $|g_c^H(\mu;\cdot)|\leq 1$ for all $c\in\mathcal{C}$ and $\mu>0$, we deduce the following theorem by bounding $|b|$ on $[-\mu, \mu] \times \partial \chi$:
+%
+\begin{theorem}
+    \label{thm:volumetric_approximation_of_coverage}
+    Under the previous regularity assumptions on the volume $\chi$ of the scene and its surface $\partial\chi$, there exist $\mu_0 > 0$ and $M>0$ such that for all $\mu < \mu_0$, and any camera $c\in \calC$:
+    %
+    \begin{equation}
+    \label{eqn:volumetric_approximation_of_coverage}
+         \left| \frac{1}{|\chi|_V}\int_{\chi}  g_c^H(\mu;x) \text{d}x -  \mu \frac{|\partial\chi|_S}{|\chi|_V} G_H(c) \right| \leq M \mu^2 \> ,
+    \end{equation}
+    %
+    where $|\chi|_V$ is the volume of $\chi$.% and $|\partial\chi|_S$ is the area of its surface $\partial\chi$.
+\end{theorem}
+
+This theorem states that, asymptotically for small values of $\mu$, the volume integral $\int_\chi  g_c^H(\mu;x)\,\text{d}x$ gets proportional to the surface coverage gain values $G_H(c)$ that we want to maximize. This result is convenient since a volume integral can be easily approximated with Monte-Carlo integration on the volume and a uniform dense sampling based on the occupancy function $\occfield$. Consequently, the more points we sample in the volume, the smaller $\mu$ we can choose, and the closer maximizing the volume integral of spherical neighborhood visibility gain gets to maximizing the surface coverage gain.
+
+\subsection{Architecture}
+
+\antoine{To approximate the volumetric integral in Equation~\ref{eqn:volumetric_approximation_of_coverage} for any camera pose $c$, we need to compute $\chi_c$ as well as function $g_c^H$. In this regard, we need to compute both the occupancy map and the visibility gains of points for any camera pose. Since the environment is not perfectly known, we predict each one of these functions with a dedicated neural module. The first module takes as input the partial point cloud gathered by the depth sensor to predict the occupancy probability distribution. The second module takes as input a camera pose, a feature representing camera history as well as a predicted sequence of occupied points located in the camera field of view to predict visibility gains.} %The visibility gains are aggregated using Monte-Carlo integration to compute the resulting coverage gain.
+
+\paragraph{Predicting the occupancy probability field $\probfield$. } The occupancy function $\occfield$ is not known perfectly in practice. \antoine{To represent occupancy, most volumetric NBV methods rely on memory-heavy representations (like an occupancy 3D-grid or a volumetric voxelization), that are generally less efficient for encoding fine details and optimizing dense reconstructions, and will necessarily downgrade the resolution compared to a point cloud directly sampled on the surface. To address this issue while still working with a volumetric representation of the scene, we use a deep implicit function to encode the 3D mapping of occupancy efficiently. Such a function has a virtually infinite resolution, and prevents us from saving a large 3D grid in memory.} We thus approximate $\occfield$ with the first module of our model, which consists of a neural network $\probfield : \calP(\IR^3) \times \IR^3 \rightarrow [0,1]$ that takes as inputs a partial surface point cloud $P_H \subset \IR^3$ and query points $x \in \IR^3$, and outputs the occupancy probability $\probfield(P_H; x)$ of $x$. $P_H$ is obtained by merging together all depth maps previously captured from cameras in $H$.
+
+\begin{figure}
+  \centering
+  %\fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+  \includegraphics[width=8cm, trim={0 0cm 0 0}, clip]{images/occupancy_probability.png}
+  \caption{\label{fig:occupancy_probability_prediction} {\bf Architecture of the first module of \method}, which predicts the occupancy probability field $\probfield$. This module predicts the occupancy probability of a point $x$ from several inputs: The point $x$ after transformation by an MLP $f(x)$; A coarse global encoding $g(P_H)$ of the point cloud obtained by applying self-attention units on the sequence of points followed by a pooling operation; Multi-scale neighborhood features $m_i(x, P_H), i=0,...,N$ computed by down-sampling multiple times the point cloud, and encoding the $k$ nearest neighbors of $x$ with self-attention units after each sampling.}
+\end{figure}
+
+As shown in Figure~\ref{fig:occupancy_probability_prediction}, rather than using a direct encoding of the global shape of $P_H$ as input to $\probfield$, we take inspiration from \cite{philipp-20-points2surf} to achieve scalability and encode $P_H$ using features computed from the points' neighborhoods. The difference with \cite{philipp-20-points2surf} is that we rely on a multiscale approach: For a given query 3D point $x$, these features are computed from the $k$ nearest neighbors of $x$ computed at different scales. For each scale $s$, we downsample point cloud $P_H$ around $x$ into a sparser point cloud $P_H^{(s)}$ before recomputing the nearest neighbors $p^{(s)}_i(x), i=1,...,k$ of $x$: In this way, the size of the neighborhood increases with scale.
+
+Next, for each value of $s$, we use small attention units \cite{ashish-2017-attention, meng-20-pct} on the sequence of centered neighborhood points ($p^{(s)}_1(x) - x, ..., p^{(s)}_k(x) - x)$ and apply pooling operations to encode each sequence of $k$ neighbors into a single feature that describes the local geometry for the corresponding scale. We finally concatenate these different scale features with another uncentered global feature as well as the query point $x$, and feed them to an MLP to predict the occupancy probability. The last global feature aims to provide really coarse information about the geometry and the location of $x$ in the scene.
+
+This model scales well to large scenes: Adding points from distant views to the current partial point cloud does not change the local state of the point cloud. 
+ To avoid computing neighborhoods on the entire point cloud when reconstructing large scenes, we partition the space into cells in which we store the points in $P_H$. Given a query point $x$, we only use the neighboring cells to compute $p^{(s)}_i(x)$. %, i=1,...,k$. 
+
+\paragraph{Predicting the visibility gain $\newvis^H_{c}$. } 
+To maximize surface coverage gain, we need to compute the volumetric integral of visibility gain functions $\newvis^H_{c}$. We do this again by Monte Carlo sampling, however, in unknown environments we cannot compute explicitly occlusions to derive visibility gain functions $\newvis^H_{c}$ since the geometry, represented as a point cloud, is partially unknown and sparser than a true surface. We thus train the second module of our model to predict visibility gain functions by leveraging a self-attention mechanism that helps to estimate occlusion effects in the point cloud $P_H$.
+
+In particular, for any camera pose $c\in \calC$ and 3D point $x\in \chi_c$, the second module derives its prediction of visibility gains from three core features: (i)~The predicted probability $\probfield(P; x)$ of $x$ to be occupied, (ii)~the occlusions on $x$ by the subvolume $\chi_c$ and (iii)~the camera history $H$. To feed all this information to our model in an efficient way, we follow the pipeline presented in Figure~\ref{fig:visibility_gain_computation}. The model starts by using the predicted occupancy probability function $\probfield$ to sample 3D points in the volume $\chi$. These samples will be used for Monte Carlo integration. We refer to these points as \emph{proxy points} as we use them to encode the  volume in the camera field of view, \ie, in a pyramidal frustum view. We write $\proxy$ as the discrete set of sampled proxy points, and $\proxy_c$ as the set of proxy points located in the field of view of the camera $c$.
+
+We first encode these proxy points individually by applying a small MLP on their 3D coordinates and their occupancy probability value concatenated together. Then, our model processes the sequence of these encodings with a self-attention unit to handle occlusion effects of subvolume $\chi_c$ on every individual point. Note there is no pooling operation on the output of this unit: The network predicts per-point features and does not aggregate predictions, since we do it ourselves with Monte Carlo integration. Next, for each proxy point $x\in \proxy$ , we compute an additional feature $h_H(x)$ that encodes the history of camera positions $H$ with respect to this point as a spherical mapping: It consists in the projection on a sphere centered on $x$ of all camera positions for which $x$ was in the field of view. These features are concatenated to the outputs of the self-attention unit.
+
+Our model finally uses an MLP on these features to predict the entire visibility gain functions of every point $x$ as a vector of coordinates in the orthonormal basis of spherical harmonics. With such a formalism, the model is able to compute visibility gains for points inside a subvolume in all directions with a single forward pass. In this regard, we avoid unnecessary computation and are able to process a large number of cameras in the same time when they share the same proxy points in their field of view (\eg, reconstruction of a single object centered in the scene, where $\proxy_c=\proxy$ for all $c$, or when several cameras observe the same part of the 3D scene, \ie, $\proxy_c=\proxy'\subset \proxy$ for several $c$).
+
+
+Formally, if we denote by $Y_l^m : S^2 \rightarrow \IR$ the real spherical harmonic of rank $(l, m)$ and $\phi_l^m(\proxy_c;x, h_H(x))$ the predicted coordinate of rank $(l,m)$ for proxy point $x\in \proxy_c$ with attention to subset $\proxy_c$ and camera history feature $h_H(x)$, the visibility gain of point $x$ in direction $d\in S^2$ is defined as
+%
+\begin{equation}
+    \label{eqn:predicted_visibility_gain}
+    \sum_{l, m} \phi_l^m(\proxy_c; x, h_H(x)) \cdot Y_l^m \left(d\right)
+\end{equation}
+%
+so that the coverage gain $G_H(c)$ of a camera pose $c\in \calC$ is proportional to
+%
+\begin{equation}
+    \label{eqn:predicted_coverage_gain}
+    I_H(c) := \frac{1}{|\proxy|} \sum_{x \in \proxy} \left[
+    \mathbb{1_{\proxy_c}}(x)
+    \sum_{l, m} \phi_l^m(\proxy_c; x, h_H(x)) \cdot Y_l^m \left(\frac{x-c_{pos}}{\|x-c_{pos}\|_2}\right) 
+    \right].
+\end{equation}
+%
+The next best view among several camera positions is finally defined as the camera pose $c^*$ with the highest value for $I_H(c^*)$. \antoine{Equation~\ref{eqn:predicted_coverage_gain} is a Monte Carlo approximation of the volumetric integral in Equation~\ref{eqn:volumetric_approximation_of_coverage}}, where the occupancy map and the visibility gains are predicted with neural networks.
+We choose to use a Monte-Carlo integral rather than a neural aggregator because this approach is simple, fast, makes training more stable, has good performance, better interpretability, and can handle sequences of arbitrary size. In particular, it implicitly encourages our model to compute meaningful visibility gains for each point since there is no asymmetry between the points.
+
+
+We also use spherical harmonics to encode the camera history encoding $h_H(x)$ of each point $x$, which makes it a homogeneous input to the predicted output. Consequently, this input comes at the end of the architecture, and aims to adapt the visibility gain according to previous camera positions. This convenient representation, inspired by \cite{yu-21-plenoxels}, allows us to handle free camera motion; On the contrary, several models in the literature encode the camera directions on a discrete sphere \cite{zeng-icirs20-pcnbv, Mendoza-2019, vasquez-21-3DCNN}.
+
+\begin{figure}
+  \centering
+  % \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+  \includegraphics[width=13.5cm]{images/visibility_gain.png}
+  \caption{\label{fig:visibility_gain_computation}  {\bf Architecture of the second module of \method}, which predicts a visibility gain for each proxy point. To make this prediction, the model encodes the proxy points $x$ concatenated with their occupancy probability $\probfield(x)$. We use an attention mechanism to take into account occlusion effects in the volume between the proxy points and their consequences on the visibility gains.}
+\end{figure}
+
+\paragraph{Training.} We train the occupancy probability module alone with a Mean Squared Error loss with the ground truth occupancy map. We do not compute ground-truth visibility gains to train the second module since it would make computation more difficult and require further assumptions: We supervise directly on $I_H(c)$ by comparing it to the ground-truth surface coverage gain for multiple cameras, with softmax normalization and Kullback-Leibler divergence loss. Extensive details about the training of our modules and the choices we made are given in the appendix.

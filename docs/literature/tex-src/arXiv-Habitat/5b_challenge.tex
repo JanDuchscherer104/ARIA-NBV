@@ -1,0 +1,52 @@
+\section{Habitat Challenge}
+
+\setlength{\epigraphwidth}{0.8\columnwidth}
+\epigraph{No battle plan ever survives contact with the enemy.}{\textit{Helmuth Karl Bernhard von Moltke}}
+
+
+Challenges drive progress. The history of AI sub-fields indicates that the formulation of the right questions, the creation of the right datasets, and the coalescence of communities around the right challenges drives scientific progress. 
+Our goal is to support this process for embodied AI. 
+%The goal of \habitatchal, an autonomous navigation challenge that aims 
+%to benchmark and advance efforts in embodied AI.
+\habitatchal is an autonomous navigation challenge  
+that aims to benchmark and advance efforts in 
+goal-directed visual navigation. 
+
+One difficulty in creating a challenge 
+around embodied AI tasks is the transition from 
+static predictions (as in passive perception) to sequential 
+decision making (as in sensorimotor control).
+In traditional `internet AI' challenges 
+(\eg ImageNet~\cite{Deng09imagenet}, COCO~\cite{mscoco}, VQA~\cite{antol_iccv15}), it is possible to release a static testing 
+dataset and ask participants to simply upload their predictions on this 
+set. In contrast, embodied AI tasks typically involve sequential decision making and agent-driven control, making it infeasible to pre-package a testing dataset. 
+Essentially, embodied AI challenges require participants 
+to \emph{upload code not predictions}. The uploaded agents 
+can then be evaluated in novel (unseen) test environments. 
+
+\xhdr{Challenge infrastructure.}
+We leverage the frontend and challenge submission process 
+of the EvalAI platform, and build backend infrastructure ourselves. 
+Participants in \habitatchal are asked to 
+upload Docker containers~\cite{merkel2014docker} with their 
+agents via EvalAI. The submitted agents are then evaluated on a live AWS GPU-enabled instance. 
+Specifically, contestants are free to train their agents however they wish 
+(any language, any framework, any infrastructure). 
+In order to evaluate these agents, participants are asked to 
+derive from a base Habitat Docker container and 
+implement a specific interface to their model -- 
+agent's action taken given an observation 
+from the environment at each step. This dockerized interface enables running the participant code on new environments. 
+
+More details regarding the \habitatchal held at CVPR 2019 are available at the \url{https://aihabitat.org/challenge/} website.
+In a future iteration of this challenge we will introduce three major differences designed to both reduce the gap between simulation and reality and to increase the difficulty of the task.
+\begin{compactitem}[--]
+  \item In the 2019 challenge, the relative coordinates specifying the goal were continuously updated during agent movement -- essentially simulating an agent with perfect localization and heading estimation (e.g. an agent with an idealized GPS+Compass). However, high-precision localization in indoor environments can not be assumed in realistic settings -- GPS has low precision indoors, (visual) odometry may be noisy, SLAM-based localization can fail, etc. Hence, we will investiage only providing to the agent a fixed relative coordinate for the goal position from the start location. \\[-7pt]
+  %In last year's version of the challenge,
+  %the updated goal-specification (in terms of relative coordinates) was provided to the agent at all times (as the episode progresses) via a ``GPS+Compass'' sensor and not just at the outset of an episode. However, any meaningfully accurate GPS sensor in unseen environments is unrealistic. Hence, in this year's version of the challenge, the agent will not be provided with \emph{not} any GPS+Compass sensor. \todo{Samyak: Expanded on this point a bit by providing more context, another pass on this would be good}
+  \item Likewise, the 2019 \habitatchal modeled agent actions (e.g.~\texttt{forward}, \texttt{turn 10$^\circ$ left},...) deterministically. However in real settings, agent intention (e.g.~go forward $1\text{m}$) and the result rarely match perfectly -- actuation error, differing surface materials, and a myriad of other sources of error introduce significant drift over a long trajectory. To model this, we introduce a noise model acquired by benchmarking a real robotic platform~\cite{pyrobot2019}. Visual sensing is an excellent means of combating this ``dead-reckoning'' drift and this change allows participants to study methodologies that are robust to and can correct for this noise.\\[-7pt]
+  %The agent's movement commands (forward, turn left, and turn right) will have realistic noise provided by the bench-marking done in \cite{pyrobot2019}.
+  \item Finally, we will introduce realistic models of sensor noise for RGB and depth sensors -- narrowing the gap between perceptual experiences agents would have in simulation and reality.
+\end{compactitem}
+
+We look forward to supporting the community in establishing a benchmark to evaluate the state-of-the-art in methods for embodied navigation agents.

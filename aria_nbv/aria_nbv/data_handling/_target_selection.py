@@ -27,6 +27,7 @@ from pydantic import Field
 from torch import Tensor
 
 from ..utils import TargetConfig
+from ..utils.semantic_names import SemanticNameMap, normalize_semantic_name_map, semantic_class_name
 from ..vin.types import EvlBackboneOutput
 from .efm_views import EfmSnippetView, VinSnippetView
 from .vin_oracle_types import CompactObbBlock
@@ -165,7 +166,7 @@ class _TargetSource:
 
     source: str
     obbs: ObbTW
-    sem_id_to_name: list[str] | None = None
+    sem_id_to_name: SemanticNameMap | None = None
 
 
 class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
@@ -589,13 +590,13 @@ class ActorVisibleTargetSelector:
         )
 
 
-def _compact_obb_block(value: CompactObbBlock | ObbTW | Tensor | None) -> tuple[ObbTW, list[str] | None] | None:
+def _compact_obb_block(value: CompactObbBlock | ObbTW | Tensor | None) -> tuple[ObbTW, SemanticNameMap | None] | None:
     if value is None:
         return None
     obbs = value.obbs if isinstance(value, CompactObbBlock) else value
     if obbs is None:
         return None
-    sem_id_to_name = value.sem_id_to_name if isinstance(value, CompactObbBlock) else None
+    sem_id_to_name = normalize_semantic_name_map(value.sem_id_to_name) if isinstance(value, CompactObbBlock) else None
     if isinstance(obbs, ObbTW):
         return obbs, sem_id_to_name
     return ObbTW(torch.as_tensor(obbs, dtype=torch.float32)), sem_id_to_name
@@ -833,11 +834,8 @@ def _ranking_key(row: TargetCandidateRow) -> tuple[float, int, str]:
     return (-float(row.score), int(row.source_index), row.target_id)
 
 
-def _class_name(sem_id: int, sem_id_to_name: list[str] | None) -> str:
-    if sem_id_to_name is None or sem_id < 0 or sem_id >= len(sem_id_to_name):
-        return "<unknown>"
-    name = str(sem_id_to_name[sem_id])
-    return name if name else "<unknown>"
+def _class_name(sem_id: int, sem_id_to_name: SemanticNameMap | None) -> str:
+    return semantic_class_name(sem_id, sem_id_to_name)
 
 
 def _target_id(

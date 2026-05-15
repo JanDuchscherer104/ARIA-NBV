@@ -101,7 +101,7 @@ def _make_snippet() -> VinSnippetView:
     )
 
 
-def _make_compact_batch(*, sem_names: list[str] | None = None, offset: float = 0.0) -> VinOracleBatch:
+def _make_compact_batch(*, sem_names: dict[int, str] | None = None, offset: float = 0.0) -> VinOracleBatch:
     """Build a compact-modality batch fixture."""
 
     return VinOracleBatch(
@@ -194,14 +194,15 @@ def test_collate_vin_oracle_batches_pads_candidates() -> None:
 def test_collate_batches_compact_obbs_and_trajectory() -> None:
     """Compact numeric OBB and trajectory blocks should stack for training."""
 
-    batch_a = _make_compact_batch(sem_names=["chair", "table"], offset=0.0)
-    batch_b = _make_compact_batch(sem_names=["chair", "table"], offset=10.0)
+    sem_names = {0: "chair", 1: "table"}
+    batch_a = _make_compact_batch(sem_names=sem_names, offset=0.0)
+    batch_b = _make_compact_batch(sem_names=sem_names, offset=10.0)
 
     batched = VinOracleBatch.collate([batch_a, batch_b])
 
     assert batched.gt_obbs is not None  # noqa: S101
     assert batched.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
-    assert batched.gt_obbs.sem_id_to_name == ["chair", "table"]  # noqa: S101
+    assert batched.gt_obbs.sem_id_to_name == {0: "chair", 1: "table"}  # noqa: S101
     assert batched.detected_obbs is not None  # noqa: S101
     assert batched.detected_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
     assert batched.detected_obbs.probs is not None  # noqa: S101
@@ -216,8 +217,8 @@ def test_collate_batches_compact_obbs_and_trajectory() -> None:
 def test_collate_rejects_inconsistent_compact_obb_semantic_maps() -> None:
     """Semantic maps are part of the batch contract for compact OBBs."""
 
-    batch_a = _make_compact_batch(sem_names=["chair", "table"], offset=0.0)
-    batch_b = _make_compact_batch(sem_names=["chair", "lamp"], offset=10.0)
+    batch_a = _make_compact_batch(sem_names={0: "chair", 1: "table"}, offset=0.0)
+    batch_b = _make_compact_batch(sem_names={0: "chair", 1: "lamp"}, offset=10.0)
 
     with pytest.raises(ValueError, match="gt_obbs.sem_id_to_name must match"):
         VinOracleBatch.collate([batch_a, batch_b])

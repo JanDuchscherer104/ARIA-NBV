@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Annotated, TypedDict
 import torch
 from typing_extensions import Doc
 
+from ..utils.semantic_names import normalize_semantic_name_map
 from ..utils.typed_payloads import from_serializable, to_serializable
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ class EvlBackboneOutput:
         obbs_pr_nms: Optional ``ObbTW["B M 34"]`` OBB predictions after NMS (voxel frame).
         obb_pred: Optional ``ObbTW["B M 34"]`` OBB predictions in snippet coordinates.
         obb_pred_viz: Optional ``ObbTW["B M 34"]`` visualization OBB predictions in snippet coordinates.
-        obb_pred_sem_id_to_name: Optional list of semantic class names aligned with EVL taxonomy.
+        obb_pred_sem_id_to_name: Optional sparse semantic id to class-name map aligned with EVL taxonomy.
         obb_pred_probs_full: Optional list of per-OBB class probability tensors.
         obb_pred_probs_full_viz: Optional list of per-OBB class probability tensors for visualization.
         pts_world: Optional ``Tensor["B (D·H·W) 3", float32]`` world-space voxel centers.
@@ -109,8 +110,8 @@ class EvlBackboneOutput:
     obb_pred_viz: ObbTW | None = None
     """``ObbTW["B M 34"]`` OBB predictions for visualization in snippet coordinates."""
 
-    obb_pred_sem_id_to_name: list[str] | None = None
-    """Semantic ID → name mapping used by EVL's OBB predictions."""
+    obb_pred_sem_id_to_name: dict[int, str] | None = None
+    """Sparse semantic id to class-name mapping used by EVL's OBB predictions."""
 
     obb_pred_probs_full: list[Tensor] | None = None
     """Per-OBB class probability tensors aligned with ``obb_pred``."""
@@ -145,6 +146,8 @@ class EvlBackboneOutput:
         payload = to_serializable(self, exclude=exclude)
         if not isinstance(payload, dict):
             raise TypeError(f"Expected serialized EvlBackboneOutput payload dict, got {type(payload)!r}.")
+        if "obb_pred_sem_id_to_name" in payload:
+            payload["obb_pred_sem_id_to_name"] = normalize_semantic_name_map(payload["obb_pred_sem_id_to_name"])
         return payload
 
     @classmethod

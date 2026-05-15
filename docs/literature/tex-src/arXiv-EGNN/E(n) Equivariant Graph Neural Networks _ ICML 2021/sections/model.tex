@@ -1,0 +1,134 @@
+\section{Equivariant Graph Neural Networks} 
+% \label{sec:method}
+
+% \subsection{}yes
+\label{sec:method_main}
+In this section we present Equivariant Graph Neural Networks (EGNNs). Following the notation from background Section \ref{sec:background_gnn}, we consider a graph $\mathcal{G} = (\mathcal{V},\mathcal{E})$ with nodes $v_i \in \mathcal{V}$ and edges $e_{ij} \in \mathcal{E}$. In addition to the feature node embeddings $\rmh_i \in \mathbb{R}^{\text{nf}}$ we now also consider a $n$-dimensional coordinate $\rmx_i \in  \mathbb{R}^{\text{n}}$ associated with each of the graph nodes. Our model will preserve equivariance to rotations and translations on these set of coordinates $\rmx_i$ and it will also preserve equivariance to permutations on the set of nodes $\mathcal{V}$ in the same fashion as GNNs.
+
+%Although the dimensionality $d$ of $\rmx_i$ usually takes values 2 or 3 for most physic scenarios, our model can scale to larger dimensions without a significant increase in computation.
+
+%Our equivariant graph convlutional layer takes as We want our model to be translation and rotation equivariant to $\rmx_i$ and equivariant to permutations of the nodes $v_i$. Following we introduce the equations of our algorithm which despite of its simplicity fulfill the proposed equivariant constraints, scale to large d-dimensional and still provide very strong results. 
+
+Our Equivariant Graph Convolutional Layer (EGCL) takes as input the set of node embeddings $\rmh^l =\{\rmh_0^l, \dots, \rmh_{M-1}^l\}$, coordinate embeddings $\rmx^l =\{\rmx_0^l, \dots, \rmx_{M-1}^l\} $ and edge information $\mathcal{E}=(e_{ij})$ and outputs a transformation on $\rmh^{l+1}$ and $\rmx^{l+1}$. Concisely: $\rmh^{l+1}, \rmx^{l+1} = \text{EGCL}[\rmh^{l}, \rmx^{l}, \mathcal{E}]$. The equations that define this layer are the following:
+\begin{align}\label{eq:method_edge}
+\rmm_{ij} &=\phi_{e}\left(\rmh_{i}^{l}, \rmh_{j}^{l},\left\|\rmx_{i}^{l}-\rmx_{j}^{l}\right\|^{2}, a_{i j}\right) \\ \label{eq:method_coords}
+\rmx_{i}^{l+1} &=\rmx_{i}^{l}+ C\sum_{j \neq i}\left(\rmx_{i}^{l}-\rmx_{j}^{l}\right) \phi_{x}\left(\rmm_{ij}\right) \\
+ \label{eq:method_agg}
+\rmm_{i} &=\sum_{j \neq i} \rmm_{ij} \\ 
+\label{eq:method_node}
+\rmh_{i}^{l+1} &=\phi_{h}\left(\rmh_{i}^l, \rmm_{i}\right)
+\end{align}
+
+% \begin{equation}
+% \begin{aligned}\label{eq:proposed_model}
+% \mathbf{m}_{i, j} &=\phi_{e}\left(\mathbf{h}_{i}^{l}, \mathbf{h}_{j}^{l},\left\|\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right\|^{2}, \left\|\mathbf{v}_{i}^{l}-\mathbf{v}_{j}^{l}\right\|^{2}, e_{i j}\right) \\
+% \mathbf{x}_{i}^{l+1} &=\mathbf{x}_{i}^{l}+\sum_{j \neq i}\left(\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right) \phi_{x}\left(\mathbf{m}_{i, j}\right) +\sum_{j \neq i}\left(\mathbf{v}_{i}^{l}-\mathbf{v}_{j}^{l}\right) \phi_{v}\left(\mathbf{m}_{i, j}\right) \\
+% \mathbf{m}_{i} &=\sum_{j \neq i} \mathbf{m}_{i, j} \\
+% \mathbf{h}_{i}^{l+1} &=\phi_{h}\left(\mathbf{h}_{i}^l, \mathbf{m}_{i}\right)
+% \end{aligned}
+% \end{equation}
+
+
+ %\begin{equation}
+ %\begin{aligned}\label{eq:proposed_model}
+ %\mathbf{m}_{i, j} &=\phi_{e}\left(\mathbf{h}_{i}^{l}, \mathbf{h}_{j}^{l},\left\|\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right\|^{2}, \left\|\mathbf{v}_{i}^{l}-\mathbf{v}_{j}^{l}\right\|^{2}, e_{i j}\right) \\
+ %\mathbf{m}_{i} &=\sum_{j \neq i} \mathbf{m}_{i, j} \\
+ %\mathbf{v}_{i}^{l+1}&= \mathbf{v}_{i}^{l} +\sum_{j \neq i}\left(\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right) \phi_{x}\left(\mathbf{m}_{i, j}\right) \\
+ %\mathbf{x}_{i}^{l+1} &=\mathbf{x}_{i}^{l}+ \mathbf{v}_i^{l+1} \phi_{v}\left(\mathbf{m}_{i}\right)\\
+ %\mathbf{h}_{i}^{l+1} &=\phi_{h}\left(\mathbf{h}_{i}^l, \mathbf{m}_{i}\right)
+ %\end{aligned}
+ %\end{equation}
+ 
+Notice the main differences between the above proposed method and the original Graph Neural Network from equation \ref{eq:gnn} are found in equations \ref{eq:method_edge} and \ref{eq:method_coords}. In equation \ref{eq:method_edge} we now input the relative squared distance between two coordinates $\|\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\|^{2}$ into the edge operation $\phi_e$. The embeddings $\rmh_i^l$, $\rmh_j^l$, and the edge attributes $a_{ij}$ are also provided as input to the edge operation as in the GNN case. In our case the edge attributes will incorporate the edge values $a_{ij} = e_{ij}$, but they can also include additional edge information.
+
+In Equation \ref{eq:method_coords} we update the position of each particle $\rmx_i$ as a vector field in a radial direction. In other words, the position of each particle $\rmx_i $ is updated by the weighted sum of all relative differences $(\rmx_i - \rmx_j)_{\forall j}$. The weights of this sum are provided as the output of the function $\phi_x: \mathbb{R}^{\text{nf}} \rightarrow \mathbb{R}^1$ that takes as input the edge embedding $\rmm_{ij}$ from the previous edge operation and outputs a scalar value. $C$ is chosen to be $1/(M-1)$, which divides the sum by its number of elements. This equation is the main difference of our model compared to standard GNNs and it is the reason why equivariances 1, 2 are preserved (proof in Appendix \ref{sec:appendix_equiv_proof}). Despite its simplicity, this equivariant operation is very flexible since the embedding $\rmm_{ij}$ can carry information from the whole graph and not only from the given edge $e_{ij}$. 
+
+Finally, equations \ref{eq:method_agg} and \ref{eq:method_node} follow the same updates than standard GNNs. Equation \ref{eq:method_agg} is the aggregation step, in this work we choose to aggregate messages from all other nodes $j\neq i$, but we could limit the message exchange to a given neighborhood $j \in \mathcal{N}(i)$ if desired in both equations \ref{eq:method_agg} and \ref{eq:method_coords}. Equation \ref{eq:method_node} performs the node operation $\phi_h$ which takes as input the aggregated messages $\rmm_i$, the node emedding $\rmh_i^{l}$ and outputs the updated node embedding $\rmh_i^{l+1}$.
+
+
+
+
+%In the first line we input the relative squared distance between two coordinates $\left\|\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right\|^{2}$ into the edge operation. The distance between two particles is invariant to rotations and translations on the set of particles, therefore, the output messages $\mathbf{m}_{ij}$ also remain invariant to translations and rotations on $X$, finally $H$ remains invariant too since it is updated from the messages $\mathbf{m}_{ij}$ that were already invariant. In the second line of equation \ref{eq:proposed_model}, the coordinates $\rmx_i$ are updated, the function $\phi_x$ takes as input the message $\rmm_{ij}$ which is invariant to rotations and translations on $\rmx_i$ and otuputs a scalar value. The coordinates $\rmx$ are updated as a weighted sum of their relative differences, this operation is equivariant to translations and rotations on $\rmx_i$, i.e. translating and rotating $\rmx^{l}$ will imply an equivalent translation and rotation on $\rmx^{l+1}$.
+
+\subsection{Analysis on E(n) equivariance} \label{sec:equivariance_proof}
+In this section we analyze the equivariance properties of our model for $E(3)$ symmetries (i.e. properties 1 and 2 stated in section \ref{sec:background_equivariance}). In other words, our model should be translation equivariant on $\rmx$ for any translation vector $g \in \mathbb{R}^n$ and it should also be rotation and reflection equivariant on $\rmx$ for any orthogonal matrix $Q \in \mathbb{R}^{n \times n}$. More formally our model satisfies:
+%
+\begin{equation*}
+    Q\rmx^{l+1} + g, \rmh^{l+1}  = \mathrm{EGCL}(Q\rmx^l + g, \rmh^l)
+\end{equation*}
+%
+We provide a formal proof of this in Appendix \ref{sec:appendix_equiv_proof}. Intuitively, let's consider a $\rmh^l$ feature which is already $\En$ invariant, then we can see that the resultant edge embedding $\rmm_{ij}$ from Equation \ref{eq:method_edge} will also be $\En$ invariant, because in addition to $\rmh^l$, it only depends on squared distances $\|\rmx_{i}^l-\rmx_{j}^l\|^{2}$, which are $\En$ invariant. Next, Equation \ref{eq:method_coords} computes $\rmx^{l+1}_i$ by a weighted sum of differences $(\rmx_i - \rmx_j)$ which is added to $\rmx_i$, this transforms as a type-1 vector and preserves equivariance (see Appendix \ref{sec:appendix_equiv_proof}). Finally the last two equations \ref{eq:method_agg} and \ref{eq:method_node} that generate the next layer node-embeddings $\rmh^{l+1}$ remain $\En$ invariant since they only depend on $\rmh^l$ and $\rmm_{ij}$ which, as we saw above, are $\En$ invariant. Therefore the output $\rmh^{l+1}$ is $\En$ invariant and $\rmx^{l+1}$ is $\En$ equivariant to $\rmx^{l}$. Inductively, a composition of $\mathrm{EGCL}$s will also be equivariant.
+
+\subsection{Extending EGNNs for vector type representations} \label{sec:method_velocity}
+In this section we propose a slight modification to the presented method such that we explicitly keep track of the particle's momentum. In some scenarios this can be useful not only to obtain an estimate of the particle's velocity at every layer but also to provide an initial velocity value in those cases where it is not 0. We can include momentum to our proposed method by just replacing Equation \ref{eq:method_coords} of our model with the following equation:
+\begin{equation} \label{eq:egnn_velocity}
+    \begin{aligned}
+     %\mathbf{v}_{i}^{l+1}&= \phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^{l} + C\sum_{j \neq i}\left(\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right) \phi_{x}\left(\mathbf{m}_{ij}\right) \\ 
+    \mathbf{v}_{i}^{l+1}&= \phi_{v}\left(\rmh_{i}^l\right)\rmv_{i}^\text{init} + C\sum_{j \neq i}\left(\mathbf{x}_{i}^{l}-\mathbf{x}_{j}^{l}\right) \phi_{x}\left(\mathbf{m}_{ij}\right) \\
+ \rmx_{i}^{l+1} &=\mathbf{x}_{i}^{l}+ \mathbf{v}_i^{l+1}
+    \end{aligned}
+\end{equation}
+Note that this extends the EGCL layer as $\rmh^{l+1}, \rmx^{l+1}, \rmv^{l+1} = \text{EGCL}[\rmh^{l}, \rmx^{l}, \rmv^{\text{init}}, \mathcal{E}]$. The only difference is that now we broke down the coordinate update (eq. \ref{eq:method_coords}) in two steps, first we compute the velocity $\rmv^{l+1}_i$ and then we use this velocity to update the position $\rmx^l_i$. The initial velocity $\rmv^{\text{init}}_i$ is scaled by a new function $\phi_v: \mathbb{R}^N \rightarrow \mathbb{R}^1$ that maps the node embedding $\rmh_i^l$ to a scalar value. Notice that if the initial velocity is set to zero (${\rmv}^{\text{init}}_i = 0$), both equations \ref{eq:method_coords} and \ref{eq:egnn_velocity} become exactly the same. We proof the equivariance of this variant of the model in Appendix \ref{sec:appendix_equiv_proof_velocity}. This variant is used in experiment \ref{sec:experiment_n_body} where we provide the initial velocity of the system, and predict a relative position change.
+
+
+\begin{table*}[t] \tiny
+  \centering
+  \begin{tabular}{|l | c | c | c | c | c | c}
+  \toprule
+     & GNN & Radial Field & TFN & Schnet  & EGNN \\
+    \midrule
+    \multirow{2}*{Edge} & 
+    \multirow{2}*{$\rmm_{ij} = \phi_e(\rmh_i^l, \rmh_j^l, a_{ij})$} &
+    \multirow{2}*{$\rmm_{ij} = \phi_{\text{rf}}(\|\rmr_{ij}^{l}\|) \rmr_{ij}^{l}$} &
+    \multirow{2}*{$\rmm_{ij} =  \sum_{k}\mathbf{W}^{lk}\rmr_{ji}^{l}\rmh_i^{lk}$} &
+    \multirow{2}*{$\rmm_{ij}=\phi_{\text{cf}}(\|\rmr_{ij}^{l}\|) \phi_\text{s}(\rmh_{j}^{l})$ } & 
+    $\mathbf{m}_{ij} =\phi_{e}(\mathbf{h}_{i}^{l}, \mathbf{h}_{j}^{l},\|\rmr_{ij}^{l}\|^{2}, a_{i j})$   \\
+    & &  & & & $\hat{\rmm}_{ij} = \rmr_{ij}^{l}\phi_x(\rmm_{ij})$  \\
+    \midrule
+    \multirow{2}*{Agg}. &
+    \multirow{2}*{$\summessages$} &
+    \multirow{2}*{$\summessagesb$} &
+    \multirow{2}*{$\summessagesb$} &
+    \multirow{2}*{$\summessagesb$} &
+    $\summessagesb$ \\
+     & & & & &
+     $\hat{\rmm}_i = C\sum_{j \neq i} \hat{\rmm}_{ij}$ \\
+    \midrule
+    \multirow{2}*{Node} &
+    \multirow{2}*{$\rmh_i^{l+1} = \phi_h(\rmh_i^l, \rmm_i)$} &
+    \multirow{2}*{$\rmx_i^{l+1} = \rmx_i^{l} + \rmm_i$} &
+    \multirow{2}*{$\rmh_i^{l+1} = w^{ll}\rmh_i^{l} + \rmm_i$} &
+    \multirow{2}*{$\rmh_i^{l+1} = \phi_h(\rmh_i^l, \rmm_i)$} &
+    $\mathbf{h}_{i}^{l+1} =\phi_{h}\left(\mathbf{h}_{i}^l, \mathbf{m}_{i}\right)$ \\
+         &
+     &
+     &
+     &
+     &
+    $\rmx_i^{l+1} = \rmx_i^{l} + \hat{\rmm}_i $  \\
+    \midrule
+     &
+    Non-equivariant &
+    $\En$-Equivariant &
+    $\mathrm{SE}(3)$-Equivariant &
+    $\En$-Invariant &
+    $\En$-Equivariant  \\
+    \bottomrule
+  \end{tabular}
+  \caption{Comparison over different works from the literature under the message passing framework notation. We created this table with the aim to provide a clear and simple way to compare over these different methods. The names from left to right are: Graph Neural Networks \cite{gilmer2017neural}; Radial Field from Equivariant Flows \cite{kohler2019equivariant_workshop}; Tensor Field Networks \cite{thomas2018tensor}; Schnet \cite{schutt2017schnet}; and our Equivariant Graph Neural Network. The difference between two points is written $\rmr_{ij} = (\rmx_i - \rmx_j)$.}
+  \label{tab:related_work}
+\end{table*}
+
+
+\subsection{Inferring the edges} \label{sec:edges_inference}
+Given a point cloud or a set of nodes, we may not always be provided with an adjacency matrix. In those cases we can assume a fully connected graph where all nodes exchange messages with each other $j \neq i$ as done in Equation \ref{eq:method_agg}. This fully connected approach may not scale well to large point clouds where we may want to locally limit the exchange  of messages $\rmm_i = 
+   \sum_{j \in \mathcal{N}(i)}\rmm_{ij}$ to a neighborhood $\mathcal{N}(i)$ to avoid an overflow of information.
+
+Similarly to \cite{serviansky2020set2graph, kipf2018neural}, we present a simple solution to infer the relations/edges of the graph in our model, even when they are not explicitly provided. Given a set of neighbors $\mathcal{N}(i)$ for each node $i$, we can re-write the aggregation operation from our model (eq. \ref{eq:method_agg}) in the following way:
+\begin{equation}\label{eq:attention}
+   \rmm_i = 
+   \sum_{j \in \mathcal{N}(i)}\rmm_{ij} = \sum_{j \neq i} e_{ij}\rmm_{ij} 
+\end{equation}
+Where $e_{ij}$ takes value $1$ if there is an edge between nodes $(i,j)$ and $0$ otherwise. %Notice this doesn't modify yet the original equation used in our model, it is just a change in notation. 
+Now we can choose to approximate the relations $e_{ij}$ with the following function $e_{ij} \approx \phi_{inf}(\rmm_{ij})$, where $\phi_{inf}: \mathbb{R}^{nf} \rightarrow [0, 1]^1$ resembles a linear layer followed by a sigmoid function that takes as input the current edge embedding and outputs a soft estimation of its edge value. This modification does not change the $\En$ properties of the model since we are only operating on the messages $\rmm_{ij}$ which are already $\En$ invariant. 
+% One can think of this as an invariant soft-attention function \cite{fuchs2020se}.

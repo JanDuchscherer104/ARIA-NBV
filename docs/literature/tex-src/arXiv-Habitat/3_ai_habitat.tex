@@ -1,0 +1,195 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\vspace{\sectionReduceTop}
+%\section{The Habitat Simulation Suite}
+\section{Habitat Platform}
+%\vspace{\sectionReduceBot}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setlength{\epigraphwidth}{0.6\columnwidth}
+\epigraph{What I cannot create I do not understand.}{\textit{Richard Feynman}}
+
+%\emph{Habitat} is a platform for embodied AI research, designed to address the need for a common framework within which embodied agents performing a variety of tasks can be developed, evaluated, and compared.
+The development of Habitat is a long-term effort to 
+%provide a unifying platform that 
+enable the formation of a common task framework~\cite{Donoho2015} for research into embodied agents, thereby supporting systematic research progress in this area.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.32\columnwidth]{fig/frames/mp3d_rgba.png}
+  \includegraphics[width=0.32\columnwidth]{fig/frames/mp3d_depth.png}
+  \includegraphics[width=0.32\columnwidth]{fig/frames/mp3d_sem.png}\\
+  \includegraphics[width=0.32\columnwidth]{fig/frames/frl_rgba.png}
+  \includegraphics[width=0.32\columnwidth]{fig/frames/frl_depth.png}
+  \includegraphics[width=0.32\columnwidth]{fig/frames/frl_sem.png}\\
+  %\vspace{-5pt}
+  \caption{Example rendered sensor observations for three sensors (color camera, depth sensor, semantic instance mask) in two different environment datasets. A Matterport3D~\cite{Chang2017} environment is in the top row, and a Replica~\cite{replica19arxiv} environment in the bottom row.}
+  %\vspace{\captionReduceBot}
+\label{fig:frames}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\xhdr{Design requirements.}
+The issues discussed in the previous section lead us to a set of requirements that we seek to fulfill. % with the design of Habitat.
+
+\begin{compactitem}[\hspace{1pt}--]
+    \item \textbf{Highly performant rendering engine}: resource-efficient rendering engine that can produce multiple channels of visual information (\eg RGB, depth, semantic instance segmentation, 
+    surface normals, optical flow) for multiple concurrently operating agents.
+    \item \textbf{Scene dataset ingestion API}: makes the platform agnostic to 3D scene datasets and allows users to use their own datasets. 
+    \item \textbf{Agent API}: allows users to specify parameterized embodied agents with well-defined geometry, physics, and actuation characteristics. 
+    \item \textbf{Sensor suite API}: allows specification of arbitrary numbers of 
+    parameterized sensors (\eg RGB, depth, contact, GPS, compass sensors) attached 
+    to each agent. 
+    \item \textbf{Scenario and task API}: allows portable definition of tasks and their evaluation protocols.
+    \item \textbf{Implementation}: C++ backend with Python API and interoperation with common learning frameworks, minimizes entry threshold.% and brings compatibility with existing widely used libraries. 
+    \item \textbf{Containerization}: enables distributed training in clusters and remote-server evaluation of user-provided code.
+    \item \textbf{Humans-as-agents}: allows humans to function as agents in simulation in order to collect human behavior and investigate human-agent or human-human interactions. 
+    \item \textbf{Environment state manipulation}: programmatic control of the environment configuration in terms of the objects that are present and their relative layout. 
+\end{compactitem}
+
+\xhdr{Design overview.}
+The above design requirements cut across several layers in the `software stack' in \Cref{fig:habitat_stack}.
+A monolithic design is not suitable for addressing requirements at all levels. We, therefore, structure the Habitat platform to mirror this multi-layer abstraction. % of the embodied agent software stack.
+
+
+At the lowest level is
+\habitatsim, a flexible, high-performance 3D simulator, 
+responsible for 
+loading 3D scenes into a standardized scene-graph representation, 
+configuring agents with multiple sensors, simulating agent motion, and returning sensory data from an agent's sensor suite.
+The sensor abstraction in Habitat allows additional sensors such as LIDAR and IMU to be easily implemented as plugins.
+
+\xhdr{Generic 3D dataset API using scene graphs.}
+\habitatsim employs a hierarchical scene graph to 
+represent all supported 3D environment datasets, 
+whether synthetic or based on real-world reconstructions.
+The use of a uniform scene graph representation allows us to abstract the details of specific datasets, and to treat them in a consistent fashion.
+Scene graphs allow us to compose 3D environments through procedural scene generation, editing, or programmatic manipulation.
+%Moreover, the scene graph representation is well-suited for integration with physics engines, allowing us to directly control the state of individual objects and agents within a scene graph.
+
+
+
+\xhdr{Rendering engine.}
+The \habitatsim backend module is implemented in C++ and leverages the Magnum graphics middleware library\footnote{\url{https://magnum.graphics/}} to support cross-platform deployment on a broad variety of hardware configurations.
+The simulator backend employs an efficient rendering pipeline that implements visual sensor frame rendering using a multi-attachment `uber-shader' combining outputs for color camera sensors, depth sensors, and semantic mask sensors.
+By allowing all outputs to be produced in a single render pass, we avoid additional overhead when sensor parameters are shared and the same render pass can be used for all outputs.
+\Cref{fig:frames} shows examples of visual sensors rendered in three different supported datasets.
+The same agent and sensor configuration was instantiated in a scene from each of the three datasets by simply specifying a different input scene.
+
+
+%\habitatsim is also responsible for configuring agents with multiple sensors, simulating agent motion, and returning sensory data corresponding to an agent's sensor suite.
+
+\xhdr{Performance.}
+\habitatsim achieves thousands of frames per second per simulator thread and is orders of magnitude faster than previous simulators for realistic indoor environments (which typically operate at tens or hundreds of frames per second) -- see \Cref{tab:performance_summary} for a summary and the supplement for more details.
+By comparison, AI2-THOR~\cite{Kolve2017} and CHALET~\cite{Yan2018} run at tens of fps, MINOS~\cite{Savva2017} and Gibson~\cite{Xia2018} run at about a hundred, and House3D~\cite{Wu2018} runs at about $300$ fps. \habitatsim is $2$-$3$ orders of magnitude faster.
+%
+%The performance of \habitatsim facilitates large-scale training in realistic environments.
+By operating at $10@000$ frames per second we shift the bottleneck from simulation to optimization for network training.
+Based on TensorFlow benchmarks, many popular network architectures run at frame rates that are 10-100x lower on a single GPU\footnote{\url{https://www.tensorflow.org/guide/performance/benchmarks}}.
+%We are confident that algorithms using \habitatsim will not incur a noticeable speed penalty.
+In practice, we have observed that it is often \emph{faster to generate images using \habitatsim than to load images from disk}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{table}[t!]
+  \centering
+\resizebox{\columnwidth}{!}{
+  %\begin{tabular}{@{}lrrrrrrrrr@{}}
+  \begin{tabular}{@{}lrrrrrr@{}}
+
+      \toprule
+      & \multicolumn{3}{c}{$1$ process} 
+      %& \multicolumn{3}{c}{$3$ procs} 
+      & \multicolumn{3}{c}{$5$ processes}\\
+      \cmidrule(l){2-4} 
+      \cmidrule(l){5-7} 
+      %\cmidrule(l){8-10}
+      Sensors / Resolution 
+      & $128$ & $256$ & $512$ 
+      %& $128$ & $256$ & $512$ 
+      & $128$ & $256$ & $512$\\
+      \midrule
+      RGB 
+      & $4@093$ & $1@987$ & $848$ 
+      %& $10638$ & $3428$ & $2068$ 
+      & $10@592$ & $3@574$ & $2@629$\\
+      RGB + depth 
+      & $2@050$ & $1@042$ & $423$ 
+      %& $5024$ & $1715$ & $1042$ 
+      & $5@223$ & $1@774$ & $1@348$\\
+%      RGB + depth + semantics\footnotemark{} 
+%      & $439$ & $346$ & $185$ & $502$ & $385$ & $336$ & $500$ & $390$ & $367$\\
+      \bottomrule
+  \end{tabular}
+}
+  %\vspace{-5pt}
+  \caption{Performance of \habitatsim in frames per second for an example Matterport3D scene (id 17DRP5sb8fy) on an Intel Xeon E5-2690 v4 CPU and Nvidia Titan Xp GPU, measured at different frame resolutions and with a varying number of concurrent simulator processes sharing the GPU. See the supplement for additional benchmarking results.}
+  \label{tab:performance_summary}
+  %\vspace{\captionReduceBot}
+\end{table}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\xhdr{Efficient GPU throughput.}
+Currently, frames rendered by \habitatsim are exposed as Python tensors through shared memory. Future development will focus on even higher rendering efficiency by entirely avoiding GPU-to-CPU memory copy overhead through the use of CUDA-GL interoperation and direct sharing of render buffers and textures as tensors. 
+Our preliminary internal testing suggests that this can lead to 
+a speedup by a factor of 2. 
+
+Above the simulation backend, the \habitatapi layer is  a modular high-level library for end-to-end development in embodied AI.
+%-- 
+%defining embodied AI tasks (\eg navigation~\cite{Anderson2018-Evaluation}, instruction following~\cite{Anderson2018-Language}, question answering~\cite{embodiedqa}), configuring embodied agents (physical form, sensors, capabilities), training these agents (via imitation or reinforcement learning, or via classic SLAM), and benchmarking their performance on the defined tasks using standard metrics~\cite{Anderson2018-Evaluation}. 
+%
+%\habitatapi currently uses \habitatsim as the core simulator, but is designed with a modular abstraction for the simulator backend to maintain compatibility over multiple simulators. 
+%Specifically, the interface between the simulation backend and the API is designed to be minimal and relies on a fully specified environment and agent configuration to form a contract between the two layers.
+%The simulator backend receives from the API a configuration summarizing the desired environment (3D scene data), the agent's physical embodiment and action space (geometry, mapping between high-level commands and actuation parameters), and the agent's sensors (\eg position, orientation, and resolution of a depth camera sensor).
+%Then, the backend simulates the agent(s) and their sensors under sequences of actions provided through the API, returning observation data for each active sensor at each simulation step.
+%
+%
+%\xhdr{Key concepts.}
+%An important objective of \habitatapi is to make it easy for users to set up a variety of embodied agent tasks in 3D environments.
+Setting up an embodied task involves 
+specifying observations that may be used by the agent(s), 
+using environment information provided by the simulator, and 
+connecting the information with a task-specific episode dataset.  
+%Keeping this primary objective in mind, the core API defines the following key concepts as abstractions that can be flexibly extended:
+
+\begin{compactitem}[\hspace{1pt}--]
+    %\item \texttt{Sensor}: a generalization of the physical \texttt{Sensor} concept provided by a \texttt{Simulator}, with the capability to provide \texttt{Task}-specific \texttt{Observation} data in a specified format.
+    
+    %\item \texttt{Observation}: data representing an observation from the \texttt{Sensor} class. This can correspond to physical sensors on an 
+    %\texttt{Agent} (\eg RGB, depth, semantic segmentation masks, collision sensors) or more abstract sensors such as the current agent state. %The structure and format of observation data is constant after an \texttt{Agent} is initialized. Observations are usually passed as input for model training.
+
+    \item \texttt{Task}: this class extends the simulator's \texttt{Observations} class and action space with task-specific ones. The criteria of episode termination and measures of success are provided by the \texttt{Task}. For example, 
+    %in EmbodiedQA the \texttt{Task} (re-)provides a question when the navigation part of the task is finished and evaluates the correctness of the reported answer. 
+    in goal-driven navigation, \texttt{Task} provides 
+    the goal and evaluation metric~\cite{Anderson2018-Evaluation}. 
+    To support this kind of functionality the \texttt{Task} has read-only access to \texttt{Simulator} and \texttt{Episode-Dataset}.
+
+    \item \texttt{Episode}: a class for episode specification that includes the initial position and orientation of an \texttt{Agent}, scene id,  goal position, and optionally the shortest path to the goal. An episode is a description of an instance of the task. % for the agent.
+    
+    %\item \texttt{Episode-Dataset}: contains a list of task-specific episodes (\eg a set of PointGoal targets for a navigation task~\cite{Anderson2018-Evaluation} or question-answer pairs for EmbodiedQA~\cite{embodiedqa}) paired with a set of scene assets (\eg Matterport3D, Gibson, etc.). 
+    %from a particular data split and additional dataset-wide information. 
+    %\habitatapi handles loading and saving of episode-datasets to disk, getting a list of associated 3D scenes, 
+    %and getting a list of episodes for a particular scene.
+    
+    \item \texttt{Environment}: the fundamental environment concept for Habitat, abstracting all the information needed for working on embodied tasks with a simulator.  %\texttt{Environment}. %This class acts as a base for other derived environment classes. %\texttt{Environment} consists of three major components: a \texttt{Simulator}, an \texttt{Episode-Dataset} (containing \texttt{Episodes}), and a \texttt{Task}, and it serves to connects all these components together.
+
+\end{compactitem}
+
+%Above the API level, we define a concrete embodied task such as visual navigation.
+%This involves defining a specific dataset configuration, specifying the structure of episodes (\eg number of steps taken, termination conditions), training curriculum (progression of episodes, difficulty ramp), and evaluation procedure (\eg test episode sets and task metrics).
+
+% \begin{figure}
+% %\begin{table}[h]
+%   \centering
+% %\resizebox{\columnwidth}{!}{
+% \inputpython{api-example_single_col.py}{1}{17}
+% %}
+% %\end{table}
+% \vspace{\captionReduceBot}
+% \end{figure}
+
+% An example of loading a pre-configured task (PointNav)
+% and stepping through the environment with a random agent 
+% %running a  PointGoal~\cite{Anderson2018-Evaluation} navigation task 
+% is shown in the code below.
+% %An example of how user code can extend the \habitatapi functionality is in the appendix. 
+More details about the architecture of the Habitat platform, performance measurements, and examples of API use are provided in the supplement.

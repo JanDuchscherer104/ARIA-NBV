@@ -1,0 +1,65 @@
+\section{Minkowski Convolutional Neural Networks}
+\label{sec:minkowski}
+
+In this section, we introduce 4-dimensional spatio-temporal convolutional neural networks for spatio-temporal perception. We treat the time dimension as an extra spatial dimension and create networks with 4-dimensional convolutions. However, there are unique problems arising from high-dimensional convolutions. First, the computational cost and the number of parameters in the networks increase exponentially as we increase the dimension. However, we experimentally show that these increases do not necessarily lead to better performance. Second, the networks do not have an incentive to make the prediction consistent throughout the space and time with conventional cross-entropy loss alone.
+
+To resolve the first problem, we make use of a special property of the generalized sparse convolution and propose non-conventional kernel shapes that not only save memory and computation, but also perform better. Second, to enforce spatio-temporal consistency, we propose a high-dimensional conditional random field (7D space-time-color space) that filters network predictions. We use variational inference to train both the base network and the conditional random field end-to-end.
+
+
+\subsection{Tesseract Kernel and Hybrid Kernel}
+\label{sec:hybrid_kernel}
+
+The surface area of 3D data increases linearly to time and quadratically to the spatial resolution. However, when we use a conventional 4D hypercube, or a tesseract (Fig.~\ref{fig:hypercubes}), for a convolution kernel, the exponential increase in the number of parameters leads to over-parametrization, overfitting, as well as high computational-cost and memory consumption. Instead, we propose a hybrid kernel (non-hypercubic, non-permutohedral) to save computation. We use the arbitrary kernel offsets $\mathcal{N}^D$ of the generalized sparse convolution to implement the hybrid kernel.
+
+
+The hybrid kernel is a combination of a cross-shaped kernel a conventional cubic kernel (Fig.~\ref{fig:kernels}). For spatial dimensions, we use a cubic kernel to capture the spatial geometry accurately. For the temporal dimension, we use the cross-shaped kernel to connect the same point in space across time. We experimentally show that the hybrid kernel outperforms the tesseract kernel both in speed and accuracy.
+\begin{figure}[ht]
+    \centering
+    \minipage{0.2\columnwidth}
+      \includegraphics[width=\linewidth]{figures/kernels/cross-trimmed.png}
+      \caption*{\small{Cross}}\label{fig:cross_kernel}
+    \endminipage
+    \minipage{0.2\columnwidth}
+      \includegraphics[width=\linewidth]{figures/kernels/hypercross-trimmed.png}
+      \caption*{\small{Hypercross}}\label{fig:hypercross_kernel}
+    \endminipage
+    \minipage{0.2\columnwidth}
+        \includegraphics[width=0.95\linewidth]{figures/kernels/square-trimmed.png}
+      \caption*{\small{Cube}}\label{fig:cube_kernel}
+    \endminipage\hfill
+    \minipage{0.2\columnwidth}
+        \includegraphics[width=0.95\linewidth]{figures/kernels/hypercube-trimmed.png}
+      \caption*{\small{Hypercube}}\label{fig:hypercube_kernel}
+    \endminipage\hfill
+    \minipage{0.2\columnwidth}
+        \includegraphics[width=0.95\linewidth]{figures/kernels/hybrid-trimmed.png}
+      \caption*{\small{Hybrid}}\label{fig:hybrid_kernel}
+    \endminipage\hfill
+    \caption{Various kernels in space-time. The red arrow indicates the temporal dimension and the other two axes are for spatial dimensions. The third spatial dimension is hidden for better visualization.}
+    \label{fig:kernels}
+    \vspace{-1em}
+\end{figure}
+
+
+\begin{figure}
+  \centering
+    \includegraphics[width=0.48\columnwidth]{figures/network/SpatioTemporalSegmentationFigures_vertical_new_crop.pdf}
+		\vspace{-0.5em}
+		\caption{\small{Architecture of ResNet18 (left) and MinkowskiNet18 (right). Note the structural similarity. $\times$ indicates a hypercubic kernel, $+$ indicates a hypercross kernel. (best viewed on display)}}
+  \label{fig:resnet}
+  \vspace{-1.7em}
+\end{figure}
+
+\begin{figure*}
+  \centering
+    \includegraphics[width=0.7\textwidth]{figures/network/SpatioTemporalSegmentationFigures_horizontal_new_crop.pdf}
+		\vspace{-0.5em}
+		\caption{\small{Architecture of MinkowskiUNet32. $\times$ indicates a hypercubic kernel, $+$ indicates a hypercross kernel. (best viewed on display)}}
+  \label{fig:resunet}
+  \vspace{-1.5em}
+\end{figure*}
+
+\subsection{Residual Minkowski Networks}
+The generalized sparse convolution allows us to define strides and kernel shapes arbitrarily. Thus, we can create a high-dimensional network only with generalized sparse convolutions, making the implementation easier and generic. In addition, it allows us to adopt recent architectural innovations in 2D directly to high-dimensional networks. To demonstrate, we create a high-dimensional version of a residual network on Fig.~\ref{fig:resnet}. For the first layer, instead of a $7 \times 7$ 2D convolution, we use a $5\times 5\times 5 \times 1$ generalized sparse convolution. However, for the rest of the networks, we follow the original network architecture.
+
+For the U-shaped variants, we add multiple strided sparse convolutions and strided sparse transpose convolutions with skip connections connecting the layers with the same stride size (Fig.~\ref{fig:resunet}) on the base residual network. We use multiple variations of the same architecture for semantic segmentation experiments.

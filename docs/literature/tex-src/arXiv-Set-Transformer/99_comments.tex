@@ -1,0 +1,111 @@
+
+\iffalse
+\begin{table}[t]
+\centering
+\small
+\caption{Time complexity of various set operations. $n$ is the number of items, $d$ is the dimensionality of each item, and $m$ is the number of inducing points.}
+\label{tab:complexities}
+\begin{center}
+\vspace{-1mm}
+
+\begin{tabular}{lccc}
+\toprule
+Set operations & Time complexity & High-order & Permutation \\
+&& interactions & invariant \\
+\hline
+%Fully- Connected (naive) & $O(n^2d^2)$ & Yes & No \\
+\rule{0pt}{2.0ex}Recurrent & $O(nd)$ & Yes & No \\
+Pooling~\citep{Zaheer2017} & $O(nd)$ & No & Yes \\
+Relational Networks~\citep{Santoro2017} & $O(n^2d)$ & Yes & Yes \\
+\midrule
+Set Transformer (SAB + PMA, ours) & $O(n^2d)$ & Yes & Yes \\
+Set Transformer (ISAB + PMA, ours) & $O(nmd)$ & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+\fi
+
+
+\if(0)
+We first introduce the \textit{set attention block} (SAB), a basic building block of the Set Transformer.  Unlike the element-wise encoding methods for sets, the set transformer encodes entire sets altogether with using self-attention mechanism. More specifically, given matrices $X, Y \in \R^{n\times d}$ collecting the vector representation of elements in two sets, SAB is defined as
+\[
+\mathrm{SAB}(X, Y) &= \mathrm{LayerNorm}(H + \mathrm{FF}(H)), \\
+\textrm{where } H &= \mathrm{LayerNorm}(X + \mathrm{Multihead}(X, Y, Y)),
+\]
+where $\mathrm{FF}$ is any type of feed-forward layer that acts on each element identically and independently, and $\mathrm{LayerNorm}$ is layer normalization~\citep{Ba2016}. The SAB is a simple adaptation of the building blocks of transformer architecture without positional encoding and dropout.  We use the simplified notation $\mathrm{SAB}(X) \coloneqq \mathrm{SAB}(X, X)$ for self-attention using the $\mathrm{SAB}$.
+
+A simple encoder structure is a stack of SABs:
+\[
+\mathrm{Encoder}(X) = \mathrm{SAB}(\mathrm{SAB}(\cdots \mathrm{SAB}(X))).
+\]
+By stacking SABs, we can encode high-order interactions between the elements in the set $X$ (recall that the matrix $X$ represents a set of size $n$).
+A problem with using SABs for set data is the time complexity $O(n^2)$, quickly making this method intractable for large sets ($n \gg 1$).
+
+We thus introduce the \textit{induced set attention block} (ISAB), which is an attention-based encoding block that can bypass this problem.
+Let $X\in \R^{n \times d}$ be our data and define $m$ new trainable $d$-dimensional vectors ($I \in \R^{m \times d}$).
+An ISAB is defined as:
+\[
+\mathrm{ISAB}(X;I) \coloneqq \mathrm{SAB}(I, X).
+\]
+Note that attention was computed between a set of size $m$ and a set of size $n$.
+Therefore, while the time complexity of self-attention $\mathrm{SAB}(X)$ is $O(n^2)$, the time complexity of $\mathrm{ISAB}(X;I)$ is $O(nm)$, where $m$ is a constant hyperparameter.
+We compare characteristics of various set operations in Table \ref{tab:complexities}.
+
+The idea of introducing trainable vectors $I$ is loosely based on the inducing point methods used in sparse Gaussian process regression~\citep{Quinonero-Candela2005} and the Nystr\"{o}m method for matrix decomposition~\citep{Fowlkes2004}.
+
+
+\subsection{Encoder}
+\label{subsec:imab}
+We construct the encoder of the Set Transformer by alternating $\mathrm{IMAB}$ and $\mathrm{MAB}$ blocks, for example:
+\begin{align}
+\mathrm{Encoder}(X) &= \mathrm{MAB}(X, H) \in \R^{n\times d} \\
+\mathrm{where} \hspace{10pt} H &= \mathrm{IMAB}(X;I)\in \R^{m\times d},
+\end{align}
+where $I \in \R^{m \times d}$.
+Note that $H \in \R^{m\times d}$, so the $\mathrm{MAB}$ operation has time complexity $O(nm)$.
+
+\subsection{Decoder}
+After the encoder transforms data $X \in \R^{n \times d}$ into feature representations $Z \in \R^{n\times d}$,
+the decoder then aggregates these features into a single vector to fed into a feed-forward network to get final outputs.
+As mentioned in section \ref{subsec:pooling}, a commonly used method of aggregating these features is to take sums or averages of the feature vectors.
+The set transformer's decoder uses an attention-based pooling mechanism using the MAB.
+We prove in Appendix \ref{app:proofs} that commonly used pooling layers such as mean-pooling and max-pooling are special cases of our decoder structure.
+Similarly to how recurrent neural nets take an initial hidden state and decode it into an output, we use an IMAB with one inducing point $s \in \R^d$:
+\[
+\mathrm{Decoder}(X) &= \mathrm{FF}(H) \\
+\mathrm{where} \hspace{10pt} H &= \mathrm{IMAB}(X; s).
+\]
+The IMAB here can be understood as a pooling operation using the weighted sum of features from each head.
+
+For some problems such as clustering, we want to decode $k$ correlated outputs.
+In this case, we introduce a set of seed vectors $S \in \R^{k \times d}$, and apply our blocks as follows:
+\[
+\mathrm{Decoder}(X) &= \mathrm{FF}(H) \in \R^{k \times d_{\mathrm{out}}} \\
+\textrm{ where } \hspace{10pt} H &= \mathrm{MAB}(\mathrm{IMAB}(Z; S)) \in \R^{k \times d}.
+\]
+The role of the MAB here is to enable the decoder to model high-order interactions between its $k$ outputs.
+\fi
+
+
+
+\iffalse
+Unlike previous work, we explicitly parameterize pairwise interactions in each self-attention block.
+Because our proposed model consists of several such blocks, it can encode high-order interactions among elements in a set.
+Additionally, we introduce the ISAB, which reduces the $O(n^2)$ time complexity of full self-attention to $O(n)$.
+\fi
+
+\iffalse
+\cite{Vinyals2016a} proposes an architecture to map sets into sequences,
+where elements in a set are pooled by weighted average with weights computed from attention mechanism.
+Several recent works have highlighted the competency of attention mechanisms in modeling sets.
+\citep{Yang2018} proposes AttSets for multi-view 3D reconstruction, where attention is applied to the encoded features of elements in sets before pooling.
+Similarly, \citep{Ilse2018} uses an attention in pooling for multiple instance learning.
+However, the attention applied in those papers are simple dot-product attention that does not encode higher-order interactions between elements.
+Although not permutation invariant, \citep{Mishra2018} has an attention as one of its core components to meta-learn to solve various tasks using sequences of inputs.
+\fi
+
+
+
+
+

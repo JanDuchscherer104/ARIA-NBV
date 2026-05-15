@@ -1,0 +1,110 @@
+\documentclass{article}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{property}{Property}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Ls}{\mathcal{L}}
+\newcommand{\gN}{\mathcal{N}}
+\newcommand{\calO}{\mathcal{O}}
+\newcommand{\R}{\mathbb{R}}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\def\[#1\]{\begin{align}#1\end{align}}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+\usepackage[accepted]{icml2019}
+
+\icmltitlerunning{Set Transformer}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Set Transformer: A Framework for Attention-based \\Permutation-Invariant Neural Networks}
+
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Juho Lee}{oxford1,aitrics}
+\icmlauthor{Yoonho Lee}{kakao}
+\icmlauthor{Jungtaek Kim}{postech}
+\icmlauthor{Adam R. Kosiorek}{oxford1,oxford2}
+\icmlauthor{Seungjin Choi}{postech}
+\icmlauthor{Yee Whye Teh}{oxford1}
+\end{icmlauthorlist}
+
+\icmlaffiliation{oxford1}{Department of Statistics, University of Oxford, United Kingdom}
+\icmlaffiliation{oxford2}{Oxford Robotics Institute, University of Oxford, United Kingdom}
+%\icmlaffiliation{oxford2}{Applied Artificial Intelligence Lab, Oxford Robotics Institute, University of Oxford}
+\icmlaffiliation{postech}{Department of Computer Science and Engineering, POSTECH, Republic of Korea}
+\icmlaffiliation{aitrics}{AITRICS, Republic of Korea}
+\icmlaffiliation{kakao}{Kakao Corporation, Republic of Korea}
+
+\icmlcorrespondingauthor{Juho Lee}{juho.lee@stats.ox.ac.uk}
+
+\icmlkeywords{Set transformer, Set-taking network, Attention-based network, Permutation-invariant network}
+
+\vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \icmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+%\printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
+
+\begin{abstract}
+Many machine learning tasks such as multiple instance learning, 3D shape recognition and few-shot image classification are defined on sets of instances.
+Since solutions to such problems do not depend on the order of elements of the set, models used to address them should be \textit{permutation invariant}.
+We present an attention-based neural network module, the \textit{Set Transformer}, specifically designed to model interactions among elements in the input set.
+The model consists of an encoder and a decoder, both of which rely on attention mechanisms.
+In an effort to reduce computational complexity, we introduce an attention scheme inspired by inducing point methods from sparse Gaussian process literature.
+It reduces computation time of self-attention from quadratic to linear in the number of elements in the set.
+We show that our model is theoretically attractive and we evaluate it on a range of tasks, demonstrating increased performance compared to recent methods for set-structured data.
+\end{abstract}
+
+\input{01_introduction.tex}
+\input{02_background.tex}
+\input{03_main.tex}
+\input{04_related_works.tex}
+\input{05_experiments.tex}
+\input{06_conclusion.tex}
+
+
+\paragraph{Acknowledgments}
+JL and YWT's research leading to these results has received funding from the
+European Research Council under the European Union's Seventh Framework
+Programme (FP7/2007-2013) ERC grant agreement no. 617071.
+JL has also received funding from EPSRC under grant EP/P026753/1. JL acknowledges support from IITP grant funded by the Korea government(MSIT) (No.2017-0-01779, XAI) and Samsung Research Funding \& Incubation Center of Samsung Electronics under Project Number SRFC-IT1702-15.
+
+\bibliography{set_transformer}
+\bibliographystyle{icml2019}
+
+\end{document}
+
+%\appendix
+%\input{10_appendix.tex}

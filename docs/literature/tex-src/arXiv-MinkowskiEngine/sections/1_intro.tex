@@ -1,0 +1,68 @@
+\section{Introduction}
+
+In this work, we are interested in 3D-video perception. A 3D-video is a temporal sequence of 3D scans such as a video from a depth camera, a sequence of LIDAR scans, or a multiple MRI scans of the same object or a body part (Fig.~\ref{fig:3dvideo}). As LIDAR scanners and depth cameras become more affordable and widely used for robotics applications, 3D-videos became readily-available sources of input for robotics systems or AR/VR applications.
+
+
+However, there are many technical challenges in using 3D-videos for high-level perception tasks. First, 3D data requires heterogeneous representations and processing those either alienates users or makes it difficult to integrate into larger systems. Second, the performance of the 3D convolutional neural networks is worse or on-par with 2D convolutional neural networks. Third, there are limited number of open-source libraries for fast large-scale 3D data.
+
+To resolve most, if not all, of the challenges in the high-dimensional perception, we adopt a sparse tensor~\cite{sparsecnn, sparse3dcnn} for our problem and propose the generalized sparse convolutions. The generalized sparse convolution encompasses all discrete convolutions as its subclasses and is crucial for high-dimensional perception. We implement the generalized sparse convolution and all standard neural network functions in Sec.~\ref{sec:minkowskiengine} and open-source the library.
+
+
+\begin{figure}[t]
+    \centering
+    \begin{tabular}{ccc}
+    \includegraphics[width=0.32\columnwidth]{figures/synthia_sequence/s10.png}
+    \includegraphics[width=0.32\columnwidth]{figures/synthia_sequence/s15.png}
+    \includegraphics[width=0.32\columnwidth]{figures/synthia_sequence/s20.png}
+    \end{tabular}
+    \vspace{-0.5em}
+    \caption{An example of 3D video: 3D scenes at different time steps. Best viewed on display.}
+    \label{fig:3dvideo}
+    \vspace{-0.5em}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \minipage{0.2\columnwidth}
+      \includegraphics[width=\linewidth]{figures/highdimension/line.png}
+      \vspace{-2em}
+      \caption*{\small{1D: Line}}\label{fig:line}
+    \endminipage\hfill
+    \minipage{0.2\columnwidth}
+      \includegraphics[width=\linewidth]{figures/highdimension/square.png}
+      \vspace{-2em}
+      \caption*{\small{2D: Square}}\label{fig:square}
+    \endminipage\hfill
+    \minipage{0.2\columnwidth}
+      \includegraphics[width=\linewidth]{figures/highdimension/cube.png}
+      \vspace{-2em}
+      \caption*{\small{3D: Cube}}\label{fig:cube}
+    \endminipage\hfill
+    \minipage{0.25\columnwidth}
+        \centering
+        \includegraphics[width=0.8\linewidth]{figures/highdimension/tesseract.png}
+      \vspace{-0.8em}
+      \caption*{\small{4D: Tesseract}}\label{fig:tesseract}
+    \endminipage
+    \vspace{-0.5em}
+    \caption{2D projections of hypercubes in various dimensions}
+    \label{fig:hypercubes}
+    \vspace{-1.0em}
+\end{figure}
+
+We adopt the sparse representation for several reasons. Currently, there are various concurrent works for 3D perception: a dense 3D convolution~\cite{scannet}, pointnet-variants~\cite{pointnet, pointnetpp}, continuous convolutions~\cite{montecarlo, pointcnn}, surface convolutions~\cite{surface, tangent}, and an octree convolution~\cite{octnet}. Out of these representations, we chose a sparse tensor due to its expressiveness and generalizability for high-dimensional spaces. Also, it allows homogeneous data representation within traditional neural network libraries since most of them support sparse tensors.
+
+Second, the sparse convolution closely resembles the standard convolution (Sec.~\ref{sec:sparse}) which is proven to be successful in 2D perception as well as 3D reconstruction~\cite{3dr2n2}, feature learning~\cite{3dmatch}, and semantic segmentation~\cite{segcloud}.
+
+Third, the sparse convolution is efficient and fast. It only computes outputs for predefined coordinates and saves them into a compact sparse tensor (Sec.~\ref{sec:sparse}). It saves both memory and computation especially for 3D scans or high-dimensional data where most of the space is empty.
+
+
+Thus, we adopt the sparse representation for the our problem and create the first large-scale 3D/4D networks or Minkowski networks.\footnote{At the time of submission, our proposed method was the first very deep 3D convolutional neural networks with more than 20 layers.} We named them after the space-time continuum, Minkowski space, in Physics.
+
+However, even with the efficient representation, merely scaling the 3D convolution to high-dimensional spaces results in significant computational overhead and memory consumption due to the curse of dimensionality. A 2D convolution with kernel size 5 requires $5^2=25$ weights which increases exponentially to $5^3 = 125$ in a 3D cube, and 625 in a 4D tesseract (Fig.~\ref{fig:hypercubes}). This exponential increase, however, does not necessarily lead to better performance and slows down the network significantly. To overcome this challenge, we propose custom kernels with non-(hyper)-cubic shapes using the generalized sparse convolution.
+
+
+Finally, the predictions from the 4D spatio-temporal generalized sparse convnets are not necessarily consistent throughout the space and time. To enforce consistency, we propose high-dimensional conditional random fields defined in a 7D trilateral space (space-time-color) with a stationary pairwise consistency function. We use variational inference to convert the conditional random field to differentiable recurrent layers which can be implemented in as a 7D generalized sparse convnet and train both the 4D and 7D networks end-to-end.
+
+
+Experimentally, we use various 3D benchmarks that cover both indoor~\cite{scannet, stanford3dis} and outdoor spaces~\cite{synthia, ruemonge2014}. First, we show that networks with only generalized sparse 3D conv nets can outperform 2D or hybrid deep-learning algorithms by a large margin.\footnote{We achieved 67.9\% mIoU on the ScanNet benchmark outperforming all algorithms including the best peer-reviewed work~\cite{3dmv} by 19\% mIoU at the time of submission.} Also, we create 4D datasets from Synthia~\cite{synthia} and Varcity~\cite{ruemonge2014} and report ablation studies of temporal components. Experimentally, we show that the generalized sparse conv nets with the hybrid kernel outperform sparse convnets with tesseract kernels. Also, the 4D generalized sparse convnets are more robust to noise and sometimes more efficient in some cases than the 3D counterpart.

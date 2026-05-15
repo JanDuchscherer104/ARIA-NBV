@@ -6,26 +6,60 @@ The legacy dashboard remains available via `aria_nbv.streamlit_app_old`.
 
 from __future__ import annotations
 
+import os
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
 from aria_nbv.app import NbvStreamlitApp, NbvStreamlitAppConfig
 
 __all__ = ["NbvStreamlitApp", "NbvStreamlitAppConfig", "main", "streamlit_entry"]
+
+_FILE_WATCHER_ENV = "STREAMLIT_SERVER_FILE_WATCHER_TYPE"
+_FILE_WATCHER_FLAG = "--server.fileWatcherType"
+_DEFAULT_FILE_WATCHER_TYPE = "none"
 
 
 def main() -> None:  # pragma: no cover - Streamlit runner
     NbvStreamlitAppConfig().setup_target().run()
 
 
-def streamlit_entry() -> None:  # pragma: no cover - console script
-    """Launch via `nbv-st` console entry."""
+def _has_file_watcher_override(args: Sequence[str]) -> bool:
+    return any(arg == _FILE_WATCHER_FLAG or arg.startswith(f"{_FILE_WATCHER_FLAG}=") for arg in args)
 
-    import sys
-    from pathlib import Path
+
+def _build_streamlit_argv(app_path: Path, forwarded_args: Sequence[str]) -> list[str]:
+    streamlit_args = list(forwarded_args)
+    script_args: list[str] = []
+    if "--" in streamlit_args:
+        delimiter_index = streamlit_args.index("--")
+        script_args = streamlit_args[delimiter_index:]
+        streamlit_args = streamlit_args[:delimiter_index]
+
+    if not _has_file_watcher_override(streamlit_args) and _FILE_WATCHER_ENV not in os.environ:
+        streamlit_args = [
+            _FILE_WATCHER_FLAG,
+            _DEFAULT_FILE_WATCHER_TYPE,
+            *streamlit_args,
+        ]
+
+    return ["streamlit", "run", *streamlit_args, str(app_path), *script_args]
+
+
+def streamlit_entry() -> None:  # pragma: no cover - console script
+    """Launch via `nbv-st` console entry.
+
+    The wrapper disables Streamlit's watchdog watcher by default because the
+    ARIA-NBV package imports enough source directories to exhaust low inotify
+    limits. Set ``STREAMLIT_SERVER_FILE_WATCHER_TYPE`` or pass
+    ``--server.fileWatcherType`` before ``--`` to override this default.
+    """
 
     from streamlit.web.cli import main as st_main
 
     # streamlit CLI does not accept "-m"; pass absolute path to this file
     app_path = Path(__file__).resolve()
-    sys.argv = ["streamlit", "run", str(app_path)]
+    sys.argv = _build_streamlit_argv(app_path, sys.argv[1:])
     st_main()
 
 

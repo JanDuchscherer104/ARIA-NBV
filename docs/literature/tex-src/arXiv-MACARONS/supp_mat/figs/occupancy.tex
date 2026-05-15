@@ -1,0 +1,226 @@
+\begin{figure*}
+  \centering
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pisa_occ.png}
+    \caption{Pisa Cathedral}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pisa_rec.png}
+    \caption{Pisa Cathedral}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/liberty_occ.png}
+    \caption{Statue of Liberty}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/liberty_rec.png}
+    \caption{Statue of Liberty}
+  \end{subfigure}
+  \hfill \\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pantheon_occ.png}
+    \caption{Pantheon}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pantheon_rec.png}
+    \caption{Pantheon}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/fushimi_occ.png}
+    \caption{Fushimi Castle}
+  \end{subfigure} 
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/fushimi_rec.png}
+    \caption{Fushimi Castle}
+  \end{subfigure} \\
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/colosseum_occ.png}
+    \caption{Colosseum}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/colosseum_rec.png}
+    \caption{Colosseum}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/neus_occ.png}
+    \caption{Neuschwanstein Castle}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/neus_rec.png}
+    \caption{Neuschwanstein Castle}
+  \end{subfigure}
+  \caption{{\bf Volume occupancy fields computed with our approach MACARONS.} Our model updates the volume occupancy field in real time during exploration: For several scene, we show here the volume occupancy after 100 NBV iterations (left), as well as the final reconstructed surface for comparison (right).% The model has been trained on a set of previous scenes; all weights  are frozen and we only perform inference computation. The first four rows depict scenes that were already seen by the model during its online, self-supervised training. The last two rows depicts scenes the model has never seen before.
+  }
+  \label{fig:supp-mat-occupancy}
+\end{figure*}
+
+\begin{comment}
+\begin{figure*}
+  \centering
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pisa_occ.png}
+    \caption{Pisa Cathedral}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pisa_rec.png}
+    \caption{Pisa Cathedral}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/liberty_occ.png}
+    \caption{Statue of Liberty}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/liberty_rec.png}
+    \caption{Statue of Liberty}
+  \end{subfigure}
+  \hfill \\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pantheon_occ.png}
+    \caption{Pantheon}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/pantheon_rec.png}
+    \caption{Pantheon}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/fushimi_occ.png}
+    \caption{Fushimi Castle}
+  \end{subfigure} 
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/fushimi_rec.png}
+    \caption{Fushimi Castle}
+  \end{subfigure} \\
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/colosseum_occ.png}
+    \caption{Colosseum}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/colosseum_rec.png}
+    \caption{Colosseum}
+  \end{subfigure}
+  \hfill
+
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/dunnottar_occ.png}
+    \caption{Dunnottar Castle}
+  \end{subfigure}
+  \hfill
+
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/dunnottar_rec.png}
+    \caption{Dunnottar Castle}
+  \end{subfigure} \\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/redeemer_occ.png}
+    \caption{Christ the Redeemer}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/redeemer_rec.png}
+    \caption{Christ the Redeemer}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/bannerman_occ.png}
+    \caption{Bannerman Castle}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/bannerman_rec.png}
+    \caption{Bannerman Castle}
+  \end{subfigure}\\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/alhambra_occ.png}
+    \caption{Alhambra Palace}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/alhambra_rec.png}
+    \caption{Alhambra Palace}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/neus_occ.png}
+    \caption{Neuschwanstein Castle}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/neus_rec.png}
+    \caption{Neuschwanstein Castle}
+  \end{subfigure}\\
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/eiffel_occ.png}
+    \caption{Eiffel Tower}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/eiffel_rec.png}
+    \caption{Eiffel Tower}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/bridge_occ.png}
+    \caption{Manhattan Bridge}
+  \end{subfigure}
+  \hfill
+    \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{supp_mat/images/occupancy/bridge_rec.png}
+    \caption{Manhattan Bridge}
+  \end{subfigure}
+  \caption{{\bf Volume occupancy fields computed with our approach MACARONS.} Our model updates the volume occupancy field in real time during exploration: For several scene, we show here the volume occupancy after 100 NBV iterations (left), as well as the final reconstructed surface for comparison (right).% The model has been trained on a set of previous scenes; all weights  are frozen and we only perform inference computation. The first four rows depict scenes that were already seen by the model during its online, self-supervised training. The last two rows depicts scenes the model has never seen before.
+  }
+  \label{fig:supp-mat-occupancy}
+\end{figure*}
+\end{comment}

@@ -4,6 +4,7 @@
 
 #import "style.typ": *
 #import "terms.typ": *
+#import "glossary.typ": *
 #import "symbols.typ": *
 #import "math.typ": *
 #import "equations.typ": *

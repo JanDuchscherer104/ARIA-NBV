@@ -1,0 +1,159 @@
+\section{Design Principle and Pilot Study}
+\label{sec:principles}
+\vspace{-1mm}
+In this section, we introduce the scaling principle and pilot study, which guide the design of our model.
+
+\begin{table}[t]
+    \begin{minipage}{0.48\textwidth}
+    \centering
+        \vspace{-4.1mm}
+        \tablestyle{3.2pt}{0.95}
+        \input{table/outdoor_model_efficiency}
+        \vspace{-2.2mm}
+        \caption{\textbf{Model efficiency.} We benchmark the training and inference efficiency of backbones with various scales of receptive field. The batch size is fixed to 1, and the number after ``/" denotes the kernel size of sparse convolution and patch size\protect\footnotemark of attention.}\label{tab:outdoor_model_efficiency}
+        \vspace{-6mm}
+    \end{minipage}
+\end{table}
+
+\footnotetext{\textit{Patch size} refers to the number of neighboring points considered together for self-attention mechanisms.}
+
+\mypara{Scaling principle.} 
+Conventionally, the relationship between accuracy and efficiency in model performance is characterized as a ``trade-off'', with a typical preference for accuracy at the expense of efficiency. In pursuit of this, numerous methods have been proposed with cumbersome operations. Point Transformers ~\cite{zhao2021point, wu2022point} prioritize accuracy and stability by substituting matrix multiplication in the computation of attention weights with learnable layers and normalization, potentially compromising efficiency. Similarly, Stratified Transformer~\cite{lai2022stratified} and Swin3D~\cite{yang2023swin3d} achieve improved accuracy by incorporating more complex forms of relative positional encoding, yet this often results in decreased computational speed.
+
+Yet, the perceived trade-off between accuracy and efficiency is not absolute, with a notable counterexample emerging through the engagement with scaling strategies. Specifically, Sparse Convolution, known for its speed and memory efficiency, remains preferred in 3D large-scale pre-training. Utilizing multi-dataset joint training strategies~\cite{wu2023ppt}, Sparse Convolution~\cite{graham20183d, choy20194d} has shown significant performance improvements, increasing mIoU on ScanNet semantic segmentation from 72.2\% to 77.0\%~\cite{zhu2023ponderv2}. This outperforms PTv2 when trained from scratch by 1.6\%, all while retaining superior efficiency. 
+However, such advancements have not been fully extended to point transformers, primarily due to their efficiency limitations, which present burdens in model training especially when the computing resource is constrained.
+
+This observation leads us to hypothesize that model performance may be more significantly influenced by scale than by complex design details. We consider the possibility of trading the accuracy of certain mechanisms for simplicity and efficiency, thereby enabling scalability. By leveraging the strength of scale, such sacrifices could have an ignorable impact on overall performance. This concept forms the basis of our scaling principle for backbone design, and we practice it with our design.
+
+\begin{figure}[t]
+    \vspace{-4.1mm}
+    \centering
+    \includegraphics[width=\linewidth]{figure/ptv2_latency.pdf}
+    \vspace{-6mm}
+    \caption{\textbf{Latency treemap of each components of PTv2.} We benchmark and visualize the proportion of the forward time of each component of PTv2. KNN Query and RPE occupy a total of 54\% of forward time.}
+    \label{fig:ptv2_latency}
+    \vspace{-7.4mm}
+\end{figure}
+
+
+\mypara{Breaking the curse of permutation invariance.}
+Despite the demonstrated efficiency of sparse convolution, the question arises about the need for a scalable point transformer.
+While multi-dataset joint training allows for data scaling and the incorporation of more layers and channels contributes to model scaling, efficiently expanding the receptive field to enhance generalization capabilities remains a challenge for convolutional backbones (refer to~\tabref{tab:outdoor_model_efficiency}). It is attention, an operator that is naturally adaptive to kernel shape, potentially to be universal.
+
+However, current point transformers encounter challenges in scaling when adhering to the request of permutation invariance, stemming from the unstructured nature of point cloud data. In PTv1, the application of the K-Nearest Neighbors (KNN) algorithm to formulate local structures introduced computational complexities. PTv2 attempted to relieve this by halving the usage of KNN compared to PTv1. Despite this improvement, KNN still constitutes a significant computational burden, consuming 28\% of the forward time (refer to~\figref{fig:ptv2_latency}). Additionally, while Image Relative Positional Encoding (RPE) benefits from a grid layout that allows for the predefinition of relative positions, point cloud RPE must resort to computing pairwise Euclidean distances and employ learned layers or lookup tables for mapping such distances to embeddings, proves to be another source of inefficiency, occupying 26\% of the forward time (see~\figref{fig:ptv2_latency}). These extremely inefficient operations bring difficulties when scaling up the backbone.
+
+\begin{figure*}[t]
+    \vspace{-1.5mm}
+    \centering
+    \includegraphics[width=\linewidth]{figure/serialization.pdf}
+    \vspace{-6.5mm}
+    \caption{\textbf{Point cloud serialization.} We show the four patterns of serialization with a triplet visualization. For each triplet, we show the space-filling curve for serialization (left), point cloud serialization var sorting order within the space-filling curve (middle), and grouped patches of the serialized point cloud for local attention (right). Shifting across the four serialization patterns allows the attention mechanism to capture various spatial relationships and contexts, leading to an improvement in model accuracy and generalization capacity.}
+    \label{fig:serialization}
+    \vspace{-3mm}
+\end{figure*}
+
+Inspired by two recent advancements~\cite{Wang2023OctFormer,liu2023flatformer}, we move away from the traditional paradigm, which treats point clouds as unordered sets. Instead, we choose to ``break''  the constraints of permutation invariance by serializing point clouds into a structured format. This strategic transformation enables our method to leverage the benefits of structured data inefficiency with a compromise of the accuracy of locality-preserving property. We consider this trade-off as an entry point of our design.
+
+\section{Point Transformer V3}
+\label{sec:method}
+\vspace{-2mm}
+
+In this section, we present our designs of Point Transformer V3 (PTv3), guided by the scaling principle discussed in \secref{sec:principles}. Our approach emphasizes simplicity and speed, facilitating scalability and thereby making it stronger.
+
+\subsection{Point Cloud Serialization}
+\label{sec:serialization}
+To trade the simplicity and efficiency nature of structured data, we introduce point cloud serialization, transforming unstructured point clouds into a structured format.
+
+\mypara{Space-filling curves.} Space-filling curves~\cite{peano1990courbe} are paths that pass through every point within a higher-dimensional discrete space and preserve spatial proximity to a certain extent.
+Mathematically, it can be defined as a bijective function $\varphi:  \mathbb{Z} \mapsto \mathbb{Z}^n$, where n is the dimensionality of the space, which is 3 within the context of point clouds and also can extend to a higher dimension. Our method centers on two representative space-filling curves: the z-order curve~\cite{morton1966computer} and the Hilbert curve~\cite{hilbert1935stetige}. The Z-order curve (see \figref{fig:serialization}\textcolor{link}{a}) is valued for its simplicity and ease of computation, whereas the Hilbert curve (see \figref{fig:serialization}\textcolor{link}{b}) is known for its superior locality-preserving properties compared with Z-order curve. \looseness=-1
+
+Standard space-filling curves process the 3D space by following a sequential traversal along the x, y, and z axes, respectively. By altering the order of traversal, such as prioritizing the y-axis before the x-axis, we introduce reordered variants of standard space-filling curves. To differentiate between the standard configurations and the alternative variants of space-filling curves, we denote the latter with the prefix ``trans'’, resulting in names such as Trans Z-order (see \figref{fig:serialization}\textcolor{link}{c}) and Trans Hilbert (see \figref{fig:serialization}\textcolor{link}{d}). These variants can offer alternative perspectives on spatial relationships, potentially capturing special local relationships that the standard curve may overlook. 
+
+\mypara{Serialized encoding.} To leverage the locality-preserving properties of space-filling curves, we employ serialized encoding, a strategy that converts a point's position into an integer reflecting its order within a given space-filling curve. Due to the bijective nature of these curves, there exists an inverse mapping $\varphi^{-1}:  \mathbb{Z}^n \mapsto \mathbb{Z}$ which allows for the transformation of a point's position $\vp_i \in \mathbb{R}^3$ into a serialization code. By projecting the point's position onto a discrete space with a grid size of $g \in \mathbb{R}$, we obtain this code as $\varphi^{-1}(\lfloor\ \vp\ /\ g\ \rfloor)$. This encoding is also adaptable to batched point cloud data. By assigning each point a 64-bit integer to record serialization code, we allocate the trailing $k$ bits to the position encoded by $\varphi^{-1}$ and the remaining leading bits to the batch index $b \in \mathbb{Z}$. Sorting the points according to this serialization code makes the batched point clouds ordered with the chosen space-filling curve pattern within each batch. The whole process can be written as follows:
+\vspace{-5mm}
+\begin{align*}
+    \texttt{Encode}(\vp, b, g) = (b \ll k) \texttt{|} \varphi^{-1}(\lfloor\ \vp\ /\ g\ \rfloor) ,
+    \label{eq:encode}
+\end{align*}
+ where $\ll$ denotes left bit-shift and $\texttt{|}$ denotes bitwise OR.
+ 
+\mypara{Serialization.} As illustrated in the \textit{middle} part of triplets in \figref{fig:serialization}, the serialization of point clouds is accomplished by sorting the codes resulting from the serialized encoding. The ordering effectively rearranges the points in a manner that respects the spatial ordering defined by the given space-filling curve, which means that neighbor points in the data structure are also likely to be close in space.
+
+In our implementation, we do not physically re-order the point clouds, but rather, we record the mappings generated by the serialization process.
+This strategy maintains compatibility with various serialization patterns and provides the flexibility to transition between them efficiently. 
+
+\vspace{-1mm}
+\subsection{Serialized Attention}
+\label{sec:serilization}
+\vspace{-1mm}
+
+\begin{figure}[t]
+    \vspace{-1mm}
+    \centering
+    \includegraphics[width=\linewidth]{figure/patch_grouping.pdf}
+    \vspace{-7mm}
+    \caption{\textbf{Patch grouping.} (a) Reordering point cloud according to order derived from a specific serialization pattern. (b) Padding point cloud sequence by borrowing points from neighboring patches to ensure it is divisible by the designated patch size.}
+    \label{fig:patch_grouping}
+    \vspace{-7mm}
+\end{figure}
+
+
+\mypara{Re-weigh options of attention mechanism.} 
+Image transformers~\cite{liu2021Swin, liu2021SwinV2, dong2022cswin}, benefiting from the structured and regular grid of pixel data, naturally prefer window~\cite{liu2021Swin} and dot-product~\cite{vaswani2017attention, dosovitskiy2020image} attention mechanisms. These methods take advantage of the fixed spatial relationships inherent to image data, allowing for efficient and scalable localized processing. However, this advantage vanishes when confronting the unstructured nature of point clouds. To adapt, previous point transformers~\cite{zhao2021point, wu2022point} introduce neighborhood attention to construct even-size attention kernels and adopt vector attention to improve model convergence on point cloud data with a more complex spatial relation.
+
+In light of the structured nature of serialized point clouds, we choose to revisit and adopt the efficient window and dot-product attention mechanisms as our foundational approach. 
+While the serialization strategy may temporarily yield a lower performance than some neighborhood construction strategies like KNN due to a reduction in precise spatial neighbor relationships,
+we will demonstrate that any initial accuracy gaps can be effectively bridged by harnessing the scalability potential inherent in serialization.
+
+Evolving from window attention, we define \textit{patch attention}, a mechanism that groups points into non-overlapping patches and performs attention within each individual patch. The effectiveness of patch attention relies on two major designs: patch grouping and patch interaction.
+
+\mypara{Patch grouping.} Grouping points into patches within serialized point clouds has been well-explored in recent advancements~\cite{Wang2023OctFormer, liu2023flatformer}. This process is both natural and efficient, involving the simple grouping of points along the serialized order after padding. Our design for patch attention is also predicated on this strategy as presented in \figref{fig:patch_grouping}. In practice, the processes of reordering and patch padding can be integrated into a single indexing operation.
+
+Furthermore, we illustrate patch grouping patterns derived from the four serialization patterns on the right part of triplets in \figref{fig:serialization}. This grouping strategy, in tandem with our serialization patterns, is designed to effectively broaden the attention mechanism's receptive field in the 3D space as the patch size increases while still preserving spatial neighbor relationships to a feasible degree. Although this approach may sacrifice some neighbor search accuracy when compared to KNN, the trade-off is beneficial. Given the attention's re-weighting capacity to reference points, the gains in efficiency and scalability far outweigh the minor loss in neighborhood precision (scaling it up is all we need).
+
+\mypara{Patch interaction.} The interaction between points from different patches is critical for the model to integrate information across the entire 
+point cloud. This design element counters the limitations of a non-overlapping architecture and is pivotal in making patch attention functional. Building on this insight, we investigate various designs for patch interaction as outlined below (also visualized in \figref{fig:patch_interaction}):
+
+\begin{figure}[t]
+    \vspace{-1mm}
+    \centering
+    \includegraphics[width=\linewidth]{figure/patch_interaction.pdf}
+    \vspace{-7mm}
+    \caption{\textbf{Patch interaction.} (a) Standard patch grouping with a regular, non-shifted arrangement; (b) Shift Dilation where points are grouped at regular intervals, creating a dilated effect; (c) Shift Patch, which applies a shifting mechanism similar to the shift window approach; (d) Shift Order where different serialization patterns are cyclically assigned to successive attention layers; (d) Shuffle Order, where the sequence of serialization patterns is randomized before being fed to attention layers.}
+    \label{fig:patch_interaction}
+    \vspace{-7mm}
+\end{figure}
+
+\begin{itemize}[leftmargin=5mm, itemsep=0mm, topsep=0mm, partopsep=0mm]
+    \item In \textit{Shift Dilation}~\cite{Wang2023OctFormer}, patch grouping is staggered by a specific step across the serialized point cloud, effectively extending the model's receptive field beyond the immediate neighboring points.
+    \item In \textit{Shift Patch}, the positions of patches are shifted across the serialized point cloud, drawing inspiration from the shift-window strategy in image transformers~\cite{liu2021Swin}. This method maximizes the interaction among patches.
+    \item In \textit{Shift Order}, the serialized order of the point cloud data is dynamically varied between attention blocks. This technique, which aligns seamlessly with our point cloud serialization method, serves to prevent the model from overfitting to a single pattern and promotes a more robust integration of features across the data.
+    \item \textit{Shuffle Order$^*$}, building upon \textit{Shift Order}, introduces a random shuffle to the permutations of serialized orders. This method ensures that the receptive field of each attention layer is not limited to a single pattern, thus further enhancing the model's ability to generalize.  
+\end{itemize}
+We mark our main proposal with $*$ and underscore its superior performance in model ablation. 
+
+\mypara{Positional encoding.}
+To handle the voluminous data, point cloud transformers commonly employ local attention, which is reliant on relative positional encoding methods~\cite{zhao2021point, lai2022stratified, yang2023swin3d} for optimal performance. However, our observations indicate that RPEs are notably inefficient and complex. As a more efficient alternative, conditional positional encoding (CPE)~\cite{chu2021cpe, Wang2023OctFormer} is introduced for point cloud transformers, where implemented by octree-based depthwise convolutions~\cite{wang2017ocnn}. We consider this replacement to be elegant, as the implementation of RPE in point cloud transformers can essentially be regarded as a variant of large-kernel sparse convolution. Even so, a single CPE is not sufficient for the peak performance (there remains potential for an additional 0.5\% improvement when coupled with RPE). Therefore, we present an enhanced conditional positional encoding (xCPE), implemented by directly prepending a sparse convolution layer with a skip connection before the attention layer. Our experimental results demonstrate that xCPE fully unleashes the performance with a slight increase in latency of a few milliseconds compared to the standard CPE, the performance gains justify this minor trade-off.
+
+\begin{figure}[t]
+    \vspace{-1.1mm}
+    \centering
+    \includegraphics[width=\linewidth]{figure/architecture.pdf}
+    \vspace{-7mm}
+    \caption{\textbf{Overall architecture.}}
+    \label{fig:architecture}
+    \vspace{-7mm}
+\end{figure}
+
+\subsection{Network Details}
+\label{subsec:network_details}
+In this section, we detail the macro designs of PTv3, including block structure, pooling strategy, and model architecture (visualized in \figref{fig:architecture}). Our options for these components are empirical yet also crucial to overall simplicity. Detailed ablations of these choices are available in the\prettyul{Appendix}.
+
+\mypara{Block structure.}
+We simplify the traditional block structure,  typically an extensive stack of normalization and activation layers, by adopting a pre-norm~\cite{child2019generating} structure, evaluated against the post-norm~\cite{vaswani2017attention} alternative. Additionally, we shift from Batch Normalization (BN) to Layer Normalization (LN). The proposed xCPE is prepended directly before the attention layer with a skip connection.
+
+\mypara{Pooling strategy.}
+We keep adopting the Grid Pooling introduced in PTv2, recognizing its simplicity and efficiency. Our experiments indicate that BN is essential and cannot be effectively replaced by LN. We hypothesize that BN is crucial for stabilizing the data distribution in point clouds during pooling. Additionally, the proposed Shuffle Order, with shuffle the permutation of serialized orders for Shift Order, is integrated into the pooling.
+
+\mypara{Model architecture.} 
+The architecture of PTv3 remains consistent with the U-Net~\cite{ronneberger2015unet} framework. It consists of four stage encoders and decoders, with respective block depths of [2, 2, 6, 2] and [1, 1, 1, 1]. For these stages, the grid size multipliers are set at [$\times$2, $\times$2, $\times$2, $\times$2], indicating the expansion ratio relative to the preceding pooling stage.

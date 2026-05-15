@@ -1,0 +1,80 @@
+\section{Minkowski Engine}
+\label{sec:minkowskiengine}
+
+In this section, we propose an open-source auto-differentiation library for sparse tensors and the generalized sparse convolution (Sec.~\ref{sec:sparse}). As it is an extensive library with many functions, we will only cover essential forward-pass functions.
+
+\subsection{Sparse Tensor Quantization}
+The first step in the sparse convolutional neural network is the data processing to generate a sparse tensor, which converts an input into unique coordinates, associated features, and optionally labels when training for semantic segmentation. In Alg.~\ref{alg:sparse_quantization}, we list the GPU function for this process. When a dense label is given, it is important that we ignore voxels with more than one unique labels. This can be done by marking these voxels with \code{IGNORE\_LABEL}. First, we convert all coordinates into hash keys and find all unique hashkey-label pairs to remove collisions. Note that \code{SortByKey}, \code{UniqueByKey}, and \code{ReduceByKey} are all standard \code{Thrust} library functions~\cite{thrust}.
+\begin{algorithm}[h]
+  \caption{GPU Sparse Tensor Quantization}
+  \label{alg:sparse_quantization}
+\begin{algorithmic}
+		\State Inputs: coordinates $C_p  \in \mathbb{R}^{N \times D}$, features $F_p \in \mathbb{R}^{N \times N_f}$, target labels $\mbf{l} \in \mathbb{Z}_{+}^N$, quantization step size $v_l$
+		\State $C_p'\leftarrow $ floor($C_p$ / $v_l$)
+		\State $\mbf{k} \leftarrow $ hash($C_p'$), $\mbf{i} \leftarrow$ sequence(N)
+		\State $((\mbf{i}', \mbf{l}'), k') \leftarrow $ SortByKey($(\mbf{i}, \mbf{l})$, key=$\mbf{k}$)
+		\State $(\mbf{i}'', (\mbf{k}'', \mbf{l}'')) \leftarrow $ UniqueByKey($\mbf{i}'$, key=$(\mbf{k}', \mbf{l}')$)
+		\State $(\mbf{l}''', \mbf{i}''') \leftarrow $ ReduceByKey(($\mbf{l}'', \mbf{i}''$), key=$\mbf{k}''$, fn=$f$)
+		\State \Return $C_p'[\mbf{i}''', :], F_p[\mbf{i}''', :], \mbf{l}'''$
+\end{algorithmic}
+\end{algorithm}
+The reduction function $f((l_x, i_x), (l_y, i_y)) => (\code{IGNORE\_LABEL}, i_x)$ takes label-key pairs and returns the \code{IGNORE\_LABEL} since at least two label-key pairs in the same key means there is a label collision. A CPU-version works similarly except that all reduction and sorting are processed serially.
+
+
+\subsection{Generalized Sparse Convolution}
+
+The next step in the pipeline is generating the output coordinates $\mathcal{C}^\text{out}$ given the input coordinates $\mathcal{C}^\text{in}$ (Eq.~\ref{eq:sparse_convolution}). When used in conventional neural networks, this process requires only a convolution stride size, input coordinates, and the stride size of the input sparse tensor (the minimum distance between coordinates). The algorithm is presented in the supplementary material. We create this output coordinates dynamically allowing an arbitrary output coordinates $\mathcal{C}^\text{out}$ for the generalized sparse convolution.
+
+Next, to convolve an input with a kernel, we need a mapping to identify which inputs affect which outputs. This mapping is not required in conventional dense convolutions as it can be inferred easily. However, for sparse convolution where coordinates are scattered arbitrarily, we need to specify the mapping. We call this mapping the kernel maps and define them as pairs of lists of input indices and output indices, $\mbf{M} = \{(I_\mbf{i}, O_\mbf{i})\}_\mbf{i}$ for $\mbf{i} \in \mathcal{N}^D$. Finally, given the input and output coordinates, the kernel map, and the kernel weights $W_\mbf{i}$, we can compute the generalized sparse convolution by iterating through each of the offset $\mbf{i} \in \mathcal{N}^D$ (Alg.~\ref{alg:sparse_convolution})
+\begin{algorithm}[h]
+\begin{algorithmic}[1]
+\Require Kernel weights $\mbf{W}$, input features $F^i$, output feature placeholder $F^o$, convolution mapping $\mbf{M}$, 
+\State $F^o \leftarrow \mbf{0}$  // set to 0
+\ForAll{$W_\mbf{i}, (I_\mbf{i}, O_\mbf{i}) \in (\mbf{W}, \mbf{M})$}
+    \State $F_{\text{tmp}} \leftarrow W_\mbf{i} [F^i_{I_\mbf{i}[1]}, F^i_{I_\mbf{i}[2]}, ...,  F^i_{I_\mbf{i}[n]}]$ // (cu)BLAS
+    \State $F_{\text{tmp}} \leftarrow F_{\text{tmp}} + [F^o_{O_\mbf{i}[1]}, F^o_{O_\mbf{i}[2]}, ...,  F^o_{O_\mbf{i}[n]}]$
+    \State $[F^o_{O_\mbf{i}[1]}, F^o_{O_\mbf{i}[2]}, ...,  F^o_{O_\mbf{i}[n]}] \leftarrow F_{\text{tmp}}$
+\EndFor
+\end{algorithmic}
+\caption{Generalized Sparse Convolution}
+\label{alg:sparse_convolution}
+\end{algorithm}
+where $I[n]$ and $O[n]$ indicate the $n$-th element of the list of indices $I$ and $O$ respectively and $F^i_n$ and $F^o_n$ are also $n$-th input and output feature vectors respectively. The transposed generalized sparse convolution (deconvolution) works similarly except that the role of input and output coordinates is reversed.
+
+\subsection{Max Pooling}
+
+Unlike dense tensors, on sparse tensors, the number of input features varies per output. Thus, this creates non-trivial implementation for a max/average pooling. Let $\mbf{I}$ and $\mbf{O}$ be the vector that concatenated all $\{I_\mbf{i}\}_\mbf{i}$ and $\{O_\mbf{i}\}_\mbf{i}$ for $\mbf{i} \in \mathcal{N}^D$ respectively. We first find the number of inputs per each output coordinate and indices of the those inputs. Alg.~\ref{alg:max_pooling} reduces the input features that map to the same output coordinate. \code{Sequence}(n) generates a sequence of integers from 0 to n - 1 and the reduction function $f((k_1, v_1), (k_2, v_2)) = \min(v_1, v_2)$ which returns the minimum value given two key-value pairs. \code{MaxPoolKernel} is a custom CUDA kernel that reduces all features at a specified channel using $\mbf{S}'$, which contains the first index of $\mbf{I}$ that maps to the same output, and the corresponding output indices $\mbf{O}"$.
+\begin{algorithm}
+  \caption{GPU Sparse Tensor MaxPooling}
+  \label{alg:max_pooling}
+\begin{algorithmic}
+  \State Input: input feature $F$, output mapping $\mbf{O}$
+  \State $(\mbf{I}', \mbf{O}') \leftarrow$ SortByKey($\mbf{I}$, key=$\mbf{O}$)
+  \State $\mbf{S} \leftarrow$ Sequence(length($\mbf{O}'$))
+  \State $\mbf{S}', \mbf{O}" \leftarrow$ ReduceByKey($\mbf{S}$, key=$\mbf{O}'$, fn=$f$)
+  \State \Return MaxPoolKernel($\mbf{S}'$, $\mbf{I}'$, $\mbf{O}"$, $F$)
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Global / Average Pooling, Sum Pooling}
+
+An average pooling and a global pooling layer compute the average of input features for each output coordinate for average pooling or one output coordinate for global pooling. This can be implemented in multiple ways. We use a sparse matrix multiplication since it can be optimized on hardware or using a faster sparse BLAS library. In particular, we use the \codeword{cuSparse} library for sparse matrix-matrix (\codeword{cusparse_csrmm}) and matrix-vector multiplication (\codeword{cusparse_csrmv}) to implement these layers. Similar to the max pooling algorithm, $\mbf{M}$ is the $(\mbf{I}, \mbf{O})$ input-to-output kernel map. For the global pooling, we create the kernel map that maps all inputs to the origin and use the same Alg.~\ref{alg:avg_pooling}. The transposed pooling (unpooling) works similarly.
+
+On the last line of the Alg.~\ref{alg:avg_pooling}, we divide the pooled features by the number of inputs mapped to each output. However, this process could remove density information. Thus, we propose a variation that does not divide the number of inputs and named it the sum pooling.
+\begin{algorithm}
+  \caption{GPU Sparse Tensor AvgPooling}
+  \label{alg:avg_pooling}
+\begin{algorithmic}
+  \State Input: mapping $\mbf{M} = (\mbf{I}, \mbf{O})$, features $F$, one vector $\mbf{1}$
+  \State $S_M$ = coo2csr(row=$\mbf{O}$, col=$\mbf{I}$, val=$\mbf{1}$)
+  \State $F'$ = cusparse\_csrmm($S_M$, $F$)
+  \State $N$ = cusparse\_csrmv($S_M$, $\mbf{1}$)
+  \State \Return $F' / N$
+\end{algorithmic}
+\end{algorithm}
+
+
+
+
+\subsection{Non-spatial Functions}
+For functions that do not require spatial information (coordinates) such as ReLU, we can apply the functions directly to the features $F$. Also, for batch normalization, as each row of $F$ represents a feature, we could use the 1D batch normalization function directly on $F$.

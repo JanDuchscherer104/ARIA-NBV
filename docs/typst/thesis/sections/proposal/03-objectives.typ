@@ -5,14 +5,14 @@
 
 = Objectives and Hypotheses
 
-The thesis objective is a leakage-safe target-aware #NBV stack whose selected
+The thesis objective is a leakage-safe target-aware #gls("next-best-view") stack whose selected
 views reduce target point-mesh error under a fixed acquisition budget. The
 endpoint metric #symb.entity.endpoint_gain is primary, and the additive return #symb.entity.return_h is the
 training target for value learning.
 
 == Aim 1: Target Oracle and Leakage Boundary
 
-Define target-specific oracle #RRI while keeping target selection and model
+Define target-specific oracle #gls("relative-reconstruction-improvement") while keeping target selection and model
 input actor-visible. V1 uses observed or predicted target descriptors
 #symb.entity.target_desc. GT crops, boxes, meshes, and all-candidate renders are restricted
 to labels, upper bounds, and evaluation. The required evidence is target

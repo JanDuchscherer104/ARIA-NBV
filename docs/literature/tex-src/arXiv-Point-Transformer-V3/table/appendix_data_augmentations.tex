@@ -1,0 +1,17 @@
+\begin{tabular}{llcc}\toprule
+Augmentations &Parameters &Indoor &Outdoor \\\midrule
+random dropout &dropout ratio: 0.2, p: 0.2 &\checkmark &- \\
+random rotate &axis: z, angle: [-1, 1], p: 0.5 &\checkmark &\checkmark \\
+&axis: x, angle: [-1 / 64, 1 / 64], p: 0.5 &\checkmark &- \\
+&axis: y, angle: [-1 / 64, 1 / 64], p: 0.5 &\checkmark &- \\
+random scale &scale: [0.9, 1.1] &\checkmark &\checkmark \\
+random flip &p: 0.5 &\checkmark &\checkmark \\
+random jitter &sigma: 0.005, clip: 0.02 &\checkmark &\checkmark \\
+elastic distort & params: [[0.2, 0.4], [0.8, 1.6]] &\checkmark &- \\
+auto contrast &p: 0.2 &\checkmark &- \\
+color jitter &std: 0.05; p: 0.95 &\checkmark &- \\
+grid sampling &grid size: 0.02 (indoor), 0.05 (outdoor) &\checkmark &\checkmark \\
+sphere crop &ratio: 0.8, max points: 128000 &\checkmark &- \\
+normalize color &p: 1 &\checkmark &- \\
+\bottomrule
+\end{tabular}

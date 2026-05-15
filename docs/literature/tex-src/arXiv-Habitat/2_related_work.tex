@@ -1,0 +1,37 @@
+%\vspace{\sectionReduceTop}
+\section{Related Work}
+%\vspace{\sectionReduceBot}
+
+\setlength{\epigraphwidth}{0.55\columnwidth}
+\epigraph{Reality is something you rise above.}{\textit{Liza Minnelli}}
+
+The availability of large-scale 3D scene datasets~\cite{armeni_cvpr16,Song2017,Chang2017} and community interest in active vision tasks led to a recent surge of work that resulted in the development of a variety of simulation platforms for indoor environments~\cite{Kolve2017,Brodeur2017,gupta_cvpr17,Savva2017,Wu2018,Anderson2018-Language,Xia2018,Yan2018,Puig2018}.
+These platforms vary with respect to the 3D scene data they use, the embodied agent tasks they address, and the evaluation protocols they implement.
+
+This surge of activity is both thrilling and alarming. On the one hand, it is clearly a sign of the interest in embodied AI across diverse research communities (computer vision, natural language processing, robotics, machine learning).
+On the other hand, the existence of multiple differing simulation environments can cause fragmentation, replication of effort, and difficulty in reproduction and community-wide progress.
+Moreover, existing simulators exhibit several shortcomings:
+\begin{compactitem}[\hspace{1pt}--]
+    \item Tight coupling of task (\eg navigation), simulation platform (\eg GibsonEnv), and 3D dataset (\eg Gibson). 
+    Experiments with multiple tasks or datasets are impractical. 
+    \item Hard-coded agent configuration (\eg size, action-space). Ablations of agent parameters and sensor types are not supported, making results hard to compare.
+    \item Suboptimal rendering and simulation performance. Most existing indoor simulators operate at relatively low frame rates (10-100 fps), becoming a bottleneck in training agents and 
+    making large-scale learning infeasible. Takeaway messages from such experiments 
+    become unreliable -- has the learning converged to trust the comparisons? 
+    \item Limited control of environment state. The structure of the 3D scene in terms of present objects cannot be programmatically modified (\eg to test the robustness of agents). 
+\end{compactitem}
+
+Most critically, work built on top of any of the existing platforms is hard to reproduce independently from the platform, and thus hard to evaluate against work based on a different platform, even in cases where the target tasks and datasets are the same.
+This status quo is undesirable and motivates the Habitat effort.
+We aim to learn from the successes of previous frameworks and develop a unifying platform that combines their desirable characteristics while addressing their limitations.
+A common, unifying platform can significantly accelerate research by enabling code re-use and consistent experimental methodology.
+Moreover, a common platform enables us to easily carry out experiments testing agents based on different paradigms (learned vs. classical) and generalization of agents between datasets.
+
+The experiments we carry out contrasting learned and classical approaches to navigation are similar to the recent work of Mishkin et al.~\cite{mishkin2019benchmarking}.
+However, the performance of the Habitat stack relative to MINOS~\cite{Savva2017} used in 
+\cite{mishkin2019benchmarking} -- thousands vs.~one hundred frames per second -- 
+allows us to evaluate agents that have been trained with significantly larger amounts of 
+experience (75 million steps vs.~five million steps). 
+The trends we observe demonstrate that learned agents can begin to match and outperform classical approaches when provided with large amounts of training experience.
+Other recent work by Koijima and Deng~\cite{kojima2019learn} has also compared hand-engineered navigation agents against learned agents but their focus is on defining additional metrics to characterize the performance of agents and to establish measures of hardness for navigation episodes.
+To our knowledge, our experiments are the first to train navigation agents provided with multi-month experience in realistic indoor environments and contrast them against classical methods.

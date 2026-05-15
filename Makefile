@@ -85,8 +85,13 @@ KG_RELATED_PATH ?=
 KG_PAPER ?=
 KG_LIMIT ?= 24
 KG_FORMAT ?= text
+KG_MODALITY ?=
 KG_DOC_PATHS ?=
 KG_DOCTOR_ARGS ?=
+comma := ,
+empty :=
+space := $(empty) $(empty)
+KG_MODALITY_ARGS = $(foreach modality,$(subst $(comma),$(space),$(strip $(KG_MODALITY))),--modality $(modality))
 PACKAGE_SMOKE_RUFF_PATHS := \
 	aria_nbv/data_handling/_offline_writer.py \
 	aria_nbv/pose_generation/types.py \
@@ -249,7 +254,7 @@ kg-ollama-check: ## 📚 Validate Mac/remote Ollama model endpoint for litkg run
 	@python3 .agents/external/litkg-rs/scripts/kg/ollama_http.py check \
 		--config "$(LITKG_CONFIG)"
 
-kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
+kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set KG_QUERY='...'; KG_MODALITY='literature,docs'; KG_VERBOSE=1 or KG_FORMAT=json for full payload)
 	@if [ -z "$(strip $(KG_QUERY))" ]; then \
 		echo "$(RED)KG_QUERY is required, e.g. make kg-search KG_QUERY='entity-aware RRI'$(NC)"; \
 		exit 2; \
@@ -259,6 +264,7 @@ kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set
 			--config "$(LITKG_CONFIG)" \
 			--repo-root "$(LITKG_REPO_ROOT)" \
 			--limit "$(KG_LIMIT)" \
+			$(KG_MODALITY_ARGS) \
 			--format "$(KG_FORMAT)" \
 			"$(KG_QUERY)"; \
 	else \
@@ -266,6 +272,7 @@ kg-search: ## 📚 Search litkg-indexed code/docs/memory/backlog/literature (set
 			--config "$(LITKG_CONFIG)" \
 			--repo-root "$(LITKG_REPO_ROOT)" \
 			--limit "$(KG_LIMIT)" \
+			$(KG_MODALITY_ARGS) \
 			--format json \
 			"$(KG_QUERY)" | jq -r -f scripts/kg/compact_search.jq; \
 	fi

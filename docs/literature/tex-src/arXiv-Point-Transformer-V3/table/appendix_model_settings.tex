@@ -1,0 +1,21 @@
+\begin{tabular}{lx{40mm}}\toprule
+Config &Value \\\midrule
+serialization pattern &Z + TZ + H + TH \\
+patch interaction &Shift Order + Shuffle Order \\
+positional encoding &xCPE \\
+embedding depth &2 \\
+embedding channels &32 \\
+encoder depth &[2, 2, 6, 2] \\
+encoder channels &[64, 128, 256, 512] \\
+encoder num heads &[4, 8, 16, 32] \\
+encoder patch size &[1024, 1024, 1024, 1024] \\
+decoder depth &[1, 1, 1, 1] \\
+decoder channels &[64, 64, 128, 256] \\
+decoder num heads &[4, 4, 8, 16] \\
+decoder patch size &[1024, 1024, 1024, 1024] \\
+down stride &[$\times$2, $\times$2, $\times$2, $\times$2] \\
+mlp ratio &4 \\
+qkv bias &True \\
+drop path &0.3 \\
+\bottomrule
+\end{tabular}

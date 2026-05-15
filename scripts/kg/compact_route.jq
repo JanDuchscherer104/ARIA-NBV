@@ -58,10 +58,10 @@ def path_with_range:
 "verb: " + (.verb // "(none)"),
 "",
 
-# Top sources (max 3): include line range, authority, and a 1-line "why".
+# Top sources (max 5): include line range, authority, and a 1-line "why".
 "top_sources:",
 ( .top_sources // []
-  | cap(3)
+  | cap(5)
   | map(
       (.path | paper_id_from_path) as $pid
       | (.why_relevant | best_why_relevant) as $why
@@ -98,11 +98,34 @@ def path_with_range:
     + (if .skill then "  (skill: " + .skill + ")" else "" end)
 ),
 
-# First required read (path only; objects collapsed).
-"read_first: " + ((.required_reads // [])
-  | if length == 0 then "(none)"
-    else (.[0] | if type == "object" then (.path // .title // "(no-path)") else . end)
-    end),
+# Required reads: this is the part agents actually open next.
+"required_reads:",
+((.required_reads // [])
+  | cap(5)
+  | map(
+      if type == "object"
+      then "  - " + (.path // .title // "(no-path)")
+        + (if .reason then " — " + (.reason | truncate(90)) else "" end)
+      else "  - " + .
+      end
+    )
+  | if length == 0 then ["  (none)"] else . end
+  | .[]
+),
+
+# Relevant code-symbol pointers when present.
+"",
+"relevant_symbols:",
+((.relevant_symbols // [])
+  | cap(5)
+  | map(
+      "  - " + (.path // "(no-path)")
+      + ": " + (.kind // "symbol")
+      + " " + (.name // "(unnamed)")
+    )
+  | if length == 0 then ["  (none)"] else . end
+  | .[]
+),
 
 # Footer hint.
 "",

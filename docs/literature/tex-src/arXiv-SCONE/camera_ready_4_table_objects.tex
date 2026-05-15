@@ -1,0 +1,38 @@
+\begin{table}
+  \caption{\label{tab:auc_shapenet}  {\bf AUCs of surface coverage for several NBV selection methods for dense object reconstruction}, as computed on the ShapeNet test dataset following the protocol of \cite{zeng-icirs20-pcnbv}\vincent{, and after averaging over multiple seeds in the case of our method}\vincentrmk{Correct?}. For this experiment, we constrain the camera to stay on a sphere centered on the objects in order to compare with previous methods. Even if our model is designed to scale to entire scene reconstructions with free camera motion, it is still able to beat other methods trained for the specific case of dense object reconstruction with constrained camera motion.}
+  \centering
+  \scalebox{0.93}{ % previously at 0.96...
+  {\scriptsize
+  \begin{tabular}{@{}lccccccccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{8}{c}{Categories seen during training} \\
+    \cmidrule(r){2-9}
+     Method & Airplane & Cabinet & Car & Chair & Lamp & Sofa & Table & Vessel & Mean \\
+    \midrule
+    Random & 0.745 & 0.545 & 0.542 & 0.724 & 0.770 & 0.589 & 0.710 & 0.674 & 0.662 \\
+    Proximity Count~\cite{delmerico-18-acomparison} & 0.800 & 0.596 & 0.591 & 0.772 & 0.803 & 0.629 & 0.753 & 0.706 & 0.706\\
+    Area Factor~\cite{vasquez-14-volumetric-nbv} & 0.797 & 0.585 & 0.587 & 0.751 & 0.801 & 0.627 & 0.725 & 0.714 & 0.698\\
+    NBV-Net~\cite{Mendoza-2019} & 0.778 & 0.576 & 0.596 & 0.743 & 0.791 & 0.599 & 0.693 & 0.667 & 0.680\\
+    PC-NBV~\cite{zeng-icirs20-pcnbv} & 0.799 & 0.612 & \textbf{0.612} & \textbf{0.782} & 0.800 & 0.640 & 0.760 & 0.719 & 0.716 \\
+    \method (Ours) & \textbf{0.827} & \textbf{0.625} & 0.591 & \textbf{0.782} & \textbf{0.819} & \textbf{0.662} & \textbf{0.792} & \textbf{0.734} & \textbf{0.729} \\
+    % \bottomrule
+  \end{tabular}}
+  }
+ \scalebox{0.88}{ 
+ {\scriptsize
+  \begin{tabular}{@{}lccccccccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{8}{c}{Categories not seen during training} \\
+    \cmidrule(r){2-9}
+     Method & Bus & Bed & Bookshelf & Bench & Guitar & Motorbike & Skateboard & Pistol & Mean \\
+    \midrule
+    Random & 0.609 & 0.619 & 0.695 & 0.795 & 0.795 & 0.672 & 0.768 & 0.614 & 0.694 \\
+    Proximity Count & 0.646 & 0.645 & \textbf{0.749} & 0.829 & 0.854 & 0.705 & 0.828 & 0.660 & 0.740\\
+    Area Factor & 0.629 & 0.631 & 0.742 & 0.827 & 0.852 & 0.718 & 0.799 & 0.660 & 0.732\\
+    NBV-Net & 0.654 & 0.628 & 0.729 & 0.824 & 0.834 & 0.710 & 0.825 & 0.645 & 0.731\\
+    PC-NBV & 0.667 & 0.662 & 0.740 & \textbf{0.845} & 0.849 & \textbf{0.728} & 0.840 & 0.672 & 0.750 \\
+    \method (Ours) & \textbf{0.694} & \textbf{0.689} & 0.746 & 0.832 & \textbf{0.860} & \textbf{0.728} & \textbf{0.845} & \textbf{0.717} & \textbf{0.764} \\
+    \bottomrule
+  \end{tabular}}
+  }
+\end{table}

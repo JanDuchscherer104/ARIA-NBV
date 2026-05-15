@@ -10,6 +10,9 @@
 #set document(title: proposalTitleEnglish + " Proposal", author: author)
 #set text(font: "New Computer Modern")
 
+#show: make-glossary.with(link: false)
+#register-aria-glossary()
+
 #show: proposal.with(
   title: proposalTitleEnglish,
   titleGerman: proposalTitleGerman,

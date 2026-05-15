@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
 
 pytest.importorskip("efm3d")
 
+import numpy as np
 import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 import trimesh
@@ -35,6 +37,7 @@ from aria_nbv.pose_generation import (
     ViewDirectionMode,
 )
 from aria_nbv.pose_generation.plotting import (
+    CounterfactualPlotBuilder,
     plot_counterfactual_paths_simple,
     plot_counterfactual_step_simple,
 )
@@ -148,6 +151,47 @@ def _mesh_triplet(device: torch.device | str = "cpu") -> tuple[trimesh.Trimesh, 
     verts = torch.from_numpy(mesh.vertices).to(dtype=torch.float32, device=device)
     faces = torch.from_numpy(mesh.faces).to(dtype=torch.int64, device=device)
     return mesh, verts, faces
+
+
+def _plot_snippet() -> SimpleNamespace:
+    mesh, _, _ = _mesh_triplet()
+    return SimpleNamespace(
+        mesh=mesh,
+        semidense=None,
+        trajectory=SimpleNamespace(
+            t_world_rig=PoseTW.from_Rt(
+                torch.eye(3, dtype=torch.float32).reshape(1, 3, 3),
+                torch.zeros(1, 3, dtype=torch.float32),
+            )
+        ),
+    )
+
+
+def _target_sample_with_gt_obb(obb: ObbTW) -> VinOfflineSample:
+    zero = torch.zeros(1, dtype=torch.float32)
+    return VinOfflineSample(
+        sample_key="sample",
+        scene_id="scene",
+        snippet_id="snippet",
+        vin_snippet=None,
+        oracle=VinOfflineOracleBlock(
+            candidate_poses_world_cam=_identity_pose(),
+            reference_pose_world_rig=_identity_pose(),
+            candidate_count=1,
+            rri=zero,
+            pm_dist_before=zero,
+            pm_dist_after=zero,
+            pm_acc_before=zero,
+            pm_comp_before=zero,
+            pm_acc_after=zero,
+            pm_comp_after=zero,
+            p3d_cameras=PerspectiveCameras(device="cpu"),
+        ),
+        sample_index=0,
+        split="test",
+        efm_snippet_view=None,
+        gt_obbs=CompactObbBlock(obbs=obb.tensor(), sem_id_to_name=[]),
+    )
 
 
 def test_target_obb_crop_keeps_oriented_membership_not_axis_aligned_shell() -> None:
@@ -269,7 +313,7 @@ def test_target_scorer_computes_target_and_scene_rri_from_one_pointcloud_batch(m
         sample_index=0,
         split="test",
         efm_snippet_view=None,
-        gt_obbs=CompactObbBlock(obbs=target_obb.tensor(), sem_id_to_name=[]),
+        gt_obbs=CompactObbBlock(obbs=target_obb.tensor(), sem_id_to_name={}),
     )
     sample = SimpleNamespace(
         mesh_verts=torch.tensor(
@@ -395,7 +439,7 @@ def _fake_rri_evaluator(result, trajectory, step_index):
     return CounterfactualCandidateEvaluation(
         scores=scores,
         score_label="oracle_rri",
-        metric_vectors={"rri": scores},
+        metric_vectors={"rri": scores, "target_rri": scores},
         candidate_point_clouds_world=candidate_points,
         candidate_point_cloud_lengths=lengths,
     )
@@ -471,6 +515,103 @@ def test_counterfactual_simple_plots_return_figures() -> None:
     assert isinstance(step_fig, go.Figure)
     assert len(path_fig.data) >= 2
     assert len(step_fig.data) >= 2
+
+
+def test_counterfactual_plot_builder_adds_actor_visible_target_obb() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1)
+    target = _target_row(gt_target_row_id=0)
+
+    fig = (
+        CounterfactualPlotBuilder.from_rollouts(
+            _plot_snippet(),  # type: ignore[arg-type]
+            rollouts,
+            title="target",
+        )
+        .add_actor_visible_target_obb(target)
+        .finalize()
+    )
+
+    target_traces = [trace for trace in fig.data if trace.name == "Active target / actor-visible"]
+    assert len(target_traces) == 1
+    assert np.nanmin(np.asarray(target_traces[0].x, dtype=float)) == pytest.approx(-0.5)
+    assert np.nanmax(np.asarray(target_traces[0].x, dtype=float)) == pytest.approx(0.5)
+
+
+def test_counterfactual_plot_builder_adds_matched_gt_target_obb() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1)
+    target = _target_row(gt_target_row_id=0)
+    sample = _target_sample_with_gt_obb(_obb((2.0, 0.0, 0.0), (1.0, 1.0, 1.0)))
+
+    fig = (
+        CounterfactualPlotBuilder.from_rollouts(
+            _plot_snippet(),  # type: ignore[arg-type]
+            rollouts,
+            title="gt target",
+        )
+        .add_matched_gt_target_obb(sample, target)
+        .finalize()
+    )
+
+    target_traces = [trace for trace in fig.data if trace.name == "Matched GT / evaluation crop"]
+    assert len(target_traces) == 1
+    assert np.nanmin(np.asarray(target_traces[0].x, dtype=float)) == pytest.approx(1.5)
+    assert np.nanmax(np.asarray(target_traces[0].x, dtype=float)) == pytest.approx(2.5)
+
+
+def test_counterfactual_plot_builder_keeps_actor_obb_when_gt_target_invalid() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1)
+    target = replace(
+        _target_row(gt_target_row_id=0),
+        gt_label_valid=False,
+        gt_target_row_id=None,
+        gt_match_status="unmatched_gt",
+    )
+    builder = CounterfactualPlotBuilder.from_rollouts(
+        _plot_snippet(),  # type: ignore[arg-type]
+        rollouts,
+        title="invalid target",
+    ).add_actor_visible_target_obb(target)
+
+    with pytest.raises(ValueError, match="not GT-label valid"):
+        builder.add_matched_gt_target_obb(_target_sample_with_gt_obb(_obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))), target)
+
+    fig = builder.finalize()
+    assert any(trace.name == "Active target / actor-visible" for trace in fig.data)
+
+
+def test_counterfactual_selected_frusta_are_rotated_and_colored_by_target_rri() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1, score_candidates=_fake_rri_evaluator)
+
+    fig = (
+        CounterfactualPlotBuilder.from_rollouts(
+            _plot_snippet(),  # type: ignore[arg-type]
+            rollouts,
+            title="selected frusta",
+        )
+        .add_counterfactual_selected_frusta()
+        .finalize()
+    )
+
+    frustum_traces = [trace for trace in fig.data if "target_rri=" in str(trace.name)]
+    assert frustum_traces
+    assert frustum_traces[0].line.color != "crimson"
+
+
+def test_counterfactual_step_shell_frusta_are_colored_by_target_rri() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1, score_candidates=_fake_rri_evaluator)
+
+    fig = (
+        CounterfactualPlotBuilder.from_rollouts(
+            _plot_snippet(),  # type: ignore[arg-type]
+            rollouts,
+            title="step frusta",
+        )
+        .add_counterfactual_step_shell(trajectory_index=0, step_index=0, show_frusta=True)
+        .finalize()
+    )
+
+    frustum_traces = [trace for trace in fig.data if "target_rri=" in str(trace.name)]
+    assert frustum_traces
 
 
 def test_counterfactual_rollout_tracks_cumulative_rri_and_selected_point_clouds() -> None:

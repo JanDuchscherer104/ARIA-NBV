@@ -1,0 +1,95 @@
+\section{Background}
+\label{sec:background}
+
+\iffalse
+\subsection{Permutation invariant models for set data}
+\label{subsec:permutation}
+
+Problems that involve a set of objects have the property that the target value is the same regardless of the order of these objects.
+We say that such functions are $\textit{permutation invariant}$:
+
+\begin{property}
+Any set function $f:2^X \rightarrow Y$ is \newterm{permutation invariant}, meaning that for any sequence $(x_1, \cdots, x_n) \in X^n$ and any permutation $\pi$ of indices $\{1, \dots, n\}$,
+\[
+f(\{ x_1, \dots, x_n \}) = f(\{ x_{\pi(1)}, \dots, x_{\pi(n)}\}).
+\]
+\end{property}
+\begin{proof}
+Obvious since $\{ x_1, \dots, x_n \}$ and $\{x_{\pi(1)}, \dots, x_{\pi(n)} \}$ are the same object.
+\end{proof}
+
+Just as convolutional networks benefit from their built-in inductive bias about the translation invariance of image features, only being able to parameterize permutation invariant functions is a desirable property in the case of set inputs.
+\fi
+
+\subsection{Pooling Architecture for Sets}
+\label{subsec:pooling}
+
+Problems involving a set of objects have the \textit{permutation invariance} property: the target value for a given set is the same regardless of the order of objects in the set.
+A simple example of a permutation invariant model is a network that performs pooling over embeddings extracted from the elements of a set.
+More formally,
+\[
+\label{eq:deepset}
+\mathrm{net}(\{x_1, \ldots, x_n \}) = \rho( \mathrm{pool}( \{ \phi(x_1), \ldots, \phi(x_n) \})).
+\]
+\citet{Zaheer2017} have proven that all permutation invariant functions can be represented as \eqref{eq:deepset} when $\mathrm{pool}$ is the $\operatorname{sum}$ operator and $\rho, \phi$ any continuous functions, thus justifying the use of this architecture for set-input problems.
+
+Note that we can deconstruct \eqref{eq:deepset} into two parts:
+an $\textit{encoder}$ ($\phi$) which independently acts on each element of a set of $n$ items, and a $\textit{decoder}$ ($\rho( \mathrm{pool}(\cdot))$) which aggregates these encoded features and produces our desired output.
+Most network architectures for set-structured data follow this encoder-decoder structure.
+
+\citet{Zaheer2017} additionally observed that the model remains permutation invariant even if the encoder is a stack of permutation-equivariant layers:
+
+\begin{definition}
+Let $S_n$ be the set of all permutations of indices $\{1, \ldots, n\}$.
+A function $f: X^n \rightarrow Y^n$ is permutation equivariant iff for any permutation $\pi \in S_n$, $f(\pi x) = \pi f(x)$.
+\end{definition}
+
+An example of a permutation-equivariant layer is
+\[
+f_i(x; \{x_1, \ldots, x_n\}) = \sigma_i(\lambda x + \gamma \mathrm{pool}(\{ x_1, \ldots, x_n \}))
+\]
+where $\mathrm{pool}$ is the pooling operation, $\lambda, \gamma$ are learnable scalar variables, and $\sigma(\cdot)$ is a nonlinear activation function.
+
+\begin{figure*}[h]
+	\centering
+	\subfigure[Our model]
+	{
+		\includegraphics[width=0.26\textwidth]{figs/main.pdf}
+	}
+	\subfigure[MAB]
+	{
+		\includegraphics[width=0.22\textwidth]{figs/mab.pdf}
+	}
+	\subfigure[SAB]
+	{
+		\includegraphics[width=0.22\textwidth]{figs/fig_sab.pdf}
+	}
+	\subfigure[ISAB]
+	{
+		\includegraphics[width=0.22\textwidth]{figs/imab.pdf}
+	}
+	\caption{Diagrams of our attention-based set operations.}
+\end{figure*}
+\subsection{Attention}
+\label{subsec:attention}
+Assume we have $n$ query vectors (corresponding to a set with $n$ elements) each with dimension $d_q$:~$Q \in \R^{n \times d_q}$.
+An attention function $\mathrm{Att}(Q, K, V)$ is a function that maps queries $Q$ to outputs using $n_v$ key-value pairs $K \in \R^{n_v \times d_q}, V \in \R^{n_v \times d_v}$.
+\[
+\mathrm{Att}(Q, K, V;\omega) = \omega \left( Q K^\top \right) V. \label{eq:att}
+\]
+The pairwise dot product $QK^\top \in \R^{n \times n_v}$ measures how similar each pair of query and key vectors is, with weights computed with an activation function $\omega$. The output $\omega(QK^\top)V$ is a weighted sum of $V$ where a value gets more weight if its corresponding key has larger dot product with the query.
+
+\textit{Multi-head attention}, originally introduced in \citet{Vaswani2017}, is an extension of the previous attention scheme.
+Instead of computing a single attention function, this method first projects $Q, K, V$ onto $h$ different $d^M_q, d^M_q, d^M_v$-dimensional vectors, respectively.
+An attention function ($\mathrm{Att}(\cdot; \omega_j)$) is applied to each of these $h$ projections.
+The output is a linear transformation of the concatenation of all attention outputs:
+\[
+\mathrm{Multihead}&(Q, K, V ; \lambda,\omega) = \mathrm{concat}(O_1, \cdots, O_h) W^O, \label{eq:multihead1}\\
+\mathrm{where}& \ \ O_j = \mathrm{Att}(Q W_j^Q, KW^K_j, V W^V_j;\omega_j) \label{eq:multihead2}
+\]
+Note that $\mathrm{Multihead}(\cdot, \cdot, \cdot;\lambda)$ has learnable parameters
+$\lambda = \{W_j^Q, W_j^K, W_j^V\}_{j=1}^h$, where $W_j^Q, W_j^K \in \R^{d_q \times d_q^M}$, $W_j^V \in \R^{d_v \times d_v^M}$, $W^O \in \R^{hd_v^M \times d}$.
+A typical choice for the dimension hyperparameters is $d_q^M=d_q / h$, $d_v^M=d_v / h$, $d=d_q$.
+For brevity, we set $d_q=d_v=d$, $d_q^M=d_v^M=d / h$ throughout the rest of the paper.
+Unless otherwise specified, we use a scaled softmax $\omega_j(\cdot) = \mathrm{softmax}(\cdot/\sqrt{d})$, 
+which our experiments were worked robustly in most settings.

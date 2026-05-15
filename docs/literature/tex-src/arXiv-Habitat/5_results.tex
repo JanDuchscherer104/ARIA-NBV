@@ -1,0 +1,163 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\vspace{\sectionReduceTop}
+\section{Results and Findings}
+%\vspace{\sectionReduceBot}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{table/baselines}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%Two key features of the Habitat stack are: i) generic dataset support and ii) high performance.
+%These two features combined allow us to carry out experiments testing for generalization between datasets, and to explore training regimes with total experience far surpassing that of previous investigations.
+We seek to answer two questions: 
+i) how do learning-based agents compare to classic SLAM 
+and hand-coded baselines as the amount of training experience increases and 
+ii) how well do learned agents generalize 
+across 3D datasets. 
+
+It should be tacitly understood, but to be explicit -- 
+`learning' and `SLAM' are broad families of techniques 
+(and not a single method), 
+are not necessarily mutually exclusive, and are 
+not `settled' in their development. We compare representative instances of these families to gain insight into questions of 
+scaling and generalization, and do not make any claims 
+about intrinsic superiority of one or the other. 
+
+
+\xhdr{Learning vs SLAM.}
+To answer the first question we plot agent performance 
+(\spl) on validation (\ie unseen) episodes over the 
+course of training in \Cref{fig:classical_learning}
+(top: Gibson, bottom: Matterport3D). 
+%hows the results of this analysis. 
+SLAM~\cite{mishkin2019benchmarking} 
+does not require training 
+and thus has a constant performance (0.59 on Gibson, 0.42 on 
+Matterport3D). 
+All RL (PPO) agents start out with far worse \spl, 
+%In contrast, the RL (PPO) agents start out with far worse  performance.
+%Over the course of training, 
+but RL (PPO) \depth, in particular, improves dramatically 
+and matches the classic baseline 
+%once they have acquired 
+at approximately $10$M frames 
+(Gibson) or $30$M frames (Matterport3D)  
+of experience, continuing to improve thereafter.  
+Notice that if we terminated the experiment at $5$M frames 
+as in \cite{mishkin2019benchmarking} we would 
+also conclude that SLAM~\cite{mishkin2019benchmarking} dominates. 
+Interestingly, 
+%agents using only color vision (\rgb) as sensory input 
+\rgb agents do not
+significantly outperform \blind agents; we hypothesize 
+%the agents using only the goal position input (\blind).
+because both 
+are equipped with GPS sensors. Indeed, qualitative 
+results (\Cref{fig:top_down_nav} and video in supplement) 
+suggest that \blind agents `hug' walls and 
+implement `wall following' heuristics.
+In contrast, \rgb sensors provide a high-dimensional complex 
+signal that may be prone to overfitting to train environments 
+due to the variety across scenes (even within the same dataset). 
+%This might indicate that color-only agents are unable 
+%to handle the visual complexity and variety of the environments in our datasets and thus do not generalize well to the unseen test environments (even from the same dataset).
+We also notice in \Cref{fig:classical_learning} that \emph{all methods} perform better on Gibson than Matterport3D. 
+This is consistent with our previous analysis that Gibson 
+contains smaller scenes and shorter episodes. 
+%scenes 
+%are physically smaller and the episodes are shorter. 
+
+
+
+Next, for each agent and dataset, we select the best-performing checkpoint on validation and report results on test in \Cref{tab:baselines}. 
+%for all datasets. 
+%A full summary of the best-performing agents evaluated on the test set is shown in \Cref{tab:baselines} for all datasets. (The agents were selected via SPL on the validation set.)
+We observe that uniformly across the datasets, 
+RL (PPO) \depth performs best, 
+outperforming RL (PPO) \rgbd (by 0.09-0.16 \spl), 
+SLAM (by 0.15-0.28 \spl), and \rgb (by 0.13-0.33 \spl) in that order (see the supplement for additional experiments involving noisy depth).
+We believe \depth performs better than \rgbd because i) the PointGoal navigation task requires reasoning only about free space and depth provides relevant information directly, and ii) \rgb has significantly more entropy (different houses look very different), thus it is easier to overfit when using \rgb.
+We ran our experiments with 5 random seeds per run, to confirm that these differences are statistically significant.
+The differences are about an order of magnitude larger than the standard deviation of average SPL for all cases (\eg on the Gibson dataset errors are, \depth: $\pm 0.015$, \rgb: $\pm 0.055$, \rgbd: $\pm 0.028$, \blind: $\pm 0.005$).
+%as measured by all metrics, on all datasets.
+%\rgbd variant of the same agent and SLAM rank second or third, while the \rgb agent ranks fourth.
+Random and forward-only agents have very low performance, while the hand-coded goal follower and \blind baseline see modest performance.%\footnotemark[4]
+See the supplement for additional analysis of trained agent behavior.
+%(approaching the performance of the \rgb in the latter case). 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}
+    %\vspace{-10pt}
+    \centering
+    \includegraphics[width=\linewidth]{fig/top_down_nav.pdf}
+    %\vspace{-20pt}
+    \caption{Navigation examples for different sensory configurations of the RL (PPO) agent, visualizing trials from the Gibson and MP3D val sets. A \textbf{blue dot} and \textbf{red dot} indicate the starting and goal positions, and the \textbf{blue arrow} indicates final agent position. The \textbf{blue-green-red line} is the agent's trajectory. Color shifts from blue to red as the maximum number of agent steps is approached.
+    See the supplemental materials for more example trajectories.
+    }
+    \label{fig:top_down_nav}
+    %\vspace{\captionReduceBot}
+    %\vspace{-5pt}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In \Cref{fig:top_down_nav} we plot example trajectories for 
+the RL (PPO) agents, to qualitatively contrast their 
+behavior in the same episode. 
+Consistent with the aggregate statistics, we observe that \blind collides with obstacles and follows walls, while \depth is 
+the most efficient.
+See the supplement and the video for more example trajectories.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{fig/generalization.pdf}
+    %\vspace{-20pt}
+    \caption{Generalization of agents between datasets. We report average SPL for a model trained on the source dataset in each row, as evaluated on test episodes for the target dataset in each column.}
+    \label{fig:generalization}
+    %\vspace{\captionReduceBot}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\xhdr{Generalization across datasets.}
+Our findings so far are that RL (PPO) agents significantly outperform SLAM~\cite{mishkin2019benchmarking}. This prompts our second question
+-- are these findings dataset specific or do learned agents generalize across datasets?
+%This is important because SLAM is (in principle) dataset agnostic. 
+We report exhaustive comparisons in \Cref{fig:generalization} -- 
+specifically, average \spl for all combinations of 
+$\{$train, test$\} \times \{$Matterport3D, Gibson$\}$ for 
+all agents $\{$\blind, \rgb, \rgbd, \depth$\}$. 
+Rows indicate (agent, train set) pair, columns indicate test set. 
+%in \Cref{fig:generalization}. 
+%A summary of the generalization performance between datasets is provided in \Cref{fig:generalization} which reports average SPL on all pairs of datasets for train and test set.
+We find a number of interesting trends. 
+First, nearly all agents suffer a drop in performance 
+when trained on one dataset and tested on another, 
+\eg \rgbd Gibson$\rightarrow$Gibson $0.70$ vs \rgbd 
+Gibson$\rightarrow$Matterport3D $0.53$ (drop of 0.17). 
+\rgb and \rgbd agents suffer a 
+significant performance degradation, 
+while the \blind agent is least affected (as we would expect).
+
+%We see a similar trend for agents tested on MP3D, though the performance degradation is much smaller.
+
+Second, we find a potentially counter-intuitive trend -- 
+agents trained on Gibson consistently outperform their 
+counterparts trained on Matterport3D, \emph{even 
+when evaluated on Matterport3D}.
+We believe the reason is the previously noted observation that 
+Gibson scenes are smaller and episodes are shorter 
+(lower \gdsp) than Matterport3D. 
+%A property of the Gibson dataset that might explain this observation is that it has a lower average geodesic distance (\gdsp) than MP3D (see dataset statistics in supplement).
+Gibson agents are trained on `easier' episodes and 
+encounter positive reward more easily during random exploration, 
+thus bootstrapping learning. Consequently, for a fixed 
+computation budget Gibson agents are stronger universally (not 
+just on Gibson). 
+This finding suggests that visual navigation agents could 
+benefit from curriculum learning. 
+
+These insights are enabled by the engineering of Habitat, which made these experiments as simple as a change in the evaluation dataset name.

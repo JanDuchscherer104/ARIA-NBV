@@ -1,0 +1,16 @@
+\begin{tabular}{lclc}\toprule
+\multicolumn{2}{c}{Ins. Seg.} &\multicolumn{2}{c}{Obj. Det} \\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+Config &Value &Config &Value \\\midrule
+framework &PointGroup~\cite{jiang2020pointgroup} &framework &CenterPoint~\cite{yin2021center} \\
+optimizer &AdamW &optimizer &Adam \\
+scheduler &Cosine &scheduler &Cosine \\
+learning rate &5e-3 &learning rate &3e-3 \\
+block lr scaler &1e-1 &block lr scaler &1e-1 \\
+weight decay &5e-2 &weight decay &1e-2 \\
+batch size &12 &batch size &16 \\
+datasets &ScanNet &datasets &Waymo \\
+warmup epochs &40 &warmup epochs &0 \\
+epochs &800 &epochs &24 \\
+\bottomrule
+\end{tabular}

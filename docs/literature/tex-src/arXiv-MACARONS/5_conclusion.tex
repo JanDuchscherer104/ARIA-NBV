@@ -1,0 +1,11 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+Our method can explore large scenes to efficiently reconstruct them using only a color camera. Beyond the potential applications, it shows that it is possible to jointly learn to explore and reconstruct a scene without any 3D input. 
+
+We assume the scene to be static, which can be a limitation, however several self-supervised depth prediction models already showed how to be robust to moving objects~\cite{watson-cvpr21-temporal-opportunist-manydepth}. Another limitation is that we assume the pose to be known as in previous works on NBV prediction. This is reasonable as the method controls the camera but such control is never perfect. It would be interesting to estimate the camera pose as well. Since we control the camera, we already have a very good initialization, which should considerably help convergence.
+We also use a very simple path planning policy from our coverage predictions, by evaluating camera poses sampled in the surroundings at each iteration. It would be very interesting to consider longer-term planning, to generate even more efficient trajectories.
+
+\paragraph{Acknowledgements.}
+%\section*{Acknowledgements}
+This work was granted access to the HPC resources of IDRIS under the allocation 2022-AD011013387 made by GENCI. We thank Elliot Vincent for inspiring discussions and valuable feedback.

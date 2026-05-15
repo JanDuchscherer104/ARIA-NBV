@@ -1,0 +1,121 @@
+\begin{comment}
+\begin{table*}
+  \centering
+  %\begin{subtable}{0.7\linewidth}
+  {%\scriptsize
+  \scalebox{0.9}{
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{4}{c}{Method} \\
+    \cmidrule(r){2-5}
+    & Trained on & Pretrained & Self-supervised \\
+    3D scene & (SCONE~\cite{guedon-nips22-scone-surface-coverage} loss) & (MACARONS loss) & training \\
+    \midrule
+    Dunnottar Castle 
+    & 0.330  
+    & 0.381  
+    & 0.650 
+    & \textbf{0.764} $\pm$ 0.030 \\
+    Colosseum 
+    & 0.312 $\pm$ 0.098
+    & 0.477 $\pm$ 0.023
+    & 0.532 $\pm$ 0.032
+    & \textbf{0.618} $\pm$ 0.003 \\
+    Bannerman Castle 
+    & 0.316 $\pm$ 0.106
+    & 0.534 $\pm$ 0.012
+    & 0.552 $\pm$ 0.020
+    & \textbf{0.722} $\pm$ 0.026 \\
+    Pantheon 
+    & 0.206 $\pm$ 0.064
+    & 0.338 $\pm$ 0.030
+    & 0.401 $\pm$ 0.030
+    & \textbf{0.516} $\pm$ 0.010 \\
+    Christ the Redeemer 
+    & 0.518 $\pm$ 0.058
+    & 0.836 $\pm$ 0.028
+    & 0.833 $\pm$ 0.037
+    & \textbf{0.878} $\pm$ 0.021\\
+    Statue of Liberty 
+    & 0.296 $\pm$ 0.188
+    & 0.673 $\pm$ 0.025
+    & \textbf{0.695} $\pm$ 0.020 
+    & 0.671$\pm$ 0.021\\
+    Pisa Cathedral 
+    & 0.327 $\pm$ 0.121
+    & 0.431 $\pm$ 0.024
+    & 0.555 $\pm$ 0.033
+    & \textbf{0.633} $\pm$ 0.025 \\
+    Fushimi Castle 
+    & 0.513 $\pm$ 0.091
+    & 0.791 $\pm$ 0.020
+    & 0.806 $\pm$ 0.029
+    & \textbf{0.828} $\pm$ 0.019 \\
+    \midrule
+    Alhambra Palace 
+    & 0.361 $\pm$ 0.045
+    & 0.425 $\pm$ 0.046
+    & 0.528 $\pm$ 0.030
+    & \textbf{0.603} $\pm$ 0.023\\
+    Neuschwanstein Castle 
+    & 0.396 $\pm$ 0.090
+    & 0.491 $\pm$ 0.039
+    & 0.662 $\pm$ 0.041
+    & \textbf{0.759} $\pm$ 0.020 \\
+    Eiffel Tower 
+    & 0.417 $\pm$ 0.074
+    & 0.702 $\pm$ 0.016
+    & 0.753 $\pm$ 0.013
+    & \textbf{0.786} $\pm$ 0.016 \\
+    Manhattan Bridge 
+    & 0.382 $\pm$ 0.092
+    & 0.422 $\pm$ 0.055
+    & 0.745 $\pm$ 0.069
+    & \textbf{0.853} $\pm$ 0.006 \\
+    \midrule
+    Average on all scenes 
+    & 0.364 
+    & 0.542 
+    & 0.643 
+    & \textbf{0.719} \\
+    \bottomrule
+  \end{tabular}
+  }}
+  %\end{subtable}
+  %\hfill
+  %\begin{subtable}{0.23\linewidth}
+  %  \includegraphics[width=\linewidth]{images/coverage_curves/all_path_planning_curve_macarons.png}
+  %\end{subtable}
+  \caption{{\bf AUCs of surface coverage in large 3D scenes.} All methods use perfect depth maps as input except for MACARONS, which takes RGB images as input. To compare the different methods, we follow \cite{guedon-nips22-scone-surface-coverage} and compute the area under the curve representing the evolution of the total surface coverage during exploration, after 100 NBV iterations. The surface coverage is computed using the ground truth meshes. AUCs are averaged on multiple trajectories in each scene: The same starting camera poses are used for each method, to allow for fair comparison. For this experience, all weights of MACARONS are frozen and we only perform inference computation. The model is considered to have been trained on a set of previous scenes. In this regard, the 8 scenes above the bar were seen during online training (but with different, random starting camera poses and trajectories), and the 4 scenes below the bar were not. Even if it only uses RGB images, our model MACARONS is able to outperform the baselines in large environments since, contrary to other methods, its self-supervised online training strategy allows it to scale its learning process to any kind of environment.}
+  \label{tab:coverage_auc}
+\end{table*}
+\end{comment}
+
+\begin{table}
+  \centering
+  %\begin{subtable}{0.7\linewidth}
+  {\scriptsize
+  \scalebox{1}{
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \multicolumn{1}{c}{} & \multicolumn{2}{c}{MACARONS-NBV} & MACARONS \\
+    \cmidrule(r){2-3}
+     & Loss from~\cite{guedon-nips22-scone-surface-coverage} & Our loss &  \\
+    \midrule
+    AUC of surface coverage 
+    & 0.561 $\pm$ 0.162
+    & 0.635 $\pm$ 0.148
+    & \textbf{0.719} $\pm$ 0.109 \\
+    \bottomrule
+  \end{tabular}
+  }}
+  %\end{subtable}
+  %\hfill
+  %\begin{subtable}{0.23\linewidth}
+  %  \includegraphics[width=\linewidth]{images/coverage_curves/all_path_planning_curve_macarons.png}
+  %\end{subtable}
+  \caption{{\bf Contribution of our new loss and self-supervised learning process.} 
+   AUCs of surface coverage in large 3D scenes, averaged over multiple trajectories in all 12 scenes of the dataset. Both our new loss and the self-supervised learning process of the full model lead to dramatic increase in performance.}
+%   \caption{{\bf AUCs of surface coverage in large 3D scenes.} AUCs are averaged over multiple trajectories in all 12 scenes of the dataset. Both our new loss and the self-supervised learning process of the full model lead to dramatic increase in performance.}
+  \label{tab:loss_ablation}
+\end{table}

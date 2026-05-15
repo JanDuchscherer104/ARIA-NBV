@@ -1,0 +1,7 @@
+\section{Limitations and Conclusion}
+
+Beyond the prediction of the Next Best View, our method \method is able to evaluate the value of any camera pose given a current estimate of the scene volume. We demonstrated this ability with a simple path planning algorithm that looks for the next pose around the current pose iteratively. However:
+\begin{itemize}[leftmargin=5mm]
+    \item Like current methods, \method relies on a depth sensor and assumes that the captured depth maps are perfect. In practice, such a sensor is not necessarily available and can also be noisy. It would be very interesting to extend the approach to color cameras.
+    \item Also like current methods, it is limited to the prediction of the camera pose for the next step. This is greedy, non-optimal as multiple poses are required anyway for a complete 3D reconstruction. Thanks to its scalability, we believe that our method could be extended to the prediction of the ``Next Best Path'', where future camera poses would be predicted jointly for their complementarity.
+\end{itemize}

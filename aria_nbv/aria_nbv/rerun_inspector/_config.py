@@ -162,14 +162,30 @@ class RerunInspectorCandidateConfig(BaseConfig):
     """Explicit selected candidate index, overriding ``selected_strategy`` when set."""
 
 
+class RerunInspectorRolloutPlotConfig(BaseConfig):
+    """Branch-aware rollout scalar plotting policy."""
+
+    enabled: bool = True
+    """Whether rollout-Zarr inspection logs RRI and diagnostic time series."""
+
+    branch_scope: Literal["selected", "same_source_target"] = "same_source_target"
+    """Rollout rows included in scalar plots for one inspected rollout."""
+
+    candidate_top_k: int = Field(default=5, ge=1)
+    """Number of valid per-step candidate RRI ranks shown in the plot."""
+
+    log_all_candidates: bool = False
+    """Reserved forensic mode; default plots only selected, top-k, and fanout summaries."""
+
+
 class RerunInspectorEfmVoxelConfig(BaseConfig):
     """EFM voxel-field visualization policy."""
 
     enabled: bool = True
     """Whether to log curated EFM voxel fields when a backbone output is loaded."""
 
-    log_occ_pr: bool = True
-    """Log occupancy probabilities as thresholded voxel-center points."""
+    log_occ_pr: bool = False
+    """Log saturated occupancy probabilities as thresholded voxel-center points."""
 
     log_cent_pr: bool = True
     """Log centerness probabilities as thresholded voxel-center points."""
@@ -290,6 +306,9 @@ class RerunOfflineInspectorConfig(TargetConfig[Any]):
     candidate: RerunInspectorCandidateConfig = Field(default_factory=RerunInspectorCandidateConfig)
     """Candidate subset and selected-detail logging policy."""
 
+    rollout_plots: RerunInspectorRolloutPlotConfig = Field(default_factory=RerunInspectorRolloutPlotConfig)
+    """Rollout branch/RRI scalar plotting policy."""
+
     efm_voxels: RerunInspectorEfmVoxelConfig = Field(default_factory=RerunInspectorEfmVoxelConfig)
     """EFM voxel-field visualization settings."""
 
@@ -309,6 +328,7 @@ __all__ = [
     "RerunInspectorOutputConfig",
     "RerunInspectorPerformanceConfig",
     "RerunInspectorPrimitivesConfig",
+    "RerunInspectorRolloutPlotConfig",
     "RerunInspectorSelectionConfig",
     "RerunOfflineInspectorConfig",
 ]

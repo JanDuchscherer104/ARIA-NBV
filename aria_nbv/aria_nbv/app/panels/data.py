@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import streamlit as st
 import torch
 from efm3d.aria.pose import PoseTW
@@ -17,132 +15,8 @@ from ...utils.data_plotting import (
     project_pointcloud_on_frame,
     semidense_points_for_frame,
 )
+from ..scene_view import DATA_SCENE_DEFAULTS, apply_scene_plot_options, scene_plot_options_ui
 from .common import _info_popover, _pretty_label
-
-
-@dataclass(slots=True)
-class Scene3DPlotOptions:
-    """Plot options for the data page 3D scene view."""
-
-    show_scene_bounds: bool
-    show_crop_bounds: bool
-    show_frustum: bool
-    frustum_frame_indices: list[int]
-    frustum_scale: float
-    mark_first_last: bool
-    show_gt_obbs: bool
-    gt_timestamp: int | None
-    semidense_mode: str
-    max_sem_points: int
-
-
-def scene_plot_options_ui(
-    sample: EfmSnippetView,
-    *,
-    key_prefix: str = "data_scene",
-) -> tuple[str, Scene3DPlotOptions]:
-    """Render UI controls for the data-page 3D plot.
-
-    Args:
-        sample: Current snippet sample used to derive available frame indices and GT timestamps.
-        key_prefix: Widget key prefix to avoid collisions across pages.
-
-    Returns:
-        Tuple of ``(frustum_camera, options)``.
-    """
-    st.subheader("3D scene view")
-
-    opt_col1, opt_col2 = st.columns(2)
-    with opt_col1:
-        frustum_camera = st.radio(
-            "Frustum camera",
-            options=["rgb", "slam-l", "slam-r"],
-            horizontal=True,
-            index=0,
-            key=f"{key_prefix}_frustum_cam",
-        )
-        num_frames = int(sample.camera_rgb.images.shape[0])
-        frustum_frame_indices = st.multiselect(
-            "Frustum frame indices",
-            options=list(range(num_frames)),
-            default=[0],
-            key=f"{key_prefix}_frustum_idx",
-        )
-        frustum_scale = st.slider(
-            "Frustum scale",
-            min_value=0.1,
-            max_value=2.0,
-            value=1.0,
-            step=0.05,
-            key=f"{key_prefix}_frustum_scale",
-        )
-
-    with opt_col2:
-        semidense_mode = st.radio(
-            "Semi-dense points",
-            options=["off", "all frames", "last frame only"],
-            horizontal=True,
-            index=1,
-            key=f"{key_prefix}_sem_mode",
-        )
-        max_sem_points = st.slider(
-            "Max semi-dense points",
-            min_value=1000,
-            max_value=200000,
-            value=20000,
-            step=1000,
-            key=f"{key_prefix}_max_sem_points",
-        )
-        show_scene_bounds = st.checkbox(
-            "Show scene bounds",
-            value=True,
-            key=f"{key_prefix}_scene_bounds",
-        )
-        show_crop_bounds = st.checkbox(
-            "Show crop bbox",
-            value=True,
-            key=f"{key_prefix}_crop_bounds",
-        )
-        show_frustum = st.checkbox(
-            "Show frustum",
-            value=True,
-            key=f"{key_prefix}_frustum_enable",
-        )
-        mark_first_last = st.checkbox(
-            "Mark start/finish",
-            value=True,
-            key=f"{key_prefix}_mark_first_last",
-        )
-        show_gt_obbs = st.checkbox(
-            "Show GT OBBs",
-            value=False,
-            key=f"{key_prefix}_gt_obbs",
-        )
-
-    gt_ts = None
-    if show_gt_obbs and sample.gt.timestamps:
-        gt_ts = st.selectbox(
-            "GT OBB timestamp",
-            options=sample.gt.timestamps,
-            index=0,
-            key=f"{key_prefix}_gt_ts",
-        )
-
-    return (
-        frustum_camera,
-        Scene3DPlotOptions(
-            show_scene_bounds=show_scene_bounds,
-            show_crop_bounds=show_crop_bounds,
-            show_frustum=show_frustum,
-            frustum_frame_indices=[int(i) for i in frustum_frame_indices] if frustum_frame_indices else [0],
-            frustum_scale=float(frustum_scale),
-            mark_first_last=mark_first_last,
-            show_gt_obbs=show_gt_obbs,
-            gt_timestamp=gt_ts,
-            semidense_mode=str(semidense_mode),
-            max_sem_points=int(max_sem_points),
-        ),
-    )
 
 
 def render_data_page(
@@ -258,7 +132,11 @@ def render_data_page(
         )
         st.plotly_chart(fig_overlay, width="stretch")
 
-    cam_choice, plot_opts = scene_plot_options_ui(sample, key_prefix="data_scene")
+    cam_choice, plot_opts = scene_plot_options_ui(
+        sample,
+        key_prefix="data_scene",
+        defaults=DATA_SCENE_DEFAULTS,
+    )
     _info_popover(
         "scene overview",
         "3D scene view combines GT mesh, semidense points, and the trajectory. "
@@ -266,45 +144,11 @@ def render_data_page(
         "scene extents and any crop applied during RRI computation.",
     )
 
-    builder = (
-        SnippetPlotBuilder.from_snippet(
-            sample,
-            title=_pretty_label("Mesh + semidense + trajectory + camera frustum"),
-        )
-        .add_mesh()
-        .add_trajectory(mark_first_last=plot_opts.mark_first_last, show=True)
+    builder = SnippetPlotBuilder.from_snippet(
+        sample,
+        title=_pretty_label("Mesh + semidense + trajectory + camera frustum"),
     )
-
-    if plot_opts.semidense_mode != "off":
-        builder.add_semidense(
-            max_points=plot_opts.max_sem_points,
-            last_frame_only=(plot_opts.semidense_mode == "last frame only"),
-        )
-
-    if plot_opts.show_frustum:
-        builder.add_frusta(
-            camera=cam_choice,
-            frame_indices=plot_opts.frustum_frame_indices,
-            scale=plot_opts.frustum_scale,
-            include_axes=True,
-            include_center=True,
-        )
-
-    if plot_opts.show_scene_bounds:
-        builder.add_bounds_box(name="Scene bounds", color="gray", dash="dash", width=2)
-
-    if plot_opts.show_gt_obbs:
-        builder.add_gt_obbs(camera=cam_choice, timestamp=plot_opts.gt_timestamp)
-
-    if plot_opts.show_crop_bounds:
-        crop_aabb = tuple(b.detach().cpu().numpy() for b in sample.crop_bounds)
-        builder.add_bounds_box(
-            name="Crop bounds",
-            color="orange",
-            dash="solid",
-            width=3,
-            aabb=crop_aabb,
-        )
+    apply_scene_plot_options(builder, sample, camera=cam_choice, options=plot_opts)
 
     st.plotly_chart(builder.finalize(), width="stretch")
 

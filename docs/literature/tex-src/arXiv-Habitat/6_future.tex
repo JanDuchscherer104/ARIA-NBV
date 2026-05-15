@@ -1,0 +1,27 @@
+%\vspace{\sectionReduceTop}
+\section{Future Work}
+%\vspace{\sectionReduceBot}
+
+We described the design and implementation of the Habitat platform. 
+Our goal is to unify existing community efforts and to accelerate research into embodied AI.
+This is a long-term effort that will succeed only by full engagement of the broader research community.
+%To this end, we have open-sourced the entire Habitat platform stack. 
+
+Experiments enabled by the generic dataset support and the high performance of the Habitat stack indicate that i)~learning-based agents can match and exceed the performance of classic visual navigation methods when trained for long enough and ii)~learned agents equipped with depth sensors generalize well between different 3D environment datasets in comparison to agents equipped with only RGB.
+
+\xhdr{Feature roadmap.} 
+%The current functionality of Habitat constitutes only a beginning towards a fully fleshed out embodied agent stack.
+Our near-term development roadmap will focus on incorporating physics simulation and enabling physics-based interaction between mobile agents and objects in 3D environments.
+%Though our focus is on higher-level navigation and interaction rather than low-level control and simulation of robotic grasping, physics simulation will strengthen our connection to work focusing on robotic manipulation.
+\habitatsim's scene graph representation is well-suited for integration with physics engines, allowing us to directly control the state of individual objects and agents within a scene graph. 
+%
+%The first version of \habitatsim is already publicly available. 
+%Unlike Gibson and AI2 THOR, it does not yet have integration with 
+% physics engines such as PyBullet (as in Gibson) or Unity (as in THOR). 
+%\habitatsim's scene graph representation is well-suited for integration with physics engines, allowing us to directly control the state of individual objects and agents within a scene graph.
+%
+Another planned avenue of future work involves procedural generation of 3D environments by leveraging a combination of 3D reconstruction and virtual object datasets.
+By combining high-quality reconstructions of large indoor spaces with separately reconstructed or modelled objects, we can take full advantage of our hierarchical scene graph representation to introduce controlled variation in the simulated 3D environments.
+
+Lastly, we plan to focus on distributed simulation settings that involve large numbers of agents potentially interacting with one another in competitive or collaborative scenarios.
+%The Habitat stack provides high-performance modules that can be deployed to investigate embodied AI training regimes at scale that has thus far been inaccessible.

@@ -471,9 +471,22 @@ def _decode_value(
         return decoded if origin is list else tuple(decoded)
     if origin is dict:
         args = get_args(expected_type)
+        key_type = args[0] if len(args) == 2 else Any
         val_type = args[1] if len(args) == 2 else Any
-        return {key: _decode_value(item, val_type, device=device) for key, item in value.items()}
+        return {
+            _decode_dict_key(key, key_type): _decode_value(item, val_type, device=device) for key, item in value.items()
+        }
     return value
+
+
+def _decode_dict_key(key: Any, expected_type: Any) -> Any:
+    """Decode serialized mapping keys for typed payload reconstruction."""
+
+    if expected_type is int:
+        return int(key)
+    if expected_type is str:
+        return str(key)
+    return key
 
 
 __all__ = [

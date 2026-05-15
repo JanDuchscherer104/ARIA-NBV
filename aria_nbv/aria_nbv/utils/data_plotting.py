@@ -16,6 +16,7 @@ import plotly.graph_objects as go  # type: ignore[import-untyped]
 import torch
 import trimesh
 from efm3d.aria.camera import CameraTW
+from efm3d.aria.obb import ObbTW
 from efm3d.aria.pose import PoseTW
 from matplotlib import colormaps
 from plotly import colors as plotly_colors
@@ -351,6 +352,43 @@ class SnippetPlotBuilder:
         )
         return self
 
+    def add_semidense_in_oriented_box(
+        self,
+        *,
+        pose_world_object: np.ndarray | torch.Tensor | PoseTW | Sequence[float],
+        extents: np.ndarray | torch.Tensor | Sequence[float],
+        name: str = "Target semidense points",
+        max_points: int | None = 20000,
+        last_frame_only: bool = False,
+        color: str = "gold",
+        size: int = 3,
+        opacity: float = 0.8,
+    ) -> Self:
+        """Add semidense points cropped by a world-frame oriented box."""
+
+        sem = self.snippet.semidense
+        if sem is None:
+            return self
+        pts_np = (
+            sem.last_frame_points_np(max_points) if last_frame_only else sem.collapse_points(max_points).cpu().numpy()
+        )
+        if pts_np.size == 0:
+            return self
+        points = torch.as_tensor(pts_np[:, :3], dtype=torch.float32)
+        pose = self._pose_from_tw_payload(pose_world_object).to(device=points.device, dtype=points.dtype)
+        extents_np = (
+            extents.detach().cpu().numpy()
+            if isinstance(extents, torch.Tensor)
+            else np.asarray(extents, dtype=np.float32)
+        )
+        half = torch.as_tensor(extents_np.reshape(3), dtype=points.dtype, device=points.device) / 2.0
+        local = pose.inverse().transform(points)
+        mask = (local.abs() <= half.reshape(1, 3)).all(dim=1)
+        cropped = points[mask].detach().cpu().numpy()
+        if cropped.size == 0:
+            return self
+        return self.add_points(cropped, name=name, color=color, size=size, opacity=opacity)
+
     def add_points(
         self,
         points: np.ndarray | torch.Tensor | PoseTW,
@@ -627,6 +665,120 @@ class SnippetPlotBuilder:
             return arr.reshape(-1, 3)[0]
         arr_np = np.asarray(center)
         return arr_np.reshape(-1, 3)[0]
+
+    def _pose_from_tw_payload(self, pose: np.ndarray | torch.Tensor | PoseTW | Sequence[float]) -> PoseTW:
+        """Return a single `PoseTW` from a flattened PoseTW or matrix payload."""
+
+        if isinstance(pose, PoseTW):
+            data = pose.tensor().detach().cpu().to(dtype=torch.float32)
+            if data.ndim > 1:
+                data = data.reshape(-1, data.shape[-1])[0]
+            return PoseTW(data)
+        if isinstance(pose, torch.Tensor):
+            data_np = pose.detach().cpu().numpy()
+        else:
+            data_np = np.asarray(pose, dtype=np.float32)
+        data_np = np.asarray(data_np, dtype=np.float32)
+        if data_np.shape == (3, 4):
+            return PoseTW.from_matrix3x4(torch.from_numpy(data_np))
+        if data_np.shape == (4, 4):
+            return PoseTW.from_matrix3x4(torch.from_numpy(data_np[:3, :4]))
+        flat = data_np.reshape(-1)
+        if flat.size != 12:
+            raise ValueError(f"Expected a flattened PoseTW payload with 12 values, got {flat.size}.")
+        return PoseTW(torch.from_numpy(flat.astype(np.float32, copy=False)))
+
+    def add_oriented_box_corners(
+        self,
+        corners_world: np.ndarray | torch.Tensor,
+        *,
+        name: str,
+        color: str,
+        width: int = 5,
+        opacity: float = 0.95,
+    ) -> Self:
+        """Add one or more oriented boxes from world-frame corners."""
+
+        corners_np = (
+            corners_world.detach().cpu().numpy()
+            if isinstance(corners_world, torch.Tensor)
+            else np.asarray(corners_world)
+        )
+        corners_np = np.asarray(corners_np, dtype=float)
+        if corners_np.ndim == 2:
+            corners_np = corners_np.reshape(1, 8, 3)
+        if corners_np.shape[-2:] != (8, 3):
+            raise ValueError(f"Expected OBB corners shaped (8, 3) or (K, 8, 3), got {corners_np.shape}.")
+
+        self._update_scene_ranges(corners_np.reshape(-1, 3))
+        edges = corners_np[:, BBOX_EDGE_IDX]
+        x, y, z = _flatten_edges_for_plotly(edges.reshape(-1, 2, 3))
+        self.fig.add_trace(
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                mode="lines",
+                line={"color": color, "width": width},
+                name=name,
+                showlegend=True,
+                opacity=opacity,
+                hoverinfo="name",
+            )
+        )
+        return self
+
+    def add_oriented_box(
+        self,
+        *,
+        pose_world_object: np.ndarray | torch.Tensor | PoseTW | Sequence[float],
+        extents: np.ndarray | torch.Tensor | Sequence[float],
+        name: str,
+        color: str,
+        width: int = 5,
+        opacity: float = 0.95,
+    ) -> Self:
+        """Add an oriented box from a world<-object pose and XYZ side lengths."""
+
+        pose = self._pose_from_tw_payload(pose_world_object)
+        extents_np = (
+            extents.detach().cpu().numpy()
+            if isinstance(extents, torch.Tensor)
+            else np.asarray(extents, dtype=np.float32)
+        )
+        half = np.asarray(extents_np, dtype=np.float32).reshape(3) / 2.0
+        signs = np.array(
+            [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]],
+            dtype=np.float32,
+        )
+        local = torch.from_numpy(signs * half).to(device=pose.device, dtype=pose.dtype)
+        corners = pose.transform(local)
+        return self.add_oriented_box_corners(
+            corners,
+            name=name,
+            color=color,
+            width=width,
+            opacity=opacity,
+        )
+
+    def add_obb(
+        self,
+        obb: ObbTW,
+        *,
+        name: str,
+        color: str,
+        width: int = 5,
+        opacity: float = 0.95,
+    ) -> Self:
+        """Add one or more `ObbTW` boxes using their world-frame corners."""
+
+        return self.add_oriented_box_corners(
+            obb.bb3corners_world,
+            name=name,
+            color=color,
+            width=width,
+            opacity=opacity,
+        )
 
     def _add_frusta_for_poses(
         self,

@@ -38,6 +38,7 @@ from ..pose_generation import (
 )
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.fingerprints import stable_config_hash, stable_msgspec_hash
+from .manifest import RolloutStoreInvocation, RolloutStoreManifestContext, collect_runtime_provenance
 from .trace import INVALID_REASON_VERSION, RolloutLineage, RolloutZarrRecord
 from .zarr_store import (
     RolloutZarrStoreConfig,
@@ -325,7 +326,7 @@ class RolloutDatasetWriter:
         )
         self.stats = RolloutDatasetWriterStats()
 
-    def run(self) -> RolloutZarrWriteResult:
+    def run(self, *, invocation: RolloutStoreInvocation | None = None) -> RolloutZarrWriteResult:
         """Build the configured rollout store."""
 
         dataset = self.config.source.setup_target()
@@ -395,6 +396,11 @@ class RolloutDatasetWriter:
             field_retention_policy=self.config.store.field_retention_policy,
             source_offline_store_version=source_lineage.source_cache_version,
             split_manifest_hash=source_lineage.split_manifest_hash,
+            manifest_context=RolloutStoreManifestContext(
+                writer_config=self.config.model_dump_jsonable(),
+                invocation=invocation or RolloutStoreInvocation.programmatic(),
+                runtime=collect_runtime_provenance(),
+            ),
         )
         self.stats.rollouts_written = int(result.num_rollouts)
         validation = validate_rollout_zarr_store(result.store_dir)

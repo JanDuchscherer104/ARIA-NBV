@@ -5,7 +5,7 @@
 
 = Problem and Research Contract
 
-ARIA-NBV is a target-conditioned, finite-candidate #NBV problem in the
+ARIA-NBV is a target-conditioned, finite-candidate #gls("next-best-view") problem in the
 Project Aria / ASE / EFM observation regime. The thesis is deliberately not a
 first-order continuous-control claim: it tests whether bounded planning over a
 finite valid candidate table improves target reconstruction quality beyond
@@ -113,7 +113,7 @@ The non-myopic headroom estimate is
 #block[#align(center)[#eqs.entity.lookahead_headroom]]
 
 If #symb.entity.lookahead_headroom is approximately zero, the thesis reports that the current
-candidate distribution and target-#RRI objective are effectively myopic. If it
+candidate distribution and target #gls("relative-reconstruction-improvement") objective are effectively myopic. If it
 is positive, the learned planner is judged by recovery over the one-step
 actor-visible target scorer:
 

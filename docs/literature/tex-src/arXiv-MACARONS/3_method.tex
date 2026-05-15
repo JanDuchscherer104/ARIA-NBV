@@ -1,0 +1,114 @@
+\section{Problem setup}
+\label{sec:problem_setup}
+\input{figs/overview}
+
+The general aim of Next Best View is to identify the next most informative sensor position(s) for reconstructing a 3D object or scene efficiently and accurately. Like previous works~\cite{guedon-nips22-scone-surface-coverage}, we look for the view that increases the most the total coverage of the scene surface. Optimizing such criterion makes sure we do not miss parts of the target scene.
+
+We denote the set of occupied points in the scene by $\chi \subset \IR^3$; its boundary $\partial\chi$ is made of the surface points of the scene. During the exploration, at any time step $t\geq 0$, our method has built a partial knowledge of the scene: It has captured \emph{observations} $(I_0, ..., I_t)$ from the \emph{poses} $(c_0, ..., c_t)$ it visited. The 6D poses $c_i=(c_i^\pos, c_i^\rot)\in\calC:=\IR^3\times SO(3)$ encode both the position and the orientation of the sensor. In our case, observations $I_i$ are RGB images. 
+
+To solve the NBV problem, we want to build a model that takes as inputs $(c_0, ..., c_t)$ and $(I_0,...,I_t)$ and predicts the next sensor pose $c_{t+1}$ that will maximize the number of new visible surface points, \ie, points in $\partial\chi$ that will be visible in the observation $I_{t+1}$ but not in the previous observations $I_0, ..., I_t$. We call the number of new visible surface points the \emph{surface coverage gain}. We assume the method is provided a 3D bounding box to delimit the part of the scene it should reconstruct.
+
+\section{Method}
+\label{sec:method}
+
+Figure~\ref{fig:pipeline} gives an overview of our pipeline and our self-supervised online learning procedure. During online exploration, we perform a training iteration at each time step $t$ which consists in three steps. 
+
+First, during the \emph{Decision Making step}, 
+we select the next best camera pose to explore the scene by running our three modules:  the \emph{depth module} predicts the depth map for the current frame from the last capture frames, which is added to a point cloud that represents the scene. This point cloud is used by the \emph{volume occupancy module} to predict a volume occupancy field, which is in turn used by the \emph{surface coverage gain module} to compute the surface coverage gain of a given camera pose. We use this last module to find a camera pose around the current pose that optimizes this surface coverage gain. 
+
+Second, the \emph{Data Collection \& Memory Building} step, during which the camera moves toward the camera pose previously predicted, creates a self-supervision signal for all three modules and stores these signals into the Memory. 
+
+Third and last, the \emph{Memory Replay} step selects randomly supervision data stored into the Memory and updates the weights of each of the three modules.
+
+We detail below our architecture and the three steps of our training procedure.
+
+\subsection{Architecture}\label{sec:archi}
+
+\paragraph{Depth module.} The goal of this module is to reconstruct the surface points observed by the RGB camera in real time during the exploration. To this end, it takes as input a sequence of recently captured images $I_t, I_{t-1}, .., I_{t-m}$ as well as the corresponding camera poses $c_t, c_{t-1}, .., c_{t-m}$ with $0 \leq m\leq t$  and predicts the depth map $d_t$ corresponding to the latest observation $I_t$. 
+
+We follow Watson~\etal~\cite{watson-cvpr21-temporal-opportunist-manydepth} and build this module around a cost-volume feature. We first use pretrained ResNet18~\cite{he-cvpr16-deepresiduallearning} layers to extract features $f_i$ from images $I_i$. We define a set of ordered planes perpendicular to the optical axis at $I_t$ with depths linearly spaced between extremal values.
+%
+Then, for each depth plane, we use the camera poses to warp the features $f_{t-j}, 0<j\leq m$ to the image coordinate system of the camera $c_t$, and compute the pixelwise L1-norm between the warped features and $f_t$. This results in a cost volume that encodes for every pixel the likelihood of each depth plane to be the correct depth. 
+%
+We implement this depth prediction with a U-Net architecture~\cite{ronneberger-15-unet} similar to~\cite{watson-cvpr21-temporal-opportunist-manydepth} that takes as inputs $f_t$ and the cost volume to recover $d_t$. More details can be found in~\cite{watson-cvpr21-temporal-opportunist-manydepth}.
+Contrary to~\cite{watson-cvpr21-temporal-opportunist-manydepth}, we suppose the camera poses to be known for faster convergence. We use $m=2$ in our experiments. In practice, the most recent images of our online learning correspond to images captured along the way between two predicted poses $c_t$ and $c_{t+1}$ so we use them instead of $I_0, .., I_t$.
+
+We then backproject the depth map $d_t$ in 3D, filter the point cloud and concatenate it to the previous points obtained from $d_0, .., d_{t-1}$. We filter points associated to strong gradients in the depth map, which we observed are likely to yield wrong 3D points: We remove points based on their value for the edge-aware smoothness loss appearing in~\cite{watson-cvpr21-temporal-opportunist-manydepth,godard-cvpr17-unsupervisedmonoculardepth,heise-iccv13-pmhuber} that we also use for training. We hypothesize such outliers are linked to the module incapacity to output sudden changes in depth, thus resulting in over-smooth depth maps. We denote by $S_t$ the reconstructed surface point cloud resulting from all previous projections.
+
+\paragraph{Volume occupancy module.} This module computes a ``volume occupancy field'' $\sigma_t$ from the predicted depth maps.
+Given a 3D point $p$, $\sigma_t(p)=0$ indicates that the module is confident the point is empty; $\sigma_t(p)=1$ indicates that the module is confident the point is occupied. As shown in Figure~\ref{fig:volume-occupancy-probability}, during exploration, $\sigma_t(p)$ evolves as the module becomes more and more confident that $p$ is empty or occupied.
+
+We implement this module using a Transformer~\cite{vaswani-nips17-attentionisallyouneed} taking as input the point $p$, the surface point cloud $S_t$ and previous poses $c_i$, and outputting a scalar value in $[0, 1]$. The exact architecture is provided in the appendix. This volumetric representation is convenient to build a NBV prediction model that scales to large environments. Indeed, it has a virtually infinite resolution and can handle arbitrarily large point clouds without failing to encode fine details since it uses mostly local features at different scales to compute the probability of a 3D point to be occupied. 
+
+\paragraph{Surface coverage gain module.}
+The final module computes the surface coverage gain of a given camera pose $c$ based on the predicted occupancy field, as proposed by~\cite{guedon-nips22-scone-surface-coverage} but with key modifications.
+
+Similar to~\cite{guedon-nips22-scone-surface-coverage}, given a time step $t$, a camera pose $c$ and a 3D point $p$, we define the visibility gain $g_t(c;p)$ as a scalar function in $[0, 1]$ such that values close to 1 correspond to occupied points that will become visible through $c$ and values close to 0 correspond to points not newly visible through $c$. In particular, the latter includes points with low occupancy, points not visible from $c$ or points already visible from prior poses. We model this function using a Transformer-based architecture accounting for both the predicted occupancy and the camera history. 
+
+Specifically, we first sample $N$ random points $(p_j)_{1\leq j\leq N}$ in the field of view $F_c$ of camera $c$ with probabilities proportional to $\sigma_t(p_j)$ using inverse transform sampling. Second, we represent the camera history of previous camera poses $c_0, ..., c_t$ for each point $p_j$ by projecting them on the sphere centered on $p_j$ and encoding the result into a spherical harmonic feature we denote by $h_t(p_j)$. Finally, we feed the camera pose $c$, a 3D point $p_j$, its occupancy $\sigma_t(p_j)$ as well as the camera history feature $h_t(p_j)$ to the Transformer predicting the corresponding visibility gain $g_t(c;p_j)$. Note that the self-attention mechanism is useful to deal with potential occlusions between points. 
+
+The visibility gains of all points are aggregated using a Monte Carlo integration to estimate the surface coverage gain $G_t(c)$ of any camera pose $c$:%
+\begin{equation}
+    G_t(c) = V_c \cdot \frac{1}{N} \sum_{j=1}^N g_t(c; p_j) \cdot l(c; p_j) \> ,
+    \label{coverage_gain}
+\end{equation}
+%
+where $V_c$ and $l(c; p_j)$ are two key quantities we introduce compared to the original formula of~\cite{guedon-nips22-scone-surface-coverage}. First, we multiply the sum by $V_c = \int_{F_c} \sigma_t(p) dp$ (\ie, the volume of occupied points seen from $c$) to account for its variability between different camera poses, which is typically strong for complex 3D scenes. Second, since the density of surface points visible in images decrease with the distance between the surface and the camera, we also weight the visibility gains with factor $l(c; p_j) = \min(1/\|c^\pos-p_j\|^2,\tau)$ inversely proportional to the distance between the camera center and the point, to give less importance to points far away from the camera. We also made several minor improvements to the computation of the surface coverage gain, which we detail in the appendix.
+
+\input{figs/occupancy}
+
+\subsection{Decision Making: Predicting the NBV}
+
+At any time $t$, the Decision Making step simply consists in applying successively the three modules of the model, as described in~\Cref{sec:archi}.
+Consequently, we first apply the depth prediction module on the current frame $I_t$ and use the resulting depth map $d_t$ to update the surface point cloud $S_t$. Then, for a set of candidate camera poses $\calC_t \subset \calC$, we apply the other modules to compute in real time the volume occupancy field and estimate the surface coverage gain $G_t(c)$ of all camera poses $c\in\calC_t$.
+%
+In practice, we build $\calC_t$ by simply sampling around the current camera pose but more complex strategies could be developed.
+%
+We select the NBV as the camera pose with the highest coverage gain:
+%
+\begin{equation}
+    c_{t+1} = \argmax_{c \in \calC_t} G_t(c) \> .
+\end{equation}
+
+We do not compute gradients nor update the weights of the model during the Decision Making step. Indeed, since the camera visits only one of the candidate camera poses at next time step $t+1$, we do not gather data about all neighbors. Consequently, we are not able to build a self-supervision signal involving every neighbor. As we explain in the next subsection, we build a self-supervision signal to learn coverage gain from RGB images only by exploiting the camera trajectory between poses $c_t$ and $c_{t+1}$.
+
+\subsection{Data Collection \& Memory Building}
+\input{supp_mat/figs/trajectory}  % For arXiv version  TODO
+
+During Data Collection \& Memory Building, we move the camera to the next pose $c_{t+1}$. This is done by simple linear interpolation between $c_t$ and $c_{t+1}$ and capture $n$ images along the way, including the image $I_{t+1}$ captured from the camera pose $c_{t+1}$. 
+We denote these images by $I'_{t,1}, ..., I'_{t,n}$ so  $I'_{t, n} = I_{t+1}$, and write $I'_{t, 0} := I_t$.
+
+Then, we collect a self-supervision signal for each of the three modules, which we store in the Memory. Some of the previous signals can be discarded at the same time, depending on the size of the Memory.
+
+\paragraph{Depth module.} We simply store the consecutive frames $I'_{t,1}, ..., I'_{t,n}$, which we will use to train the module in a standard self-supervised fashion.
+
+\paragraph{Volume occupancy module.} We rely on Space Carving~\cite{kutulakos00space} using the predicted depth maps to create a supervision signal to train the prediction of the volume occupancy field. Our key idea is as follows: When the whole surface of the scene is covered with depth maps, a 3D point $p \in \IR^3$ is occupied iff for any depth map $d$ containing $p$ in its field of view, $p$ is located behind the surface visible in $d$. Consequently, if we had images covering the entire scene and their corresponding depth maps, we could  compute the complete occupancy field of the scene by removing all points that are not located behind depth maps. 
+
+In practice, we only have access to the depth maps $d_{t, 1}', ..., d_{t,n}'$ predicted for the images captured so far. We can still compute an intermediate occupancy field, which is an approximation but can be used as supervision signal. Since it is not reliable far away from the depth maps when the whole surface has not been covered, we only sample points around the newly reconstructed surface within a margin that increases with the total number of depth maps. 
+
+Finally, we store in the Memory some of the sampled points with their occupancy value for future supervision, and update the value of points already stored in the Memory.
+
+\paragraph{Surface coverage gain module.} The process to build supervision values for training the surface coverage gain prediction is as follows. Using the data collected at time steps $i\leq t$, we apply the surface coverage gain module to predict the surface coverage gain of camera poses $c'_{t,1}, ..., c'_{t,n-1}$. Then, for each $c'_{t,i}$, we compute a supervision value for the coverage gain by counting the number of new visible surface points appearing in the depth map $d'_{t, i}$.  
+%
+We consider a surface point to be new if its distance to the previous reconstructed point cloud $S_t$ is at least $\epsilon$, where $\epsilon$ is a hyperparameter used for coverage evaluation.
+
+We finally update the surface point cloud $S_t$ stored in the Memory. We also store the poses $c'_{t,i}$ and the depth maps $d'_{t,i}$, in order to recompute supervision values for surface coverage gain when sampling from the Memory.
+
+\subsection{Memory Replay}
+
+During this step, we randomly sample the data stored in the Memory to train each of the modules as follows. We add to these samples the newly acquired data, to make sure the model learns from the current state of the scene. The more memory replay iterations, the faster the model learns and converges but the slower it explores.
+
+\paragraph{Depth module.} We follow a standard loss from self-supervised monocular depth prediction literature~\cite{watson-cvpr21-temporal-opportunist-manydepth,godard-iccv19-digginginto,godard-cvpr17-unsupervisedmonoculardepth} to train the depth prediction module from RGB images. The only difference is that in our case, we use multiple input images. We thus predict the depth map for the current image from the $m$ previously captured images. The loss compares these images after warping using the predicted depth map with the same reconstruction loss as~\cite{watson-cvpr21-temporal-opportunist-manydepth,godard-iccv19-digginginto,godard-cvpr17-unsupervisedmonoculardepth}, which is a combination of SSIM, L1 and an edge-aware smoothness loss. We also include in this loss the next image as suggested in~\cite{watson-cvpr21-temporal-opportunist-manydepth}, since it greatly improves performance.
+
+\paragraph{Volume occupancy module.}
+
+We train this module by comparing its predictions, computed from $S_t$ and the previous camera poses, to the updated carved occupancy field computed from the newly acquired data with the MSE loss. 
+\input{figs/recons}  % TODO For arxiv version
+
+\paragraph{Surface coverage gain module.}
+
+We rely on a loss different from \cite{guedon-nips22-scone-surface-coverage} to train the surface coverage gain, which improves performance and interpretability.
+%
+\cite{guedon-nips22-scone-surface-coverage} showed that its formalism can estimate the surface coverage gain by integrating over the volume occupancy, but only to a scale factor that cannot be computed in closed form. Moreover, their training approach requires to have a dense set of cameras for each forward pass, since they compute the surface coverage gain as a distribution over the whole set of camera poses to compute their loss. They solve this requirement using many renderings of ShapeNet objects, but such a dense set is not available in our online self-supervised setting. Also, their normalization using softmax does not enforce the lowest visibility gain values to be close to zero.
+
+Since the predicted coverage gains are supposed to be proportional to the real values, we propose a much simpler approach that consists in dividing both predicted and supervision coverage gains by their respective means on a potentially small set of cameras. We then compare these normalized coverage gains directly with a L1-norm. This simpler loss also enforces the lowest visibility gain values to be equal to zero. Overall, this loss function applies better constraints on the model to target meaningful visibility gains, and allows for training with less camera poses, which is essential to let our model learn in an online self-supervised fashion where only a few coverage gain values are available at real-time. Additional figures showing the proportionality of predicted and true coverage gains are available in the appendix.

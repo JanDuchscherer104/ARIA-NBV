@@ -194,7 +194,7 @@ def _viewer_command(
         "--serve-web",
         "--web-viewer-port",
         str(web_viewer_port),
-        "--ws-server-port",
+        "--port",
         str(ws_server_port),
         str(save_path),
     ]

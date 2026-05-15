@@ -1,0 +1,260 @@
+%\vspace{\sectionReduceTop}
+\section{PointGoal Navigation at Scale}
+%\vspace{\sectionReduceBot}
+
+To demonstrate the utility of the Habitat platform design, we carry out experiments to test for generalization of goal-directed visual navigation agents between datasets of different environments and to compare the performance of learning-based agents against classic agents as the amount of available training experience is increased.
+
+\xhdr{Task definition.}
+We use the PointGoal task (as defined by Anderson~\etal~\cite{Anderson2018-Evaluation}) as our 
+experimental testbed. This task is ostensibly simple to define -- 
+an agent is initialized at a random starting position and 
+orientation in an environment and asked to navigate to target coordinates that are provided relative to the agent's position; 
+no ground-truth map is available and the agent must only use
+%its the goal signal and 
+its sensory input to navigate. 
+However, in the course of experiments, we realized that 
+this 
+%definition is significantly underspecified and there are 
+task leaves space for
+subtle choices that (a) can make a significant difference in 
+experimental outcomes and (b) are either not specified 
+or inconsistent across papers, making comparison difficult. 
+We attempt to be as descriptive as possible about these 
+seemingly low-level choices; we hope the Habitat platform will help iron out these inconsistencies. 
+
+\xhdr{Agent embodiment and action space.}
+The agent is physically embodied as a cylindrical primitive shape with diameter $0.2\text{m}$ and height $1.5\text{m}$.
+The action space consists of four actions: \turnleft, \turnright, \forward, and \callstop.
+These actions are mapped to idealized actuations that result in $10$ degree turns for the turning actions and linear displacement of $0.25\text{m}$ for the \forward action. 
+The \callstop action allows the agent to signal that it has reached the goal.
+Habitat supports noisy actuations but experiments in this paper are conducted in the noise-free setting as our analysis focuses on other factors.
+
+\xhdr{Collision dynamics.} 
+Some previous works~\cite{Anderson2018-Language} use a coarse 
+irregular navigation graph where an agent effectively 
+`teleports' from one location to another ($1$-$2\text{m}$ apart). Others~\cite{embodiedqa} use a fine-grained regular grid 
+($0.01\text{m}$ resolution) where the agent moves on unoccupied cells 
+and there are no collisions or partial steps. 
+%where the agent cannot actually collide with 
+%obstacles 
+In Habitat and our experiments, we use a more realistic 
+collision model -- 
+the agent navigates in 
+a continuous state space\footnote{Up to machine precision.}
+%in a realistic 3D environment, 
+and motion can produce collisions resulting in partial 
+(or no) progress along the direction intended -- simply put, 
+it is possible for the agent to `slide' along a wall or obstacle. 
+Crucially, the agent may choose \forward (0.25m) and 
+end up in a location that is \emph{not} 0.25m 
+forward of where it started; thus, 
+odometry is not trivial even in the absence of actuation noise. 
+%On the other hand, the absence of actuation noise allows in 
+%our experiments allow an agent to easily acertain whether a 
+%collision happened 
+
+\xhdr{Goal specification: static or dynamic?}
+One conspicuous underspecification in the PointGoal task~\cite{Anderson2018-Evaluation} is whether the goal coordinates 
+are \emph{static} (\ie provided once at the start of the episode) 
+or \emph{dynamic} (\ie provided at \emph{every} time step). 
+The former is more realistic -- it is difficult to imagine a real 
+task where an oracle would provide precise dynamic goal coordinates. 
+However, in the absence of actuation noise and collisions, 
+every step taken by the agent results in a known turn or 
+translation, and this combined with the initial goal location is 
+functionally equivalent to dynamic goal specification. 
+We hypothesize that this is why recent works~\cite{kojima2019learn, mishkin2019benchmarking, gupta_cvpr17} used dynamic 
+goal specification. 
+We follow and prescribe the following conceptual delineation 
+-- as a \emph{task}, we adopt static PointGoal navigation; 
+%because it is realistic; 
+as for the \emph{sensor suite}, we equip our 
+agents with an idealized GPS+Compass sensor.  
+This orients us towards a realistic task (static PointGoal navigation), disentangles simulator design 
+(actuation noise, collision dynamics) from the task definition, 
+and allows us to compare techniques by sensors used 
+(RGB, depth, GPS, compass, contact sensors). 
+
+%There are several options for specifying the 
+%goal position relative to the agent. 
+%On one end of the spectrum, the most challenging setting would be to provide an initial relative position to the goal but no subsequent information as the agent navigates within the environment.
+%We call this the `one shot' PointGoal task.
+%On the other extreme, we can provide the relative offset from the agent to the goal as well as the current absolute orientation of the agent at each time step.
+%With this information, it is possible to deduce the ego-motion of the agent and to perfectly localize it relative to the goal.
+%In between these two variations is the setting of providing just the relative offset of the goal from the agent at each step.
+%This setting has the practical analogue of an idealized indoor GPS signal to the goal coordinates.
+%We use this idealized indoor GPS PointGoal setting for all our experiments.
+%The vector to the goal is encoded in polar coordinates $(r,\theta)$ in the agent's coordinate frame of reference.
+
+
+\begin{comment}
+\xhdr{Task definition.}
+%We evaluate the performance of various baseline methods on an idealized goal-directed visual navigation task.
+We follow the PointGoal task as defined by Anderson~\etal~\cite{Anderson2018-Evaluation}.
+In this task, a virtual agent is initialized at a random starting position and orientation in an environment and is required to navigate to target coordinates that are provided relative to the agent's position.
+To be successful and efficient, the agent should ideally avoid obstacles and make consistent progress towards the goal. %also have a sense of its motion (ego-motion).
+This setting provides a strong signal describing the goal (relative position from the agent's current position at each time step), but is still challenging.
+Firstly, the agent must navigate a continuous state space in a realistic 3D environment, where motion can produce collisions resulting in partial or no forward progress.
+Moreover, no ground-truth map is available and the agent must use only its the goal signal and its sensory input to navigate.
+\end{comment}
+
+
+\xhdr{Sensory input.}
+The agents are endowed with a single color vision sensor placed at a height of $1.5\text{m}$ from the center of the agent's base and oriented to face `forward'.
+This sensor provides RGB frames at a resolution of $256^2$ pixels 
+and with a field of view of $90$ degrees.
+In addition, an idealized depth sensor is available, in the same position and orientation as the color vision sensor.
+%The depth sensor returns noise-free depth values in meters from the agent's current position, perpendicular to the camera image plane.
+The field of view and resolution of the depth sensor 
+match those of the color vision sensor.
+We designate agents that make use of the color sensor by \rgb, 
+agents that make use of the depth sensor by \depth, 
+and agents that make use of both by \rgbd.
+Agents that use neither sensor are denoted as \blind.
+All agents are equipped with an idealized GPS and compass 
+-- \ie, they have access to their location coordinates, and 
+implicitly their orientation relative to the goal position.
+%Note that this is a \emph{weaker} sensor suite than used by prior work assuming access to both~\cite{gupta_cvpr17}. 
+%location and orientation 
+%(due to design decisions about lack of actuation 
+%noise and collision dynamics). 
+%Agents are not equipped with contact sensors, however, 
+%they are exactly inferrable given lack of actuator noise. 
+
+\xhdr{Episode specification.}
+%At the outset of an episode, 
+We initialize the agent at a starting position and 
+orientation that are sampled uniformly at random from all 
+navigable positions on the floor of the environment. 
+The goal position is chosen such that it lies on the 
+same floor and there exists a navigable path from the 
+agent's starting position. 
+During the episode, the agent is allowed to take up to 
+\maxsteps actions.
+This threshold significantly exceeds the number of steps an optimal agent requires to reach all goals (see the supplement).
+After each action, the agent receives a set of 
+observations from the active sensors. 
+%as well as an updated vector to the goal.
+
+\xhdr{Evaluation.}
+A navigation episode is considered successful if and only if the agent issues a \callstop action within $0.2\text{m}$ of the target coordinates, as measured by a geodesic distance along the shortest path from the agent's position to the goal position.
+If the agent takes \maxsteps actions without the above condition being met the episode ends and is considered unsuccessful.
+%Otherwise, when the agent calls the \callstop action, the episode ends and its 
+Performance is measured using the `Success weighted by Path Length' (\spl) metric~\cite{Anderson2018-Evaluation}.
+For an episode where the geodesic distance of the 
+shortest path is $l$ and the agent traverses a distance $p$, 
+\spl is defined as $S \cdot \nicefrac{l}{\max(p,l)}$, where $S$ is a binary indicator of success.
+%Note that if the agent does not invoke the \callstop action during an episode, the episode is deemed to be unsuccessful and the \spl is equal to zero.
+
+\xhdr{Episode dataset preparation.}
+We create PointGoal navigation episode-datasets for Matterport3D~\cite{Chang2017} and Gibson~\cite{Xia2018} scenes. 
+For Matterport3D we followed the publicly available train/val/test splits.
+Note that as in recent works~\cite{embodiedqa, mishkin2019benchmarking, kojima2019learn}, 
+there is no overlap between train, val, and test scenes. 
+For Gibson scenes, we obtained textured 3D surface meshes from the Gibson authors~\cite{Xia2018}, manually annotated each scene 
+on its reconstruction quality 
+(small/big holes, floating/irregular surfaces, poor textures), 
+and curated a subset of 106 scenes (out of 572); 
+see the supplement for details.
+%and curated them to prune poor-quality reconstructions 
+%\Cref{tab:dataset_stats} reports the statistics of these datasets.
+An episode is defined by the unique id of the scene, the starting position and orientation of the agent, and the goal position.
+Additional metadata such as the geodesic distance along the shortest path (\gdsp) from start position to goal position is also included.
+While generating episodes, we restrict the \gdsp 
+%between the start and goal positions 
+to be between $1\text{m}$ and $30\text{m}$.
+%
+%\input{table/dataset_stats}
+%
+An episode is trivial if there is an obstacle-free straight line between the start and goal positions.
+A good measure of the navigation complexity of an episode is the ratio of \gdsp to Euclidean distance between start and goal positions (notice that \gdsp can only be larger than or equal to the Euclidean distance).
+%to the corresponding Euclidean distance.
+If the ratio is nearly $1$, there are few obstacles and the episode is easy; if the ratio is much larger than $1$, the 
+episode is difficult because strategic navigation is required. 
+To keep the navigation complexity of the precomputed episodes reasonably high, we perform rejection sampling for episodes with the above ratio falling in the range $[1, 1.1]$. 
+Following this, there is a significant decrease in the number of  near-straight-line episodes (episodes with a ratio in $[1, 1.1]$)
+ -- from $37\%$ to $10\%$ for the Gibson dataset generation. 
+This step was not performed in any previous studies.
+We find that without this filtering, all metrics appear inflated.
+Gibson scenes have smaller physical dimensions compared to 
+the Matterport3D scenes.
+This is reflected in the resulting PointGoal dataset -- 
+average \gdsp of episodes in Gibson scenes is smaller than that of Matterport3D scenes.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+    %\vspace{-14pt}
+    \centering
+    \includegraphics[width=\columnwidth]{fig/gibson_spl.pdf}\quad\quad
+    \includegraphics[width=\columnwidth]{fig/mp3d_spl.pdf}
+    %\vspace{-20pt}
+    \caption{Average SPL of agents on the val set over the course of training. Previous work~\cite{mishkin2019benchmarking, kojima2019learn} has analyzed performance at 5-10 million steps. Interesting trends emerge with more experience: i)~\blind agents initially outperform \rgb and \rgbd but saturate quickly; ii)~Learning-based \depth agents outperform classic SLAM. The shaded areas around curves show the standard error of SPL over five seeds.
+    }
+    \label{fig:classical_learning}
+    %\vspace{\captionReduceBot}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\xhdr{Baselines.}
+We compare the following baselines:
+\begin{compactitem}[\hspace{1pt}--]
+\item \textbf{Random} chooses an action randomly among \turnleft, \turnright, and \forward with uniform distribution.
+The agent calls the \callstop action when within $0.2\text{m}$ of the goal 
+%computed using the relative vector to the goal, 
+(computed using the difference of static goal and dynamic GPS
+coordinates).
+
+\item \textbf{Forward only} always calls the \forward action, and calls the \callstop action when within $0.2\text{m}$ of the goal.
+
+\item \textbf{Goal follower} moves towards the goal direction. If it is not facing the goal (more than $15$ degrees off-axis), it performs \turnleft or \turnright to align itself; otherwise, it calls \forward.
+The agent calls the \callstop action when within $0.2\text{m}$ of the goal.
+
+\item \textbf{RL (PPO)} is an agent trained with reinforcement 
+learning, 
+%reinforcement learning agent trained with 
+specifically proximal policy optimization \cite{Schulman2017ProximalPO}. 
+We experiment with RL agents equipped with different 
+visual sensors:  %configurations: 
+no visual input (\blind), \rgb input, \depth input, and  RGB with depth (\rgbd). 
+The model consists of a CNN that produces an embedding for visual input, which together with the relative goal vector 
+is used by an actor (GRU) and a critic (linear layer).
+The CNN has the following architecture: $\{$Conv 8$\times$8, ReLU, Conv 4$\times$4, ReLU, Conv  3$\times$3, ReLU, Linear, ReLU$\}$ (see supplement for details). 
+Let $r_t$ denote the reward at timestep $t$, 
+$d_{t}$ be the geodesic distance to goal at timestep $t$, 
+$s$ a success reward and $\lambda$ a time penalty (to encourage 
+efficiency). 
+All models were trained with the following reward function:
+%\vspace{\eqnReduceTop}
+$$
+    r_t=\begin{cases}
+s + d_{t - 1} - d_{t} + \lambda & \text{if goal is reached}
+\\ d_{t - 1} - d_{t} + \lambda & \text{otherwise}
+\end{cases}
+$$
+%
+In our experiments $s$ is set to $10$ and $\lambda$ is set to $-0.01$.
+Note that rewards are only provided in training environments; the task is challenging as the agent must generalize to unseen test environments.
+
+\item \textbf{SLAM \cite{mishkin2019benchmarking}} 
+is an agent implementing a classic robotics navigation pipeline 
+(including components for localization, mapping, and planning), using RGB and depth sensors.
+We use the classic agent by  Mishkin~\etal~\cite{mishkin2019benchmarking} which leverages the ORB-SLAM2~\cite{murORB2} localization pipeline, with the same parameters as reported in the original work.
+\end{compactitem}
+
+\vspace{1em}
+\xhdr{Training procedure.}
+When training learning-based agents, we first divide 
+the scenes in the training set equally among 
+$8$ (Gibson), $6$ (Matterport3D) concurrently running simulator worker threads. 
+Each thread establishes blocks of $500$ training 
+episodes for each scene in its training set partition 
+and shuffles the ordering of these blocks. 
+Training continues through shuffled copies of this array. 
+We do not hardcode the \callstop action to retain generality and allow for comparison with future work that does not assume GPS inputs.
+For the experiments reported here, we train until 
+$75$ million agent steps are accumulated across 
+all worker threads. This is 15x larger than the 
+experience used in previous investigations~\cite{mishkin2019benchmarking, kojima2019learn}. 
+Training agents to $75$ million steps took (in sum over all three datasets): $320$ GPU-hours for \blind, $566$ GPU-hours for \rgb, $475$ GPU-hours for \depth, and $906$ GPU-hours for \rgbd (overall $2267$ GPU-hours).
+%This total is equivalent to approximately three months of experience with which the RL PPO agents are trained.

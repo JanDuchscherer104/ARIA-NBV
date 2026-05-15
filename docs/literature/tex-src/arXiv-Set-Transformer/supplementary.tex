@@ -1,0 +1,572 @@
+\documentclass{article}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{xr}
+\externaldocument{set_transformer}
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2019} with \usepackage[nohyperref]{icml2019} above.
+\usepackage{hyperref}
+
+\usepackage{url}
+%\usepackage{caption}
+\usepackage{amsthm} % Added by LYH. Theorem env
+%\usepackage{booktabs,ctable,flushend} % Added by LYH. For tables
+\usepackage{mathtools} % Added by LYH. For \coloneqq
+\usepackage{amsfonts}
+\usepackage{amsmath}
+
+%\captionsetup[table]{skip=5pt}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{property}{Property}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Ls}{\mathcal{L}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\calO}{\mathcal{O}}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\def\gN{{\mathcal{N}}}
+
+\def\[#1\]{\begin{align}#1\end{align}}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+\usepackage[accepted]{icml2019}
+
+\icmltitlerunning{Supplementary Material for Set Transformer}
+
+\begin{document}
+
+\onecolumn
+
+\icmltitle{Supplementary Material for Set Transformer}
+
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Juho Lee}{oxford1,aitrics}
+\icmlauthor{Yoonho Lee}{kakao}
+\icmlauthor{Jungtaek Kim}{postech}
+\icmlauthor{Adam R. Kosiorek}{oxford1,oxford2}
+\icmlauthor{Seungjin Choi}{postech}
+\icmlauthor{Yee Whye Teh}{oxford1}
+\end{icmlauthorlist}
+
+\icmlaffiliation{oxford1}{Department of Statistics, University of Oxford, United Kingdom}
+\icmlaffiliation{oxford2}{Oxford Robotics Institute, University of Oxford, United Kingdom}
+%\icmlaffiliation{oxford2}{Applied Artificial Intelligence Lab, Oxford Robotics Institute, University of Oxford}
+\icmlaffiliation{postech}{Department of Computer Science and Engineering, POSTECH, Republic of Korea}
+\icmlaffiliation{aitrics}{AITRICS, Republic of Korea}
+\icmlaffiliation{kakao}{Kakao Corporation, Republic of Korea}
+
+\icmlcorrespondingauthor{Juho Lee}{juho.lee@stats.ox.ac.uk}
+
+\icmlkeywords{Set transformer, Set-taking network, Attention-based network, Permutation-invariant network}
+
+\vskip 0.3in
+
+\section{Proofs}
+\label{app:proofs}
+
+\begin{lemma}
+The mean operator $\mathrm{mean}(\{x_1, \ldots, x_n \}) = \frac{1}{n} \sum_{i=1}^n x_i$ is a special case of dot-product attention with softmax.
+\end{lemma}
+\begin{proof}
+Let $s = \mathbf{0} \in \R^d$ and $X \in \R^{n \times d}$.
+\[
+\mathrm{Att}(s, X, X; \mathrm{softmax})
+= \mathrm{softmax}\left( \frac{s X^\top}{\sqrt{d}} \right) X
+= \frac{1}{n} \sum_{i=1}^n x_i \nonumber
+\]
+\end{proof}
+
+\begin{lemma}
+The decoder of a Set Transformer, given enough nodes, can express any element-wise function of the form $\left( \frac{1}{n} \sum^n_{i=1} z_i^p \right)^\frac{1}{p}$.
+\end{lemma}
+\begin{proof}
+We first note that we can view the decoder as the composition of functions
+\[
+\mathrm{Decoder}(Z) &= \mathrm{rFF}(H) \\
+\textrm{where} \ \ H &=\mathrm{rFF}(\mathrm{MAB}(Z, \mathrm{rFF}(Z))) \label{eq:decoder_h}
+\]
+We focus on $H$ in \eqref{eq:decoder_h}.
+Since feed-forward networks are universal function approximators at the limit of infinite nodes, let the feed-forward layers in front and back of the MAB encode the element-wise functions $z \rightarrow z^p$ and $z \rightarrow z^{\frac{1}{p}}$, respectively.
+We let $h=d$, so the number of heads is the same as the dimensionality of the inputs, and each head is one-dimensional.
+Let the projection matrices in multi-head attention ($W_j^Q, W_j^K, W_j^V$) represent projections onto the jth dimension and the output matrix ($W^O$) the identity matrix.
+Since the mean operator is a special case of dot-product attention, by simple composition, we see that an MAB can express any dimension-wise function of the form
+\[
+M_p(z_1, \cdots, z_n) = \left( \frac{1}{n} \sum^n_{i=1} z_i^p \right)^\frac{1}{p}.
+\]
+\end{proof}
+
+\begin{lemma}
+\label{lem:sum}
+A PMA, given enough nodes, can express sum pooling $\left( \sum^n_{i=1} z_i \right)$.
+\end{lemma}
+\begin{proof}
+We prove this by construction.
+
+Set the seed $s$ to a zero vector and let $\omega(\cdot)=1+f(\cdot)$, where $f$ is any activation function such that $f(0)=0$.
+The identiy, sigmoid, or relu functions are suitable choices for $f$.
+The output of the multihead attention is then simply a sum of the values, which is $Z$ in this case.
+\end{proof}
+
+We additionally have the following universality theorem for pooling architectures:
+\begin{theorem}
+\label{thm:univ}
+Models of the form $\mathrm{rFF}(\mathrm{sum}(\mathrm{rFF}(\cdot)))$ are universal function approximators in the space of permutation invariant functions.
+\end{theorem}
+\begin{proof}
+See Appendix A of \citet{Zaheer2017}.
+\end{proof}
+
+By Lemma~\ref{lem:sum}, we know that $\mathrm{decoder}(Z)$ can express any function of the form $\textrm{rFF}(\mathrm{sum}(Z))$.
+Using this fact along with Theorem~\ref{thm:univ}, we can prove the universality of Set Transformers:
+
+\begin{proposition}
+\label{thm:univ_set}
+The Set Transformer is a universal function approximator in the space of permutation invariant functions.
+\end{proposition}
+\begin{proof}
+By setting the matrix $W^O$ to a zero matrix in every SAB and ISAB, we can ignore all pairwise interaction terms in the encoder.
+Therefore, the $\mathrm{encoder}(X)$ can express any instance-wise feed-forward network ($Z=\mathrm{rFF}(X)$).
+Directly invoking Theorem~\ref{thm:univ} concludes this proof.
+\end{proof}
+
+While this proof required us to ignore the pairwise interaction terms inside the SABs and ISABs to prove that Set Transformers are universal function approximators, our experiments indicated that self-attention in the encoder was crucial for good performance.
+
+\section{Experiment Details}
+In all implementations, we omit the feed-forward layer in the beginning of the decoder ($\mathrm{rFF}(Z)$) because the end of the previous block contains a feed-forward layer.
+All MABs (inside SAB, ISAB and PMA) use fully-connected layers with ReLU activations for rFF layers.
+
+In the architecture descriptions, $\mathrm{FC}(d,f)$ denotes the fully-connected layer with $d$ units and activation function $f$.
+$\mathrm{SAB}(d, h)$ denotes the SAB with $d$ units and $h$ heads.
+$\mathrm{ISAB}_m(d, h)$ denotes the ISAB with $d$ units, $h$ heads and $m$ inducing points.
+$\mathrm{PMA}_k(d, h)$ denotes the PMA with $d$ units, $h$ heads and $k$ vectors. All MABs used in SAB and PMA uses FC layers with ReLU activations for FF layers.
+
+\newcommand{\relu}{\mathrm{ReLU}}
+\newcommand{\bn}{\mathrm{BN}}
+\newcommand{\fc}{\mathrm{FC}}
+\newcommand{\sab}{\mathrm{SAB}}
+\newcommand{\isab}{\mathrm{ISAB}}
+\newcommand{\pma}{\mathrm{PMA}}
+\newcommand{\conv}{\mathrm{Conv}}
+
+\subsection{Max Regression}
+Given a set of real numbers $\{ x_1, \ldots, x_n\}$, the goal of this task is to return the maximum value in the set $\mathrm{max}(x_1, \cdots, x_n)$.
+We construct training data as follows.
+We first sample a dataset size $n$ uniformly from the set of integers $\{1, \cdots, 10 \}$.
+We then sample real numbers $x_i$ independently from the interval $[0, 100]$.
+Given the network's prediction $p$, we use the actual maximum value $\mathrm{max}(x_1, \cdots, x_n)$ to compute the mean absolute error $|p - \mathrm{max}(x_1, \cdots, x_n)|$.
+We don't explicitly consider splits of train and test data, since we sample a new set $\{ x_1, \ldots, x_n\}$ at each time step.
+
+\begin{table}[h]
+\small
+\centering
+\caption{Detailed architectures used in the max regression experiments.}
+\vspace{5pt}
+\begin{tabular}{@{}cccc@{}}\toprule
+\multicolumn{2}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+FF & SAB & Pooling & PMA \\
+\midrule
+$\fc(64,\relu)$ & $\sab(64, 4)$ & $\mathrm{mean, sum, max}$ & $\pma_1(64,4)$\\
+$\fc(64,\relu)$ & $\sab(64, 4)$ & $\fc(64,\relu)$ & $\fc(1,-)$\\
+$\fc(64,\relu)$ & & $\fc(1,-)$ & \\
+$\fc(64,-)$ & & & \\
+\bottomrule
+\end{tabular}
+\label{tab:max_architecture}
+\end{table}
+
+We show the detailed architectures used for the experiments in Table~\ref{tab:max_architecture}.
+We trained all networks using the Adam optimizer~\citep{Kingma2015} with a constant learning rate of $10^{-3}$ and a batch size of 128 for 20,000 batches, after which loss converged for all architectures.
+
+\subsection{Counting Unique Characters}
+\iffalse
+\begin{figure}[h]
+\centering\includegraphics[width=\columnwidth]{figs/omni20.png}
+  \caption{Try the task yourself: this is a randomly sampled set of 20 images from the Omniglot dataset. There are 14 different characters inside this set.}
+\label{fig:omni_try}
+\end{figure}
+\fi
+
+\begin{table}[h]
+\centering
+\caption{Detailed results for the unique character counting experiment.}
+\vspace{5pt}
+\begin{tabular}{@{}cc@{}} \toprule
+Architecture & Accuracy\\ \midrule
+rFF + Pooling & 0.4366 $\pm$ 0.0071 \\
+rFF + PMA & 0.4617 $\pm$ 0.0073\\
+rFFp-mean + Pooling & 0.4617 $\pm$ 0.0076 \\
+rFFp-max + Pooling & 0.4359 $\pm$ 0.0077 \\
+rFF + Dotprod & 0.4471 $\pm$ 0.0076 \\
+\hline
+SAB + Pooling & 0.5659 $\pm$ 0.0067 \\
+SAB + Dotprod & 0.5888 $\pm$ 0.0072 \\
+SAB + PMA (1) & \bf 0.6037 $\pm$ 0.0072\\
+SAB + PMA (2) & 0.5806 $\pm$ 0.0075\\
+SAB + PMA (4) & 0.5945 $\pm$ 0.0072\\
+SAB + PMA (8)  & 0.6001 $\pm$ 0.0078\\
+\bottomrule
+\end{tabular}
+\label{table:appunique}
+\end{table}
+
+\begin{table}[h]
+\small
+\centering
+\caption{Detailed architectures used in the unique character counting experiments.}
+\vspace{5pt}
+\begin{tabular}{@{}cccc@{}}\toprule
+\multicolumn{2}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+rFF & SAB & Pooling & PMA \\
+\midrule
+$\conv(64, 3, 2, \bn, \relu)$ & $\conv(64, 3, 2, \bn, \relu)$ & $\mathrm{mean}$ & $\pma_1(8, 8)$ \\
+$\conv(64, 3, 2, \bn, \relu)$ & $\conv(64, 3, 2, \bn, \relu)$ & $\fc(64, \relu)$ & $\fc(1, \mathrm{softplus})$ \\
+$\conv(64, 3, 2, \bn, \relu)$ & $\conv(64, 3, 2,\bn,\relu)$ & $\fc(1,\mathrm{softplus})$ & \\
+$\conv(64, 3, 2, \bn, \relu)$ & $\conv(64,3,2,\bn,\relu)$ & & \\
+$\fc(64,\relu)$ & $\sab(64,4)$ & & \\
+$\fc(64,\relu)$ & $\sab(64,4)$ & & \\
+$\fc(64,\relu)$& & & \\
+$\fc(64,-)$ & & & \\
+\bottomrule
+\end{tabular}
+\label{tab:unique_architecture}
+\end{table}
+
+The task generation procedure is as follows.
+We first sample a set size $n$ uniformly from the set of integers $\{ 6, \ldots, 10\}$.
+We then sample the number of characters $c$ uniformly from $ \{ 1, \ldots, n \}$.
+We sample $c$ characters from the training set of characters, and randomly sample instances of each character so that the total number of instances sums to $n$ and each set of characters has at least one instance in the resulting set.
+
+We show the detailed architectures used for the experiments in Table~\ref{tab:unique_architecture}.
+For both architectures, the resulting $1$-dimensional output is passed through a $\mathrm{softplus}$ activation to produce the Poisson parameter $\gamma$.
+The role of $\mathrm{softplus}$ is to ensure that $\gamma$ is always positive.
+
+The loss function we optimize, as previously mentioned, is the log likelihood $\log p(x | \gamma) = x \log(\gamma) - \gamma - \log(x!)$.
+We chose this loss function over mean squared error or mean absolute error because it seemed like the more logical choice when trying to make a real number match a target integer.
+Early experiments showed that directly optimizing for mean absolute error had roughly the same result as optimizing $\gamma$ in this way and measuring $|\gamma - x|$.
+We train using the Adam optimizer with a constant learning rate of $10^{-4}$ for 200,000 batches each with batch size 32.
+
+
+
+\subsection{Solving maximum likelihood problems for mixture of Gaussians}
+\label{subsec:clustering}
+\subsubsection{Details for 2D synthetic mixtures of Gaussians experiment}
+We generated the datasets according to the following generative process.
+\begin{enumerate}
+\item Generate the number of data points, $n \sim \mathrm{Unif}(100, 500)$.
+\item Generate $k$ centers.
+\[
+\mu_{j,d} \sim \mathrm{Unif}(-4, 4), \quad j=1,\dots, 4, \,\,\, d=1,2.
+ \]
+\item Generate cluster labels.
+\[
+\pi \sim \mathrm{Dir}([1,1]^\top), \quad z_i \sim \mathrm{Categorical}(\pi), \,\,  i=1,\dots, n.
+\]
+\item Generate data from spherical Gaussian.
+\[
+x_i \sim \gN(\mu_{z_i}, (0.3)^2 I).
+\]
+\end{enumerate}
+
+Table~\ref{tab:2d_synthetic_architecture} summarizes the architectures used for the experiments. For all architectures, at each training step, we generate 10 random datasets according to the above generative process, and updated the parameters via Adam optimizer  with initial learning rate $10^{-3}$. We trained all the algorithms for $50k$ steps, and decayed the learning rate to $10^{-4}$ after $35k$ steps. Table~\ref{tab:2d_synthetic_more_results} summarizes the detailed results with various number of inducing points in the ISAB.
+Figure~\ref{fig:synthetic_clustering} shows the actual clustering results based on the predicted parameters.
+
+\begin{table}[h]
+\small
+\centering
+\caption{Detailed architectures used in 2D synthetic experiments.}
+\vspace{5pt}
+\begin{tabular}{@{}ccccc@{}}\toprule
+\multicolumn{3}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-3} \cmidrule(lr){4-5}
+rFF & SAB & ISAB & Pooling & PMA \\
+\midrule
+$\fc(128,\relu)$ & $\sab(128,4)$ & $\isab_m(128,4)$ & $\mathrm{mean}$ & $\pma_4(128,4)$\\
+$\fc(128,\relu)$ & $\sab(128,4)$ & $\isab_m(128,4)$ & $\fc(128,\relu)$ & $\sab(128,4)$\\
+$\fc(128,\relu)$ & & & $\fc(128,\relu)$ & $\fc(4\cdot(1+2\cdot 2),-)$ \\
+$\fc(128,\relu)$& & & $\fc(128,\relu)$ & \\
+& & & $\fc(4\cdot(1+2\cdot 2),-)$ & \\
+\bottomrule
+\end{tabular}
+\label{tab:2d_synthetic_architecture}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Average log-likelihood/data (LL0/data) and average log-likelihood/data after single EM iteration (LL1/data) the clustering experiment. The number inside parenthesis  indicates the number of inducing points used in the SABs of encoder. For all PMAs, four seed vectors were used.}
+\vspace{5pt}
+\begin{tabular}{@{}ccc@{}} \toprule
+Architecture & LL0/data & LL1/data \\ \midrule
+Oracle & -1.4726 & \\
+\hline
+rFF + Pooling& -2.0006 $\pm$ 0.0123 &-1.6186 $\pm$ 0.0042 \\
+rFFp-mean + Pooling & -1.7606 $\pm$ 0.0213 &-1.5191 $\pm$ 0.0026 \\
+rFFp-max + Pooling & -1.7692 $\pm$ 0.0130 &-1.5103 $\pm$ 0.0035 \\
+rFF+Dotprod & -1.8549 $\pm$ 0.0128 &-1.5621 $\pm$ 0.0046 \\
+\hline
+SAB + Pooling & -1.6772 $\pm$ 0.0066 &-1.5070 $\pm$ 0.0115 \\
+ISAB (16) + Pooling & -1.6955 $\pm$ 0.0730 &-1.4742 $\pm$ 0.0158 \\
+ISAB (32) + Pooling & -1.6353 $\pm$ 0.0182 &-1.4681 $\pm$ 0.0038 \\
+ISAB (64) + Pooling & -1.6349 $\pm$ 0.0429 &-1.4664 $\pm$ 0.0080 \\
+rFF + PMA  & -1.6680 $\pm$ 0.0040 &-1.5409 $\pm$ 0.0037 \\
+SAB + PMA  & -1.5145 $\pm$ 0.0046 &-1.4619 $\pm$ 0.0048 \\
+ISAB (16) + PMA & -1.5009 $\pm$ 0.0068 &-1.4530 $\pm$ 0.0037 \\
+ISAB (32) + PMA & \bf -1.4963 $\pm$ 0.0064 & \bf-1.4524 $\pm$ 0.0044 \\
+ISAB (64) + PMA & -1.5042 $\pm$ 0.0158 &-1.4535 $\pm$ 0.0053 \\
+\bottomrule
+\end{tabular}
+\label{tab:2d_synthetic_more_results}
+\end{table}
+
+\subsubsection{2D Synthetic Mixtures of Gaussians Experiment on Large-scale Data}
+To show the scalability of the set transformer, we conducted additional experiments on large-scale 2D synthetic clustering dataset. We generated the synthetic data as before, except that we sample the number of data points $n~\mathrm{Unif}(1000, 5000)$ and set $k=6$. We report the clustering accuracy of a subset of comparing methods in Table~\ref{tab:2d_synthetic_large_scale}. The set transformer with only 32 inducing points works extremely well, demonstrating its scalability and efficiency.
+
+
+\iffalse
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.49\linewidth]{figs/ff.pdf}
+\includegraphics[width=0.49\linewidth]{figs/sab_ff.pdf}
+\includegraphics[width=0.49\linewidth]{figs/ff_sab.pdf}
+\includegraphics[width=0.49\linewidth]{figs/sab.pdf}
+\caption{Clustering results for 10 test datasets, along with centers and covariance matrices. rFF+Pooling (top-left), SAB+Pooling (top-right), rFF+PMA (bottom-left), Set Transformer (bottom-right). Best viewed magnified in color.}
+\label{fig:synthetic_clustering}
+\end{figure}
+\fi
+
+\begin{table}
+\centering
+\caption{Average log-likelihood/data (LL0/data) and average log-likelihood/data after single EM iteration (LL1/data) the clustering experiment on large-scale data. The number inside parenthesis  indicates the number of inducing points used in the SABs of encoder. For all PMAs, six seed vectors were used.}
+\vspace{5pt}
+\begin{tabular}{@{}ccc@{}} \toprule
+Architecture & LL0/data & LL1/data \\ \midrule
+Oracle & -1.8202 & \\
+\hline
+rFF + Pooling & -2.5195 $\pm$ 0.0105 &-2.0709 $\pm$ 0.0062 \\
+rFFp-mean + Pooling & -2.3126 $\pm$ 0.0154 &-1.9749 $\pm$ 0.0062 \\
+\hline
+rFF + PMA (6) & -2.0515 $\pm$ 0.0067 &-1.9424 $\pm$ 0.0047 \\
+SAB (32) + PMA (6) & \bf-1.8928 $\pm$ 0.0076 & \bf-1.8549 $\pm$ 0.0024 \\
+\bottomrule
+\end{tabular}
+\label{tab:2d_synthetic_large_scale}
+\end{table}
+
+
+\subsubsection{Details for CIFAR-100 amortized clutering experiment}
+\label{subsec:cifar}
+We pretrained VGG net~\citep{Simonyan2014} with CIFAR-100, and obtained the test accuracy 68.54\%. Then, we extracted feature vectors of 50k training images of CIFAR-100 from the 512-dimensional hidden layers of the VGG net (the layer just before the last layer). Given these feature vectors, the generative process of datasets is as follows.
+\begin{enumerate}
+\item Generate the number of data points, $n \sim \mathrm{Unif}(100, 500)$.
+\item Uniformly sample four classes among 100 classes.
+\item Uniformly sample $n$ data points among four sampled classes.
+\end{enumerate}
+Table~\ref{tab:cifar100_architecture} summarizes the architectures used for the experiments. For all architectures, at each training step, we generate 10 random datasets according to the above generative process, and updated the parameters via Adam optimizer with initial learning rate $10^{-4}$. We trained all the algorithms for $50k$ steps, and decayed the learning rate to $10^{-5}$ after $35k$ steps. Table~\ref{tab:cifar100_more_results} summarizes the detailed results with various number of inducing points in the ISAB.
+
+\begin{table}
+\small
+\centering
+\caption{Detailed architectures used in CIFAR-100 meta clustering experiments.}
+\vspace{5pt}
+\begin{tabular}{@{}ccccc@{}}\toprule
+\multicolumn{3}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-3} \cmidrule(lr){4-5}
+rFF & SAB & ISAB & rFF & PMA \\
+\midrule
+$\fc(256,\relu)$ & $\sab(256, 4)$ & $\isab_m(256, 4)$ & $\mathrm{mean}$ & $\pma_4(128,4)$\\
+$\fc(256,\relu)$ &  $\sab(256, 4)$ & $\isab_m(256, 4)$ & $\fc(256,\relu)$ & $\sab(256, 4)$\\
+$\fc(256,\relu)$ &  $\sab(256, 4)$ & $\isab_m(256, 4)$ & $\fc(256,\relu)$ & $\sab(256, 4)$ \\
+$\fc(256,\relu)$ & & & $\fc(256,\relu)$) & $\fc(4\cdot(1+2\cdot 512),-)$ \\
+$\fc(256,\relu)$ & & &$\fc(256,\relu)$ & \\
+$\fc(256,-)$ & & & $\fc(256,\relu)$ & \\
+ & & & $\fc(4\cdot(1+2\cdot 512),-)$& \\
+\bottomrule
+\end{tabular}
+\label{tab:cifar100_architecture}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Average clustering accuracies measured by Adjusted Rand Index (ARI) for CIFAR100 clustering experiments. The number inside parenthesis  indicates the number of inducing points used in the SABs of encoder. For all PMAs, four seed vectors were used.
+}
+\vspace{5pt}
+\begin{tabular}{@{}ccc@{}} \toprule
+Architecture & ARI0 & ARI1 \\ \midrule
+Oracle & 0.9151 & \\
+rFF + Pooling & 0.5593 $\pm$ 0.0149 &0.5693 $\pm$ 0.0171 \\
+rFFp-mean + Pooling & 0.5673 $\pm$ 0.0053 &0.5798 $\pm$ 0.0058 \\
+rFFp-max + Pooling & 0.5369 $\pm$ 0.0154 &0.5536 $\pm$ 0.0186 \\
+rFF+Dotprod & 0.5666 $\pm$ 0.0221 &0.5763 $\pm$ 0.0212 \\
+\hline
+SAB + Pooling & 0.5831 $\pm$ 0.0341 &0.5943 $\pm$ 0.0337 \\
+ISAB (16) + Pooling  & 0.5672 $\pm$ 0.0124 &0.5805 $\pm$ 0.0122 \\
+ISAB (32) + Pooling & 0.5587 $\pm$ 0.0104 &0.5700 $\pm$ 0.0134 \\
+ISAB (64) +  Pooling & 0.5586 $\pm$ 0.0205 &0.5708 $\pm$ 0.0183 \\
+rFF + PMA  & 0.7612 $\pm$ 0.0237 &0.7670 $\pm$ 0.0231 \\
+SAB + PMA & 0.9015 $\pm$ 0.0097 &0.9024 $\pm$ 0.0097 \\
+ISAB (16) + PMA & \bf 0.9210 $\pm$ 0.0055 &\bf 0.9223 $\pm$ 0.0056 \\
+ISAB (32) + PMA & 0.9103 $\pm$ 0.0061 &0.9119 $\pm$ 0.0052 \\
+ISAB (64) + PMA & 0.9141 $\pm$ 0.0040 &0.9153 $\pm$ 0.0041 \\
+\bottomrule
+\end{tabular}
+\label{tab:cifar100_more_results}
+\end{table}
+
+\subsection{Set Anomaly Detection}
+\label{app:anomaly}
+
+\iffalse
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{figs/celeba.pdf}
+\caption{Subsampled dataset examples. Each row is one dataset, which is composed of 7 normal images and 1 abnormal image (red box). Normal images in each subsampled dataset have both two attributes that are described in the rightmost column of figure. On the other hand, abnormal image does not contain the two attributes.}
+\label{fig:celeba_figures}
+\end{figure}
+\fi
+
+\begin{table}[h]
+\small
+\centering
+\caption{Detailed architectures used in CelebA meta set anomaly experiments.
+$\conv(d, k, s, r, f)$ is a convolutional layer with $d$ output channels, $k$ kernel size, $s$ stride size, $r$ regularization method, and activation function $f$. If $d$ is a list, each element in the list is distributed.
+$\fc(d, f, r)$ denotes a fully-connected layer with $d$ units, activation function $f$ and $r$ regularization method.
+If ${d}$ is a list, each element in the list is distributed.
+$\sab(d, h)$ denotes the SAB with $d$ units and $h$ heads.
+%$\mathrm{ISAB}(d, h, n_{\mathrm{ind}})$ denotes the ISAB with $d$ units, $h$ heads and $n_{\mathrm{ind}}$ inducing points.
+$\pma(d, h, n_{\mathrm{seed}})$ denotes the PMA with $d$ units, $h$ heads and $n_{\mathrm{seed}}$ vectors.
+All MABs used in SAB and PMA uses FC layers with ReLU activations for rFF layers.}
+\vspace{5pt}
+\begin{tabular}{@{}cccc@{}}\toprule
+\multicolumn{2}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+rFF & SAB & Pooling & PMA \\
+\midrule
+\multicolumn{2}{c}{$\conv([32, 64, 128], 3, 2, \mathrm{Dropout}, \relu)$} & $\mathrm{mean}$ & $\pma_4(128, 4)$ \\
+\multicolumn{2}{c}{$\fc([1024, 512, 256], -, \mathrm{Dropout})$} & $\fc(128, \relu, -)$ & $\sab(128, 4)$ \\
+\multicolumn{2}{c}{$\fc(256, -, -)$} & $\fc(128, \relu, -)$ & $\fc(256 \cdot 8, -, -)$ \\
+$\fc([128, 128, 128], \relu, -)$ & $\sab(128,4)$ & $\fc(128, \relu, -)$ & \\
+$\fc([128, 128, 128], \relu, -)$ & $\sab(128,4)$  & $\fc(256 \cdot 8, -, -)$ & \\
+$\fc(128, \relu, -)$ & $\sab(128,4)$ & & \\
+$\fc(128, -, -)$ & $\sab(128, 4)$ & & \\
+\bottomrule
+\end{tabular}
+\label{tab:meta_anomaly_architecture}
+\end{table}
+
+Table~\ref{tab:meta_anomaly_architecture} describes the architecture for meta set anomaly experiments.
+We trained all models via Adam optimizer with learning rate $10^{-4}$ and exponential decay of learning rate for 1,000 iterations.
+1,000 datasets subsampled from CelebA dataset (see Figure~\ref{fig:celeba_figures}) are used to train and test all the methods.
+We split 800 training datasets and 200 test datasets for the subsampled datasets.
+
+\subsection{Point Cloud Classification}
+\label{app:point_cloud}
+We used the ModelNet40 dataset for our point cloud classification experiments.
+This dataset consists of a three-dimensional representation of 9,843 training and 2,468 test data which each belong to one of 40 object classes.
+As input to our architectures, we produce point clouds with $n=100, 1000, 5000$ points each (each point is represented by $(x,y,z)$ coordinates).
+For generalization, we randomly rotate and scale each set during training.
+
+We show results our architectures in Table~\ref{tab:pointcloud_architecture} and additional experiments which used $n=100, 5000$ points in Table~\ref{table:pointcloud}.
+We trained using the Adam optimizer with an initial learning rate of $10^{-3}$ which we decayed by a factor of $0.3$ every 20,000 steps.
+For the experiment with 5,000 points (Table~\ref{table:pointcloud}), we increased the dimension of the attention blocks ($\mathrm{ISAB}_{16}(512, 4)$ instead of $\mathrm{ISAB}_{16}(128, 4)$) and also decayed the weights by a factor of $10^{-7}$.
+We also only used one ISAB block in the encoder because using two lead to overfitting in this setting.
+
+\begin{table}[h]
+\small
+\centering
+\caption{Detailed architectures used in the point cloud classification experiments.}
+\vspace{5pt}
+\begin{tabular}{@{}cccc@{}}\toprule
+\multicolumn{2}{c}{Encoder} & \multicolumn{2}{c}{Decoder}\\
+\cmidrule(lr){1-2} \cmidrule(lr){3-4}
+rFF & ISAB & Pooling & PMA \\
+\midrule
+$\fc(256, \relu)$ & $\isab(256, 4)$ & $\max$& $\mathrm{Dropout}(0.5)$ \\
+$\fc(256, \relu)$  & $\isab(256, 4)$ & $\mathrm{Dropout}(0.5)$ & $\pma_1(256, 4)$ \\
+$\fc(256, \relu)$  & & $\fc(256, \relu)$ & $\mathrm{Dropout}(0.5)$ \\
+$\fc(256, -)$ & &$\mathrm{Dropout}(0.5)$ & $\fc(40, -)$ \\
+&&$\fc(40, -)$ &\\
+\bottomrule
+\end{tabular}
+\label{tab:pointcloud_architecture}
+\end{table}
+
+\iffalse
+\begin{table}[h]
+\centering
+\caption{Additional point cloud experiments using 100 points.}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+Architecture & Accuracy\\
+\midrule
+rFF + Pooling & 0.7951 $\pm$ 0.0166 \\
+rFF + PMA (1) & 0.8076 $\pm$ 0.0160 \\
+ISAB (16) + Pooling & 0.8273 $\pm$ 0.0159 \\
+Set Transformer (16) & \bf 0.8454 $\pm$ 0.0144 \\
+\midrule
+rFF + Pooling + tricks \citep{Zaheer2017} & 0.82 $\pm$ 0.02 \\
+\bottomrule
+\end{tabular}
+\label{table:app_pointcloud100}
+\vspace{10pt}
+\centering
+\caption{Additional point cloud experiments using 5000 points.}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+Architecture & Accuracy\\
+\midrule
+rFF + Pooling & 0.8933 $\pm$ 0.0156 \\
+rFF + PMA (1) & 0.8628 $\pm$ 0.0136 \\
+ISAB (16) + Pooling & \bf 0.9040 $\pm$ 0.0173 \\
+Set Transformer (16) & 0.8779 $\pm$ 0.0122 \\
+\midrule
+rFF + Pooling + tricks \citep{Zaheer2017} & \bf 0.90 $\pm$ 0.003 \\
+\bottomrule
+\end{tabular}
+\label{table:app_pointcloud5k}
+\end{table}
+\fi
+
+\section{Additional Experiments}
+\subsection{Runtime of SAB and ISAB}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{figs/runtime.png}
+\caption{
+Runtime of a single SAB/ISAB block on dummy data.
+x axis is the size of the input set and y axis is time (seconds).
+Note that the x-axis is log-scale.
+}
+\label{fig:runtime}
+\end{figure}
+We measured the runtime of SAB and ISAB on a simple benchmark (Figure~\ref{fig:runtime}).
+We used a single GPU (Tesla P40) for this experiment.
+The input data was a constant (zero) tensor of $n$ three-dimensional vectors.
+We report the number of seconds it took to process 10,000 sets of each size.
+The maximum set size we report for SAB is 2,000 because the computation graph of bigger sets could not fit on our GPU.
+The specific attention blocks used are $\mathrm{ISAB}_4(64, 8)$ and $\mathrm{SAB}(64, 8)$.
+
+
+\bibliography{set_transformer}
+\bibliographystyle{icml2019}
+
+
+\end{document}

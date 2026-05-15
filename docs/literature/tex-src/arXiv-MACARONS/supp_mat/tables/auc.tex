@@ -1,0 +1,119 @@
+\begin{table*}
+  \centering
+  %\begin{subtable}{0.7\linewidth}
+  {%\scriptsize
+  \scalebox{0.8}{
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    % \multicolumn{1}{c}{} & \multicolumn{4}{c}{Method} \\
+    % \cmidrule(r){2-5}
+    \multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{4}{c}{MACARONS} \\
+    \cmidrule(r){3-6}
+     & & Initialized & Initialized & Pretrained & Pretrained \\
+    3D scene & SCONE~\cite{guedon-nips22-scone-surface-coverage} & 1 MRI & 3 MRI & 1 MRI & 3 MRI \\
+    \midrule 
+    %
+Dunnottar Castle 
+& 0.650 $\pm$ 0.093
+& 0.774 $\pm$ 0.049
+& 0.791 $\pm$ 0.049
+& 0.784 $\pm$ 0.025
+& \textbf{0.811} $\pm$ 0.025 \\ 
+%
+Colosseum 
+& 0.532 $\pm$ 0.032
+& 0.622 $\pm$ 0.005
+& 0.622 $\pm$ 0.012
+& \textbf{0.629} $\pm$ 0.011
+& 0.620 $\pm$ 0.011 \\ 
+%
+Bannerman Castle 
+& 0.552 $\pm$ 0.020
+& 0.764 $\pm$ 0.026
+& \textbf{0.775} $\pm$ 0.022
+& 0.716 $\pm$ 0.029
+& 0.763 $\pm$ 0.017 \\ 
+%
+Pantheon 
+& 0.401 $\pm$ 0.030
+& 0.488 $\pm$ 0.012
+& 0.505 $\pm$ 0.007
+& 0.499 $\pm$ 0.020
+& \textbf{0.503} $\pm$ 0.014 \\ 
+%
+Christ the Redeemer 
+& 0.833 $\pm$ 0.037
+& 0.848 $\pm$ 0.024
+& 0.833 $\pm$ 0.037
+& 0.865 $\pm$ 0.037
+& \textbf{0.868} $\pm$ 0.018 \\ 
+%
+Statue of Liberty 
+& 0.695 $\pm$ 0.020
+& 0.696 $\pm$ 0.010
+& 0.670 $\pm$ 0.009
+& \textbf{0.708} $\pm$ 0.014
+& 0.703 $\pm$ 0.015 \\ 
+%
+Pisa Cathedral 
+& 0.555 $\pm$ 0.033
+& 0.633 $\pm$ 0.023
+& 0.645 $\pm$ 0.008
+& \textbf{0.661} $\pm$ 0.008
+& 0.640 $\pm$ 0.011 \\ 
+%
+Fushimi Castle 
+& 0.806 $\pm$ 0.029
+& 0.807 $\pm$ 0.014
+& 0.821 $\pm$ 0.013
+& 0.842 $\pm$ 0.019
+& \textbf{0.854} $\pm$ 0.012 \\ 
+%
+\midrule 
+Alhambra Palace 
+& 0.528 $\pm$ 0.030
+& 0.632 $\pm$ 0.017
+& 0.642 $\pm$ 0.023
+& 0.634 $\pm$ 0.019
+& \textbf{0.656} $\pm$ 0.011 \\ 
+%
+Neuschwanstein Castle 
+& 0.662 $\pm$ 0.041
+& 0.738 $\pm$ 0.043
+& 0.761 $\pm$ 0.029
+& 0.760 $\pm$ 0.020
+& \textbf{0.766} $\pm$ 0.030 \\ 
+%
+Eiffel Tower 
+& 0.753 $\pm$ 0.013
+& 0.766 $\pm$ 0.033
+& 0.766 $\pm$ 0.016
+& 0.789 $\pm$ 0.010
+& \textbf{0.794} $\pm$ 0.018 \\ 
+%
+Manhattan Bridge 
+& 0.745 $\pm$ 0.069
+& 0.820 $\pm$ 0.021
+& 0.768 $\pm$ 0.106
+& 0.825 $\pm$ 0.034
+& \textbf{0.833} $\pm$ 0.021 \\ 
+%
+\midrule 
+Average on all scenes 
+& 0.643 
+& 0.716 
+& 0.717 
+& 0.726 
+& \textbf{0.734} \\ 
+    \bottomrule
+  \end{tabular}
+  }}
+  %\end{subtable}
+  %\hfill
+  %\begin{subtable}{0.23\linewidth}
+  %  \includegraphics[width=\linewidth]{images/coverage_curves/all_path_planning_curve_macarons.png}
+  %\end{subtable}
+  \caption{{\bf AUCs of surface coverage on large 3D scenes for SCONE~\cite{guedon-nips22-scone-surface-coverage} and different training configurations of MACARONS.} SCONE~\cite{guedon-nips22-scone-surface-coverage} uses perfect depth maps as input, and MACARONS takes RGB images as input. We follow \cite{guedon-nips22-scone-surface-coverage} and compute the area under the curve representing the evolution of the total surface coverage during exploration. The 8 scenes above the bar were seen by MACARONS during self-supervised training (but with different, random starting camera poses and trajectories), and the 4 scenes below the bar were not. SCONE~\cite{guedon-nips22-scone-surface-coverage} is trained on ShapeNet~\cite{chang-15-shapenet} with 3D supervision. We trained MACARONS using different setups: we initialize the model using our previously described initialization process (\emph{Initialized}), or with a complete pretraining on ShapeNet with explicit 3D supervision, following~\cite{guedon-nips22-scone-surface-coverage} (\emph{Pretrained}). Additionally, we perform either one memory replay iteration (\emph{1 MRI}) or three memory replay iterations (\emph{3 MRI}) for both the volume occupancy and surface coverage gain modules. For the depth module, we computed five memory replay iterations in each setup.}
+  \label{tab:ablation_coverage_auc}
+\end{table*}
+% \end{comment}

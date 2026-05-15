@@ -1,0 +1,48 @@
+---
+config:
+  sequence:
+    showSequenceNumbers: false
+  themeVariables:
+    fontSize: "18px"
+---
+sequenceDiagram
+  autonumber
+  participant CLI as nbv-build-rollouts
+  participant DS as VinOfflineDataset
+  participant SEL as ActorVisibleTargetSelector
+  participant GEN as CandidateMixtureViewGenerator
+  participant SC as TargetRriScorer
+  participant REN as CandidateDepthRenderer
+  participant RRI as OracleRRI
+  participant POL as RolloutPolicy
+  participant STORE as rollouts.zarr
+  participant AUD as audit summary
+
+  CLI->>DS: open strict VIN store in sample mode
+  loop source rows in configured split
+    DS-->>CLI: VinOfflineSample with cached refs and live snippet
+    CLI->>SEL: select V1 actor-visible targets
+    SEL-->>CLI: top-K target rows with GT-EVAL metadata
+    alt target is invalid for labels
+      CLI->>AUD: record source or target skip reason
+    else target is label-valid
+      loop rollout recipes and retained chains
+        loop t = 0..H-1
+          CLI->>GEN: regenerate finite candidate shell for current state
+          GEN-->>CLI: q_ti, m_ti, invalidity, sampler provenance
+          CLI->>SC: score actor-valid candidates for target e
+          SC->>REN: render candidate depths from GT mesh
+          REN-->>SC: depth and valid mask batches
+          SC->>RRI: compute target and optional scene RRI
+          RRI-->>CLI: target rewards and retained diagnostics
+          CLI->>POL: select valid q_ti_star under recipe policy
+          POL-->>CLI: selected candidate and policy metadata
+          CLI->>CLI: advance counterfactual state with selected depth only
+        end
+      end
+      CLI->>STORE: write sources, targets, rollouts, steps, candidates
+    end
+  end
+  CLI->>STORE: write zarr.json and manifest.json
+  CLI->>STORE: validate masks, lineage, links, manifest hash
+  STORE-->>CLI: validation summary

@@ -6,6 +6,9 @@
 #set document(title: titleEnglish, author: author)
 #set text(font: "New Computer Modern")
 
+#show: make-glossary.with(link: false)
+#register-aria-glossary()
+
 #show: thesis.with(
   title: titleEnglish,
   titleGerman: titleGerman,
@@ -28,7 +31,7 @@
   submissionDate: submissionDate,
   submissionDateText: submissionDateText,
   abstract_en: [
-    This thesis investigates quality-driven #NBV planning for egocentric 3D reconstruction in #ASE. It builds on the ARIA-NBV seminar paper and frames Relative Reconstruction Improvement (#RRI) as the central supervision and evaluation signal for choosing informative future views.
+    This thesis investigates quality-driven #gls("next-best-view") planning for egocentric 3D reconstruction in #gls("aria-synthetic-environments"). It builds on the ARIA-NBV seminar paper and frames #gls("relative-reconstruction-improvement") as the central supervision and evaluation signal for choosing informative future views.
   ],
   abstract_de: [
     TODO: Deutsche Zusammenfassung ergaenzen.

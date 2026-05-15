@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import re
 import shutil
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +33,7 @@ from ..configs import PathConfig
 from ..pipelines.oracle_rri_labeler import OracleRriLabelerConfig
 from ..utils import Console, TargetConfig, Verbosity
 from ..utils.fingerprints import stable_json_signature
+from ..utils.semantic_names import normalize_semantic_name_map
 from ..vin.backbone_evl import EvlBackboneConfig
 from ._offline_format import (
     VinOfflineIndexRecord,
@@ -50,6 +50,8 @@ from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
 from .vin_adapter import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from efm3d.aria.obb import ObbTW
     from efm3d.aria.pose import PoseTW
     from numpy.typing import DTypeLike, NDArray
@@ -381,14 +383,10 @@ def _validate_candidate_label_alignment(
 
 def _semantic_names_payload(
     value: Mapping[object, object] | Sequence[object] | None,
-) -> list[str] | dict[str, str] | None:
+) -> dict[int, str] | None:
     """Normalize semantic-name mappings for msgpack records."""
 
-    if value is None:
-        return None
-    if isinstance(value, Mapping):
-        return {str(key): str(item) for key, item in value.items()}
-    return [str(item) for item in value]
+    return normalize_semantic_name_map(value)
 
 
 def _keep_field(field_name: str, keep_fields: set[str] | None) -> bool:

@@ -11,11 +11,12 @@ from efm3d.aria.pose import PoseTW
 from plotly.colors import sample_colorscale  # type: ignore[import]
 from plotly.subplots import make_subplots  # type: ignore[import]
 
-from ..data_handling import EfmSnippetView
+from ..data_handling import EfmSnippetView, target_gt_obb_world
 from ..utils import Console
 from ..utils.data_plotting import SnippetPlotBuilder, get_frustum_segments
 
 if TYPE_CHECKING:
+    from ..data_handling import TargetCandidateRow, VinOfflineSample
     from .candidate_generation import CandidateViewGeneratorConfig
     from .counterfactuals import CounterfactualRolloutResult, CounterfactualTrajectory
     from .types import CandidateSamplingResult
@@ -504,6 +505,37 @@ def _trajectory_colors(
     return colors, values, metric_label
 
 
+def _metric_color(value: float | None, finite_values: np.ndarray, *, default: str, colorscale: str) -> str:
+    if value is None or not np.isfinite(value) or finite_values.size == 0:
+        return default
+    vmin = float(finite_values.min())
+    vmax = float(finite_values.max())
+    scale_pos = 0.5 if np.isclose(vmin, vmax) else float((float(value) - vmin) / (vmax - vmin))
+    return str(sample_colorscale(colorscale, [scale_pos])[0])
+
+
+def _selected_step_target_rri(step: object) -> float | None:
+    metrics = getattr(step, "selected_metrics", {})
+    for key in ("target_rri", "rri"):
+        if key not in metrics:
+            continue
+        value = float(metrics[key])
+        if np.isfinite(value):
+            return value
+    return None
+
+
+def _valid_metric_values(step: object, metric_name: str) -> np.ndarray:
+    vectors = getattr(step, "metric_vectors", {})
+    values = vectors.get(metric_name)
+    if values is None and metric_name == "target_rri":
+        values = vectors.get("rri")
+    if values is None:
+        return np.asarray([], dtype=float)
+    values_np = values.detach().cpu().numpy().reshape(-1)
+    return values_np[np.isfinite(values_np)].astype(float, copy=False)
+
+
 def _trajectory_name(
     trajectory: "CounterfactualTrajectory",
     *,
@@ -583,6 +615,44 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         self.counterfactual_rollouts = rollouts
         return self
 
+    def add_actor_visible_target_obb(
+        self,
+        target: "TargetCandidateRow",
+        *,
+        color: str = "#ff2f74",
+        name: str = "Active target / actor-visible",
+        width: int = 7,
+    ) -> Self:
+        """Overlay the actor-visible target OBB used for target-conditioned rollout generation."""
+
+        return self.add_oriented_box(
+            pose_world_object=target.pose_world_object,
+            extents=target.extents,
+            name=name,
+            color=color,
+            width=width,
+            opacity=0.95,
+        )
+
+    def add_matched_gt_target_obb(
+        self,
+        sample: "VinOfflineSample",
+        target: "TargetCandidateRow",
+        *,
+        color: str = "#00d4ff",
+        name: str = "Matched GT / evaluation crop",
+        width: int = 6,
+    ) -> Self:
+        """Overlay the matched GT OBB used only for oracle labels and evaluation crops."""
+
+        return self.add_obb(
+            target_gt_obb_world(target, sample),
+            name=name,
+            color=color,
+            width=width,
+            opacity=0.95,
+        )
+
     def add_counterfactual_paths(
         self,
         *,
@@ -655,30 +725,54 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         include_axes: bool = False,
         include_center: bool = False,
         max_frustums_per_trajectory: int | None = None,
+        display_rotate: bool = True,
+        color_by_target_rri: bool = True,
+        colorscale: str = "Viridis",
     ) -> Self:
         """Overlay frusta for the selected poses in each attached trajectory."""
 
         if self.counterfactual_rollouts is None:
             raise ValueError("Counterfactual rollouts missing; call attach_counterfactual_rollouts() first.")
 
+        finite_values = np.asarray(
+            [
+                value
+                for trajectory in self.counterfactual_rollouts.trajectories
+                for step in trajectory.steps
+                if (value := _selected_step_target_rri(step)) is not None
+            ],
+            dtype=float,
+        )
         for traj_idx, trajectory in enumerate(self.counterfactual_rollouts.trajectories):
             steps = trajectory.steps
             if max_frustums_per_trajectory is not None:
                 steps = steps[:max_frustums_per_trajectory]
             if not steps:
                 continue
-            cams = [step.selected_view for step in steps]
-            poses = [step.selected_pose_world for step in steps]
-            self._add_frusta_for_poses(
-                cams=cams,
-                poses=poses,
-                scale=scale,
-                color=_counterfactual_color(traj_idx),
-                name=f"CF frusta {traj_idx}",
-                max_frustums=None,
-                include_axes=include_axes,
-                include_center=include_center,
-            )
+            for step in steps:
+                value = _selected_step_target_rri(step) if color_by_target_rri else None
+                color = _metric_color(
+                    value,
+                    finite_values,
+                    default=_counterfactual_color(traj_idx),
+                    colorscale=colorscale,
+                )
+                pose = step.selected_pose_world
+                if display_rotate:
+                    from aria_nbv.utils import rotate_yaw_cw90
+
+                    pose = rotate_yaw_cw90(pose)
+                label = "n/a" if value is None else f"{value:.4f}"
+                self._add_frusta_for_poses(
+                    cams=[step.selected_view],
+                    poses=[pose],
+                    scale=scale,
+                    color=color,
+                    name=f"CF frusta {traj_idx} step {step.step_index + 1} target_rri={label}",
+                    max_frustums=None,
+                    include_axes=include_axes,
+                    include_center=include_center,
+                )
         return self
 
     def add_counterfactual_step_shell(
@@ -692,6 +786,7 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         frustum_scale: float = 0.5,
         max_frustums: int | None = 16,
         include_rejected: bool = False,
+        color_frusta_by_target_rri: bool = True,
     ) -> Self:
         """Plot one rollout step's candidate shell within the snippet scene."""
 
@@ -734,15 +829,38 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         if include_rejected:
             self.add_rejected_cloud()
         if show_frusta:
-            self.add_candidate_frusta(
-                scale=frustum_scale,
-                color="crimson",
-                name=f"Step {step_index + 1} frusta",
-                max_frustums=max_frustums,
-                include_axes=False,
-                include_center=False,
-                display_rotate=False,
-            )
+            metric_values = _valid_metric_values(step, "target_rri")
+            if color_frusta_by_target_rri and metric_values.size:
+                from aria_nbv.utils import rotate_yaw_cw90
+
+                poses = self._pose_list_from_input(rotate_yaw_cw90(step.candidates.poses_world_cam()))
+                indices = np.arange(len(poses))
+                if max_frustums is not None and len(indices) > max_frustums:
+                    indices = np.linspace(0, len(poses) - 1, num=max_frustums, dtype=int)
+                finite_values = metric_values[np.isfinite(metric_values)]
+                for local_idx in indices.tolist():
+                    value = float(metric_values[local_idx]) if local_idx < metric_values.size else None
+                    label = "n/a" if value is None else f"{value:.4f}"
+                    self._add_frusta_for_poses(
+                        cams=[step.candidates.views[int(local_idx)]],
+                        poses=[poses[int(local_idx)]],
+                        scale=frustum_scale,
+                        color=_metric_color(value, finite_values, default="crimson", colorscale="Viridis"),
+                        name=f"Step {step_index + 1} frustum {local_idx} target_rri={label}",
+                        max_frustums=None,
+                        include_axes=False,
+                        include_center=False,
+                    )
+            else:
+                self.add_candidate_frusta(
+                    scale=frustum_scale,
+                    color="crimson",
+                    name=f"Step {step_index + 1} frusta",
+                    max_frustums=max_frustums,
+                    include_axes=False,
+                    include_center=False,
+                    display_rotate=True,
+                )
 
         ref_pose = trajectory.reference_pose_world(step_index)
         self.add_frame_axes(frame=ref_pose, title="Rollout ref", is_rotate_yaw_cw90=False)
@@ -1237,8 +1355,7 @@ def plot_min_distance_to_mesh(
     hover = [f"dist={d:.3f} m<br>valid={bool(v)}" for d, v in zip(dist_np.tolist(), mask_valid.tolist(), strict=False)]
 
     builder = (
-        CandidatePlotBuilder
-        .from_snippet(snippet, title="Min distance to mesh")
+        CandidatePlotBuilder.from_snippet(snippet, title="Min distance to mesh")
         .attach_candidate_results(candidates)
         .add_mesh()
         .add_candidate_points(
@@ -1266,8 +1383,7 @@ def plot_path_collision_segments(
     colors = ["rgba(0,200,0,0.2)" if not m else "rgba(220,0,0,0.9)" for m in mask_np.tolist()]
 
     builder = (
-        CandidatePlotBuilder
-        .from_snippet(snippet, title="Path collision segments")
+        CandidatePlotBuilder.from_snippet(snippet, title="Path collision segments")
         .attach_candidate_results(candidates)
         .add_mesh()
     )

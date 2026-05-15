@@ -1,0 +1,69 @@
+---
+config:
+  theme: base
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 18
+    rankSpacing: 30
+    curve: basis
+  layout: elk
+  themeVariables:
+    background: "#ffffff"
+    fontFamily: "Inter, DejaVu Sans, Arial, sans-serif"
+    fontSize: "18px"
+    primaryTextColor: "#1f2937"
+    lineColor: "#64748b"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 18px; font-weight: 700; }
+---
+flowchart TB
+  Sample["$$\\begin{array}{c}\\textbf{Joined Multi-Step Sample}\\\\\\text{one source + one target + one rollout chain}\\end{array}$$"]
+
+  subgraph SourceView["Source view"]
+    Source["$$\\begin{array}{c}\\textbf{source}\\\\ s_0^{\\mathrm{cf0}}\\ \\text{refs}\\\\\\texttt{source\\_row\\_id}:\\ \\texttt{int64[1]}\\end{array}$$"]
+    Backbones["$$\\begin{array}{c}\\textbf{cached substrate}\\\\\\text{external VIN blocks}\\\\\\text{not duplicated}\\end{array}$$"]
+  end
+
+  subgraph TargetView["Target view"]
+    Target["$$\\begin{array}{c}\\textbf{target}\\\\ e,\\ z_e\\\\\\texttt{target\\_row\\_id}:\\ \\texttt{int64[1]}\\end{array}$$"]
+    Match["$$\\begin{array}{c}\\textbf{GT-EVAL}\\\\ \\mu(\\hat{e},e),\\ \\text{valid masks}\\\\\\texttt{float32[1]}\\ +\\ \\texttt{bool[1]}\\end{array}$$"]
+  end
+
+  subgraph RolloutView["Rollout branch"]
+    Rollout["$$\\begin{array}{c}\\textbf{rollout}\\\\ \\pi,\\ H,\\ \\texttt{chain\\_id}\\\\ G_0^{(H)}:\\ \\texttt{float32[1]}\\end{array}$$"]
+  end
+
+  subgraph StepView["Step sequence"]
+    Step0["$$\\begin{array}{c}\\textbf{step }t\\\\\\texttt{step\\_index}:\\ \\texttt{int16[1]}\\\\\\texttt{selected\\_candidate\\_row\\_id}\\end{array}$$"]
+    Candidates["$$\\begin{array}{c}\\textbf{candidate shell}\\\\\\boldsymbol{\\mathcal{Q}}_t=\\{q_{t,i}\\}_{i=1}^{N_q}\\\\\\texttt{PoseTW}[N_q,12]\\end{array}$$"]
+    Masks["$$\\begin{array}{c}\\textbf{masks + labels}\\\\ m_{t,i},\\ \\rho_{t,i},\\ r_t^e(q_{t,i})\\\\\\texttt{Bool/Float}[N_q]\\end{array}$$"]
+    Depth["$$\\begin{array}{c}\\textbf{selected depth}\\\\\\mathbf{D}_{q_{t,i^\\star}},\\ \\mathbf{M}_{q_{t,i^\\star}}\\\\\\texttt{float16/bool}[H_{\\mathrm{img}},W_{\\mathrm{img}}]\\end{array}$$"]
+  end
+
+  QH["$$\\begin{array}{c}\\textbf{derived }Q_H\\textbf{ view}\\\\\\text{candidate ids, masks, rewards}\\\\\\text{shape }[H,N_q]\\end{array}$$"]
+
+  Sample --> Source --> Backbones
+  Sample --> Target --> Match
+  Sample --> Rollout
+  Rollout --> Step0 --> Candidates --> Masks
+  Masks --> Depth
+  Candidates --> QH
+  Masks --> QH
+  Step0 --> QH
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  class Source,Backbones,Target,Match,Rollout,Step0,Candidates,Masks,Depth data;
+  class Sample input;
+  class QH output;
+
+  style SourceView fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
+  style TargetView fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style RolloutView fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12
+  style StepView fill:#ffffff,stroke:#cbd5e1,stroke-width:1.5px,rx:12,ry:12

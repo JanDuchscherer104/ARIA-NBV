@@ -1,0 +1,14 @@
+\begin{tabular}{lccccccc}\toprule
+Outdoor Sem. Seg. &\multicolumn{2}{c}{nuScenes~\cite{caesar2020nuscenes}} &\multicolumn{2}{c}{Sem.KITTI~\cite{behley2019semantickitti}} &\multicolumn{2}{c}{Waymo Val~\cite{sun2020waymo}} \\\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+Methods &Val &Test &Val &Test &mIoU &mAcc \\\midrule
+\scratch MinkUNet~\cite{choy20194d} &73.3 &- &63.8 &- &65.9 &76.6 \\
+\scratch SPVNAS~\cite{tang2020spvnas} &77.4 &- &64.7 &66.4 &- &- \\
+\scratch Cylinder3D~\cite{zhu2021cylindrical} &76.1 &77.2 &64.3 &67.8 &- &- \\
+\scratch AF2S3Net~\cite{Cheng2021af2s3net} &62.2 &78.0 &74.2 &70.8 &- &- \\
+\scratch 2DPASS~\cite{yan20222dpass} &- &80.8 &69.3 &72.9 &- &- \\
+\scratch SphereFormer~\cite{lai2023spherical} &78.4 &81.9 &67.8 &74.8 &69.9 &- \\
+\scratch PTv2~\cite{wu2022point} &80.2 &82.6 &70.3 &72.6 &70.6 &80.2 \\
+\cellcolor[HTML]{efefef}\scratch PTv3~(Ours) &\cellcolor[HTML]{efefef}80.4 &\cellcolor[HTML]{efefef}82.7 &\cellcolor[HTML]{efefef}70.8 &\cellcolor[HTML]{efefef}74.2 &\cellcolor[HTML]{efefef}71.3 &\cellcolor[HTML]{efefef}80.5 \\
+\cellcolor[HTML]{efefef}\pretrain PTv3~(Ours) &\cellcolor[HTML]{efefef}\textbf{81.2} &\cellcolor[HTML]{efefef}\textbf{83.0} &\cellcolor[HTML]{efefef}\textbf{72.3} &\cellcolor[HTML]{efefef}\textbf{75.5} &\cellcolor[HTML]{efefef}\textbf{72.1} &\cellcolor[HTML]{efefef}\textbf{81.3} \\
+\bottomrule
+\end{tabular}

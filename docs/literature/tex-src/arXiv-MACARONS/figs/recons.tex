@@ -1,0 +1,91 @@
+\begin{figure*}
+  \centering
+  \begin{subfigure}{0.23\linewidth} % TODO: 0.15 for camera-ready, 0.23 for arxiv
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/pisa_1_color.png}
+    \caption{\scriptsize Pisa Cathedral}
+    \label{fig:surface-a}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/liberty_1_color.png}
+    \caption{\scriptsize Statue of Liberty}
+    \label{fig:surface-b}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    % \fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/pantheon_2_color.png}
+    \caption{\scriptsize Pantheon}
+    \label{fig:surface-c}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/fushimi_1_color.png}
+    \caption{\scriptsize Fushimi Castle}
+    \label{fig:surface-d}
+  \end{subfigure} 
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/colosseum_3_color.png}
+    \caption{\scriptsize Colosseum}
+    \label{fig:surface-e}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/dunnottar_2_color.png}
+    \caption{\scriptsize Dunnottar Castle}
+    \label{fig:surface-f}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/redeemer_1_color.png}
+    \caption{\scriptsize Christ the Redeemer}
+    \label{fig:surface-g}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/bannerman_1_color.png}
+    \caption{\scriptsize Bannerman Castle}
+    \label{fig:surface-h}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/alhambra_1_color.png}
+    \caption{\scriptsize Alhambra Palace}
+    \label{fig:surface-i}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/neusch_2_color.png}
+    \caption{\scriptsize Neuschwanstein Castle}
+    \label{fig:surface-j}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+    \includegraphics[width=\linewidth]{images/surface_reconstruction/eiffel_4_color.png}
+    \caption{\scriptsize Eiffel Tower}
+    \label{fig:surface-k}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.23\linewidth}
+    %\fbox{\rule{0pt}{0.5in} \rule{.9\linewidth}{0pt}}
+\includegraphics[width=\linewidth]{images/surface_reconstruction/manhattan_1_color.png}
+    \caption{\scriptsize Manhattan Bridge}
+    \label{fig:surface-l}
+  \end{subfigure}
+  \caption{{\bf Automated reconstruction of large 3D structures from RGB images with our approach MACARONS.} Our model reconstructs the surface in real time during exploration: We show here the reconstruction after 100 NBV iterations. The model has been trained on a set of previous scenes; all weights are frozen and we only perform inference computation.
+  The first two rows depict scenes that were already seen by the model during its online, self-supervised training. The last row depicts scenes the model has never seen before. % TODO: For arxiv. 
+  % The first 8 images depict scenes that were already seen by the model during its online, self-supervised training. The last 4 images depict scenes the model has never seen before. % TODO: For camera-ready. 
+  MACARONS is not only able to reconstruct surfaces thanks to its depth prediction module (even for scenes it has never seen before), but is also able to optimize its path around the structure and consistently cover most of the surface of the scene thanks to its NBV prediction.}
+  \label{fig:surface-reconstruction}
+\end{figure*}

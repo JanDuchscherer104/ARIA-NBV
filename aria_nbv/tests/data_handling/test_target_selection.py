@@ -56,7 +56,7 @@ def _obb_block(
         inst_id=torch.tensor(inst, dtype=torch.int64),
         prob=torch.tensor(conf, dtype=torch.float32),
     )
-    return CompactObbBlock(obbs=obbs.tensor(), sem_id_to_name=["chair", "table", "sofa"])
+    return CompactObbBlock(obbs=obbs.tensor(), sem_id_to_name={0: "chair", 1: "table", 2: "sofa"})
 
 
 def _cameras(count: int = 1) -> PerspectiveCameras:
@@ -182,7 +182,7 @@ def test_selector_falls_back_to_backbone_obbs_when_detected_block_is_missing() -
         t_world_voxel=_poses([[0.0, 0.0, 0.0]]),
         voxel_extent=torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32),
         obb_pred_viz=ObbTW(_obb_block([[0.0, 0.0, 0.0]]).obbs),
-        obb_pred_sem_id_to_name=["chair"],
+        obb_pred_sem_id_to_name={0: "chair"},
         pts_world=torch.tensor([[[0.0, 0.0, 0.0]]], dtype=torch.float32),
         counts=torch.ones((1, 1), dtype=torch.int64),
     )
@@ -194,12 +194,30 @@ def test_selector_falls_back_to_backbone_obbs_when_detected_block_is_missing() -
     assert len(result.selected_rows) == 1
 
 
+def test_selector_resolves_sparse_backbone_semantic_names_after_payload_decode() -> None:
+    source = EvlBackboneOutput(
+        t_world_voxel=_poses([[0.0, 0.0, 0.0]]),
+        voxel_extent=torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32),
+        obb_pred_viz=ObbTW(_obb_block([[0.0, 0.0, 0.0]], sem_ids=[28]).obbs),
+        obb_pred_sem_id_to_name={28: "window"},
+        pts_world=torch.tensor([[[0.0, 0.0, 0.0]]], dtype=torch.float32),
+        counts=torch.ones((1, 1), dtype=torch.int64),
+    )
+    backbone = EvlBackboneOutput.from_serializable(source.to_serializable(), device=torch.device("cpu"))
+    sample = _sample(backbone_out=backbone, points=[])
+
+    result = _selector(k=1).select(sample)
+
+    assert result.source == "backbone.obb_pred_viz"
+    assert result.selected_rows[0].class_name == "window"
+
+
 def test_backbone_obb_without_2d_projection_can_use_3d_support() -> None:
     backbone = EvlBackboneOutput(
         t_world_voxel=_poses([[0.0, 0.0, 0.0]]),
         voxel_extent=torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32),
         obb_pred_viz=ObbTW(_obb_block([[0.0, 0.0, 0.0]], box_size=0.0).obbs),
-        obb_pred_sem_id_to_name=["chair"],
+        obb_pred_sem_id_to_name={0: "chair"},
         pts_world=torch.tensor([[[0.0, 0.0, 0.0]]], dtype=torch.float32),
         counts=torch.ones((1, 1), dtype=torch.int64),
     )

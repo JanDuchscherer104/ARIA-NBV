@@ -1,0 +1,127 @@
+%\vspace{\sectionReduceTop}
+\section{Introduction}
+%\vspace{\sectionReduceBot}
+
+\epigraph{The embodiment hypothesis is the idea that intelligence emerges in the interaction of an agent with
+an environment
+and as a result of sensorimotor activity.}
+{\textit{Smith and Gasser~\cite{smith_al05}}}
+
+\begin{comment}
+A key long-term goal of artificial intelligence (AI) is to build intelligent \emph{agents} that can 
+%\begin{compactitem}
+\begin{inparaitem}[]
+    \item \emph{see} (or more generally perceive their environment through vision, audition, or other senses),
+    \item \emph{talk} (\ie hold a natural language dialog grounded in the environment),
+    %answer natural language questions about its environment),
+    \item \emph{act} (\ie navigate their environment and interact with it to accomplish goals), and 
+    \item \emph{reason} (\ie consider the long-term consequences of their actions).
+%\end{compactitem}
+\end{inparaitem}
+
+
+This goal is of deep scientific and engineering interest. Even a small advance towards such intelligent systems can fundamentally change our lives -- from assistive dialog agents for the visually impaired, to natural-language interaction with self-driving cars, in-home robots, and personal assistants. 
+\end{comment}
+Imagine walking up to a home robot and asking \myquote{Hey -- can you go check if my laptop is on my desk? And if so, bring it to me.} In order to be successful, such a robot would need a range of skills -- visual perception (to recognize scenes and objects), language understanding (to translate questions and instructions into actions), and navigation in complex environments (to move and find things in a changing environment). 
+
+While there has been significant progress in the vision and language communities thanks to recent advances in deep representations~\cite{he_cvpr16, devlin_arxiv18}, much of this progress has been on `internet AI' rather than \emph{embodied} AI. The focus of the former is pattern recognition in images, videos, and text on \emph{datasets} typically curated from the internet~\cite{Deng09imagenet, mscoco, antol_iccv15}. The focus of the latter is to enable action by an embodied agent (\eg a robot) in an \emph{environment}. This brings to the fore active perception, long-term planning, learning from interaction, and holding a dialog grounded in an environment.
+
+A straightforward proposal is to train agents directly in the physical world -- exposing them to all its richness.
+This is valuable and will continue to play an important role in the development of AI.
+However, we also recognize that training robots in the real world is 
+%\begin{compactitem}
+\begin{inparaitem}[]
+    \item \emph{slow} (the real world runs no faster than real time and cannot be parallelized), 
+    \item \emph{dangerous} (poorly-trained agents can unwittingly injure themselves, the environment, or others), 
+    \item \emph{resource intensive} (the robot(s) and the environment(s) in which they execute demand resources and time), 
+    \item \emph{difficult to control} (it is hard to test corner-case scenarios as these are, by definition, infrequent and challenging to recreate), and 
+    \item \emph{not easily reproducible} (replicating conditions across experiments and institutions is difficult). 
+%\end{compactitem}
+\end{inparaitem}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}[t]
+    \centering
+    %\vspace{-5pt}
+    \includegraphics[width=\textwidth]{fig/habitat_stack.pdf}
+    %\vspace{-20pt}
+    \caption{The `software stack' for training embodied agents involves 
+    (1) \emph{datasets} providing 3D assets with semantic annotations, 
+    (2) \emph{simulators} that render these assets and 
+    within which an embodied agent may be simulated, and 
+    (3) \emph{tasks} that define evaluatable problems that enable us to benchmark scientific progress.
+    Prior work (highlighted in blue boxes) has contributed a variety of datasets, simulation software, and task definitions.
+    We propose a unified embodied agent stack with the Habitat platform, including generic dataset support, a highly performant simulator (\habitatsim), and a flexible API (\habitatapi) allowing the definition and evaluation of a broad set of tasks.}
+    %\todo{can we include representative images for all the layers of Habitat stack too?}
+    \label{fig:habitat_stack}
+    %\vspace{\captionReduceBot}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+We aim to support a complementary research program: training embodied agents (\eg virtual robots) in rich realistic simulators and then transferring the learned skills to reality.
+Simulations have a long and rich history in science and engineering (from aerospace to zoology).
+In the context of embodied AI, simulators help overcome the aforementioned challenges -- they can run orders of magnitude faster than real-time and can be parallelized over a cluster; training in simulation is safe, cheap, and enables fair comparison and benchmarking of progress in a concerted community-wide effort.
+%
+Once a promising approach has been developed and tested in simulation, it can be transferred to physical platforms that operate in the real world~\cite{sim2real-driving,sim2real-legged}.
+%In particular, research into mobile robots and other forms of embodied agents can use simulation to evaluate agent policies with standardized benchmarks, establishing a clear measure of progress and promoting reproducibility.
+
+Datasets have been a key driver of progress in computer vision, NLP, and other areas of AI~\cite{Deng09imagenet,mscoco,antol_iccv15,ammirato2017dataset}.
+As the community transitions to embodied AI, we believe that simulators will 
+assume the role played previously by datasets. 
+%Simulators will be used to train and benchmark embodied AI systems that can be reproduced and incrementally advanced by the entire research community. 
+To support this transition, 
+we aim to standardize the entire `software stack' for training embodied agents 
+(\Cref{fig:habitat_stack}): 
+%We present \emph{Habitat}, a platform that aims to standardize the entire `software stack' for 
+%training embodied agents (\Cref{fig:habitat_stack}): 
+scanning the world and creating photorealistic 3D assets, 
+developing the next generation of highly efficient and parallelizable simulators, 
+specifying embodied AI tasks that enable us to benchmark scientific progress, 
+and releasing modular high-level libraries for training and deploying embodied agents. 
+%
+%\noindent
+Specifically, Habitat consists of the following: 
+\begin{asparaenum}
+
+\item \habitatsim: 
+a flexible, high-performance 3D simulator with configurable agents, 
+multiple sensors, and generic 3D dataset handling
+(with built-in support for Matterport3D, Gibson, and Replica datasets). 
+%and \habitatrep datasets).
+%and other datasets). 
+%\habitatsim is fast -- 
+%when rendering a scene from the Matterport3D dataset, \habitatsim achieves several thousand frames per second (fps) running single-threaded, and can reach over $10@000$ fps multi-process on a single GPU, which is orders of magnitude faster than the closest simulator.
+
+\item \habitatapi: a modular high-level library for 
+end-to-end development of embodied AI algorithms -- 
+defining embodied AI tasks (\eg navigation,
+instruction following, question answering), 
+configuring %embodied agents, %(physical form, sensors, capabilities), 
+and training embodied agents (via imitation or reinforcement learning, 
+or via classic SLAM), and 
+benchmarking 
+%their performance on the defined tasks 
+using standard metrics~\cite{Anderson2018-Evaluation}.
+
+\end{asparaenum}
+
+
+The Habitat architecture and implementation combine modularity and high performance.
+%When rendering a scene from the Matterport3D dataset \habitatsim can reach over $10@000$ fps multi-process on a single GPU, which is orders of magnitude faster than the closest simulator.
+When rendering a scene from the Matterport3D dataset, \habitatsim achieves several thousand frames per second (fps) running single-threaded, and can reach over $10@000$ fps multi-process on a single GPU, which is orders of magnitude faster than the closest simulator. 
+\habitatapi allows us to train and benchmark embodied agents with different classes of methods and in different 3D scene datasets. 
+
+These large-scale engineering contributions enable us to answer scientific questions requiring experiments that were till now impracticable or `merely' impractical.
+Specifically, in the context of point-goal navigation~\cite{Anderson2018-Evaluation}, we 
+make two scientific contributions: 
+%
+\begin{asparaenum}
+\item We revisit the comparison between learning and SLAM approaches from two recent works~\cite{mishkin2019benchmarking, kojima2019learn}
+and find evidence for the \textbf{opposite conclusion} -- that learning outperforms SLAM if scaled to an order of magnitude more experience than previous investigations.
+%if scaled to total experience far surpassing that of previous investigations, and 
+
+\item We conduct the first cross-dataset generalization experiments $\{$train, test$\} \times \{$Matterport3D, Gibson$\}$ for multiple sensors $\{$Blind\footnote{$Blind$ refers to agents with no visual sensory inputs.}, RGB, RGBD, D$\} \times \{$GPS+Compass$\}$ and find that only agents with depth ($D$) sensors generalize well across datasets.
+\end{asparaenum}
+
+We hope that our open-source platform and these findings will advance and guide 
+future research in embodied AI. 

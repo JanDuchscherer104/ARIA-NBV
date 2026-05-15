@@ -1,0 +1,256 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{cvpr}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% to compile a preprint version, e.g., for submission to arXiv, add
+% add the [preprint] option:
+% \usepackage[preprint]{nips_2018}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+% \usepackage[final]{nips_2018}
+
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{nips_2018}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+
+% Additional envs
+\usepackage{amsmath,amssymb} % define this before the line numbering.
+\usepackage{color}
+\usepackage{algorithm}% http://ctan.org/pkg/algorithms
+\usepackage{algpseudocode}% http://ctan.org/pkg/algorithmicx
+\usepackage{mathtools} % declarepaireddelimiter
+\usepackage{booktabs} % table midrule
+\usepackage{multirow}
+\usepackage{subcaption}
+\usepackage{hyphenat} % code
+
+\usepackage{color}    % python listing
+\usepackage{listings} % python listing
+\usepackage{setspace} % python listing
+\usepackage{xparse}   % inline code
+\usepackage{pdfpages} % include supplementary
+
+
+% Include other packages here, before hyperref.
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
+% Macros
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
+\DeclarePairedDelimiterX{\infdivx}[2]{(}{)}{%
+  #1\delimsize\|#2%
+}
+\newcommand{\infdiv}{\mathbf{D}\infdivx}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+
+\NewDocumentCommand{\codeword}{v}{%
+\texttt{#1}%
+}
+
+\graphicspath{{./figures/}}
+
+% Macros
+\newcommand{\ignore}[1]{}
+\newcommand{\mbf}[1]{\mathbf{#1}}
+\newcommand{\todo}[1]{\textcolor{red}{TODO: #1}\PackageWarning{TODO:}{#1!}}
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+\DeclareRobustCommand\code[1]{%
+  \ifmmode
+    \expandafter\texttt
+  \else
+    \expandafter\textnhtt
+  \fi{#1}%
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Code listing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\definecolor{Code}{rgb}{0,0,0}
+\definecolor{Decorators}{rgb}{0.5,0.5,0.5}
+\definecolor{Numbers}{rgb}{0.5,0,0}
+\definecolor{MatchingBrackets}{rgb}{0.25,0.5,0.5}
+\definecolor{Keywords}{rgb}{0,0,1}
+\definecolor{self}{rgb}{0,0,0}
+\definecolor{Strings}{rgb}{0,0.63,0}
+\definecolor{Comments}{rgb}{0,0.63,1}
+\definecolor{Backquotes}{rgb}{0,0,0}
+\definecolor{Classname}{rgb}{0,0,0}
+\definecolor{FunctionName}{rgb}{0,0,0}
+\definecolor{Operators}{rgb}{0,0,0}
+\definecolor{Background}{rgb}{0.98,0.98,0.98}
+
+\lstdefinestyle{default}{
+    backgroundcolor=\color{Background},   
+    commentstyle=\color{Comments},
+    keywordstyle=\color{Keywords},
+    numberstyle=\tiny\color{Numbers},
+    stringstyle=\color{Strings},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,       
+    breaklines=true,         
+    captionpos=b,                 
+    keepspaces=true,                 
+    numbers=left,
+    numberstyle=\footnotesize,
+    numbersep=1em,
+    xleftmargin=1em,
+    framextopmargin=2em,
+    framexbottommargin=1em,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+}
+
+\lstdefinelanguage{Python}{
+    frame=l,
+    basicstyle=\ttfamily\small\setstretch{1},
+    commentstyle=\color{Comments}\slshape,
+    stringstyle=\color{Strings},
+    morecomment=[s][\color{Strings}]{"""}{"""},
+    morecomment=[s][\color{Strings}]{'''}{'''},
+    morekeywords={import,from,class,def,for,while,if,is,in,elif,else,not,and,or,print,break,continue,return,True,False,None,access,as,del,except,exec,finally,global,import,lambda,pass,print,raise,try,assert},
+    keywordstyle={\color{Keywords}\bfseries},
+    morekeywords={[2]@invariant,pylab,numpy,np,scipy},
+    keywordstyle={[2]\color{Decorators}\slshape},
+    emph={self},
+    emphstyle={\color{self}\slshape},
+}
+
+\lstdefinelanguage{cpp}{
+    basicstyle=\footnotesize \ttfamily \color{black} \bfseries,
+    breakatwhitespace=false,
+    commentstyle=\color{dkgreen},
+    deletekeywords={...},
+    escapeinside={\%*}{*)},
+    language=C++,
+    morekeywords={string,cerr,exit},
+    identifierstyle=\color{black},
+    stringstyle=\color{blue},
+    numberstyle=\tiny\color{black},
+    rulecolor=\color{black},
+    stepnumber=1,
+    tabsize=2,
+    title=\lstname,         
+}
+
+\lstset{style=default}
+% \linespread{1.3}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\cvprfinalcopy % *** Uncomment this line for the final submission
+
+\def\cvprPaperID{1523} % *** Enter the CVPR Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+\ifcvprfinal\pagestyle{empty}\fi
+\begin{document}
+
+
+\title{4D Spatio-Temporal ConvNets: Minkowski Convolutional Neural Networks}
+
+% The \author macro works with any number of authors. There are two
+% commands used to separate the names and addresses of multiple
+% authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to
+% break the lines. Using \AND forces a line break at that point. So,
+% if LaTeX puts 3 of 4 authors names on the first line, and the last
+% on the second line, try using \AND instead of \And before the third
+% author name.
+
+\author{
+  Christopher Choy \\
+  \small{\texttt{chrischoy@stanford.edu}}
+   \and
+   JunYoung Gwak \\
+   \small{\texttt{jgwak@stanford.edu}}
+   \and
+   Silvio Savarese \\
+   \small{\texttt{ssilvio@stanford.edu}}
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+}
+
+\maketitle
+
+\begin{abstract}
+In many robotics and VR/AR applications, 3D-videos are readily-available sources of input (a continuous sequence of depth images, or LIDAR scans). However, these 3D-videos are processed frame-by-frame either through 2D convnets or 3D perception algorithms in many cases. In this work, we propose 4-dimensional convolutional neural networks for spatio-temporal perception that can directly process such 3D-videos using high-dimensional convolutions. For this, we adopt sparse tensors~\cite{sparsecnn, sparse3dcnn} and propose the generalized sparse convolution which encompasses all discrete convolutions. To implement the generalized sparse convolution, we create an open-source auto-differentiation library for sparse tensors that provides extensive functions for high-dimensional convolutional neural networks.\footnote{\url{https://github.com/StanfordVL/MinkowskiEngine}} We create 4D spatio-temporal convolutional neural networks using the library and validate them on various 3D semantic segmentation benchmarks and proposed 4D datasets for 3D-video perception. To overcome challenges in the high-dimensional 4D space, we propose the hybrid kernel, a special case of the generalized sparse convolution, and the trilateral-stationary conditional random field that enforces spatio-temporal consistency in the 7D space-time-chroma space. Experimentally, we show that convolutional neural networks with only generalized sparse convolutions can outperform 2D or 2D-3D hybrid methods by a large margin.\footnote{At the time of submission, we achieved the best performance on ScanNet~\cite{scannet} with 67.9\% mIoU} Also, we show that on 3D-videos, 4D spatio-temporal convolutional neural networks are robust to noise, outperform 3D convolutional neural networks and are faster than the 3D counterpart in some cases.
+
+\end{abstract}
+
+\input{sections/1_intro.tex}
+\input{sections/2_related.tex}
+\input{sections/3_preliminary.tex}
+\input{sections/4_minkowskiengine.tex}
+\input{sections/5_minkowskinetwork.tex}
+\input{sections/6_trilateral_crf.tex}
+\input{sections/7_experiments.tex}
+
+\section{Conclusion}
+
+In this paper, we propose a generalized sparse convolution and an auto-differentiation library for sparse tensors and the generalized sparse convolution. Using these, we create 4D convolutional neural networks for spatio-temporal perception. Experimentally, we show that 3D convolutional neural networks alone can outperform 2D networks and 4D perception can be more robust to noise.
+
+
+\section{Acknowledgements}
+
+Toyota Research Institute ("TRI") provided funds to assist the authors with their research but this article solely reflects the opinions and conclusions of its authors and not TRI or any other Toyota entity. We acknowledge the support of the System X Fellowship and the companies sponsored: NEC Corporation, Nvidia, Samsung, and Tencent. Also, we want to acknowledge the academic hardware donation from Nvidia.
+
+
+{
+\begingroup
+\let\clearpage\relax
+    {\small
+    \bibliographystyle{ieee_fullname}
+    \bibliography{egbib}
+    }
+\endgroup
+}
+% {\small
+% \bibliographystyle{ieee}
+% \bibliography{egbib}
+% }
+
+\clearpage
+\includepdf[pages=1, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=2, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=3, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=4, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=5, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=6, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=7, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=8, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=9, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=10, pagecommand={}]{supplementary.pdf}
+\includepdf[pages=11, pagecommand={}]{supplementary.pdf}
+
+\end{document}

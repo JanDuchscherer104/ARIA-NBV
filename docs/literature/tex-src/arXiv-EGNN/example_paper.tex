@@ -1,0 +1,156 @@
+%%%%%%%% ICML 2021 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage[font=small,labelfont=bf,tableposition=top]{caption}
+
+\DeclareCaptionLabelFormat{andtable}{#1~#2  \&  \tablename~\thetable}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\x}{\mathbf{x}}
+\DeclareMathOperator*{\y}{\mathbf{y}}
+
+\newcommand{\MW}[1]{{\color{blue} Max: #1}}
+
+\newcommand{\rmm}{\mathbf{m}}
+\newcommand{\rmh}{\mathbf{h}}
+\newcommand{\rmH}{\mathbf{H}}
+\newcommand{\rmx}{\mathbf{x}}
+\newcommand{\rmy}{\mathbf{y}}
+\newcommand{\rmX}{\mathbf{X}}
+\newcommand{\rmp}{\mathbf{p}}
+\newcommand{\rmu}{\mathbf{u}}
+\newcommand{\rmv}{\mathbf{v}}
+\newcommand{\rmz}{\mathbf{z}}
+\newcommand{\rmr}{\mathbf{r}}
+\newcommand{\En}{\mathrm{E}(n)}
+\newcommand{\summessages}{\rmm_i = \sum_{j \in \mathcal{N}(i)} \rmm_{ij}}
+\newcommand{\summessagesb}{\rmm_i = \sum_{j \neq i} \rmm_{ij}}
+
+
+% [Victor] the next line breaks the compilation, I removed it
+%\newcommand{\max}[1]{\textcolor{red}{[\textbf{Max}: #1]}}
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2021} with \usepackage[nohyperref]{icml2021} above.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+%\usepackage{icml2021}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2021}
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{E(n) Equivariant Graph Neural Networks}
+
+\newcommand{\Emiel}[1]{{\color{red}Emiel: #1}}
+
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{E(n) Equivariant Graph Neural Networks}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2021
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Victor Garcia Satorras}{delta}
+\icmlauthor{Emiel Hoogeboom}{delta}
+\icmlauthor{Max Welling}{delta}
+\end{icmlauthorlist}
+
+\icmlaffiliation{delta}{UvA-Bosch Delta Lab, University of Amsterdam, Netherlands}
+
+
+\icmlcorrespondingauthor{Victor Garcia Satorras}{v.garciasatorras@uva.nl}
+\icmlcorrespondingauthor{Emiel Hoogeboom}{e.hoogeboom@uva.nl}
+\icmlcorrespondingauthor{Max Welling}{m.welling@uva.nl}
+
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
+\icmlkeywords{Machine Learning, ICML}
+
+\vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \icmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+%\printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
+
+\begin{abstract}
+This paper introduces a new model to learn graph neural networks equivariant to rotations, translations, reflections and permutations called $\En$-Equivariant Graph Neural Networks (EGNNs). In contrast with existing methods, our work does not require computationally expensive higher-order representations in intermediate layers while it still achieves competitive or better performance. In addition, whereas existing methods are limited to equivariance on $3$ dimensional spaces, our model is easily scaled to higher-dimensional spaces. We demonstrate the effectiveness of our method on dynamical systems modelling, representation learning in graph autoencoders and predicting molecular properties.
+\end{abstract}
+
+
+%\input{sections/index}
+
+%\input{sections/template}
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/model}
+\input{sections/related}
+\input{sections/experiments}
+\input{sections/conclusions}
+
+\bibliography{example_paper}
+\bibliographystyle{icml2021}
+
+% We can use onecolumn formatting for appendix.
+\onecolumn
+\input{sections/appendix}
+
+\end{document}
+
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2021. Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.

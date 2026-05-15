@@ -5,58 +5,183 @@
   (id: "area-under-curve", label: "Area Under Curve", short: "AUC", anchor: "term-area-under-curve"),
   (id: "aria-digital-twin", label: "Aria Digital Twin", short: "ADT", anchor: "term-aria-digital-twin"),
   (id: "aria-everyday-objects", label: "Aria Everyday Objects", short: "AEO", anchor: "term-aria-everyday-objects"),
-  (id: "aria-synthetic-environments", label: "Aria Synthetic Environments", short: "ASE", anchor: "term-aria-synthetic-environments"),
+  (
+    id: "aria-synthetic-environments",
+    label: "Aria Synthetic Environments",
+    short: "ASE",
+    anchor: "term-aria-synthetic-environments",
+  ),
   (id: "candidate-view", label: "Candidate View", short: "candidate", anchor: "term-candidate-view"),
   (id: "central-pupil-frame", label: "Central Pupil Frame", short: "CPF", anchor: "term-central-pupil-frame"),
   (id: "chamfer-distance", label: "Chamfer Distance", short: "CD", anchor: "term-chamfer-distance"),
-  (id: "counterfactual-transition", label: "Counterfactual Transition", short: "transition", anchor: "term-counterfactual-transition"),
+  (
+    id: "counterfactual-transition",
+    label: "Counterfactual Transition",
+    short: "transition",
+    anchor: "term-counterfactual-transition",
+  ),
   (id: "coverage-ratio", label: "Coverage Ratio", short: "CR", anchor: "term-coverage-ratio"),
   (id: "degrees-of-freedom", label: "Degrees of Freedom", short: "DoF", anchor: "term-degrees-of-freedom"),
-  (id: "egocentric-foundation-model-3d", label: "Egocentric Foundation Model 3D", short: "EFM3D", anchor: "term-egocentric-foundation-model-3d"),
-  (id: "egocentric-voxel-lifting", label: "Egocentric Voxel Lifting", short: "EVL", anchor: "term-egocentric-voxel-lifting"),
-  (id: "finite-candidate-action-set", label: "Finite Candidate Action Set", short: "action set", anchor: "term-finite-candidate-action-set"),
-  (id: "finite-horizon-q-function", label: "Finite-Horizon Q Function", short: "Q_H", anchor: "term-finite-horizon-q-function"),
+  (
+    id: "egocentric-foundation-model-3d",
+    label: "Egocentric Foundation Model 3D",
+    short: "EFM3D",
+    anchor: "term-egocentric-foundation-model-3d",
+  ),
+  (
+    id: "egocentric-voxel-lifting",
+    label: "Egocentric Voxel Lifting",
+    short: "EVL",
+    anchor: "term-egocentric-voxel-lifting",
+  ),
+  (
+    id: "finite-candidate-action-set",
+    label: "Finite Candidate Action Set",
+    short: "action set",
+    anchor: "term-finite-candidate-action-set",
+  ),
+  (
+    id: "finite-horizon-q-function",
+    label: "Finite-Horizon Q Function",
+    short: "Q_H",
+    anchor: "term-finite-horizon-q-function",
+  ),
   (id: "finite-horizon-return", label: "Finite-Horizon Return", short: "return", anchor: "term-finite-horizon-return"),
-  (id: "five-degrees-of-freedom", label: "Five Degrees of Freedom", short: "5DoF", anchor: "term-five-degrees-of-freedom"),
+  (
+    id: "five-degrees-of-freedom",
+    label: "Five Degrees of Freedom",
+    short: "5DoF",
+    anchor: "term-five-degrees-of-freedom",
+  ),
   (id: "frustum", label: "Frustum", short: "frustum", anchor: "term-frustum"),
-  (id: "geometry-rich-counterfactual-state", label: "Geometry-Rich Counterfactual State", short: "CF+ state", anchor: "term-geometry-rich-counterfactual-state"),
+  (
+    id: "geometry-rich-counterfactual-state",
+    label: "Geometry-Rich Counterfactual State",
+    short: "CF+ state",
+    anchor: "term-geometry-rich-counterfactual-state",
+  ),
   (id: "ground-truth", label: "Ground Truth", short: "GT", anchor: "term-ground-truth"),
-  (id: "ground-truth-target-evaluation", label: "Ground-Truth Target Evaluation", short: "GT-EVAL", anchor: "term-ground-truth-target-evaluation"),
-  (id: "historic-snippet-state", label: "Historic Snippet State", short: "historic state", anchor: "term-historic-snippet-state"),
+  (
+    id: "ground-truth-target-evaluation",
+    label: "Ground-Truth Target Evaluation",
+    short: "GT-EVAL",
+    anchor: "term-ground-truth-target-evaluation",
+  ),
+  (
+    id: "historic-snippet-state",
+    label: "Historic Snippet State",
+    short: "historic state",
+    anchor: "term-historic-snippet-state",
+  ),
   (id: "left-up-forward", label: "Left-Up-Forward", short: "LUF", anchor: "term-left-up-forward"),
-  (id: "machine-perception-services", label: "Machine Perception Services", short: "MPS", anchor: "term-machine-perception-services"),
-  (id: "minimal-counterfactual-state", label: "Minimal Counterfactual Actor State", short: "CF0 state", anchor: "term-minimal-counterfactual-state"),
+  (
+    id: "machine-perception-services",
+    label: "Machine Perception Services",
+    short: "MPS",
+    anchor: "term-machine-perception-services",
+  ),
+  (
+    id: "minimal-counterfactual-state",
+    label: "Minimal Counterfactual Actor State",
+    short: "CF0 state",
+    anchor: "term-minimal-counterfactual-state",
+  ),
   (id: "motion-trajectory-data", label: "Motion Trajectory Data", short: "MTD", anchor: "term-motion-trajectory-data"),
-  (id: "multi-frame-camera-data", label: "Multi-Frame Camera Data", short: "MFCD", anchor: "term-multi-frame-camera-data"),
-  (id: "multi-semi-dense-point-data", label: "Multi-Semi-Dense Point Data", short: "MSDPD", anchor: "term-multi-semi-dense-point-data"),
+  (
+    id: "multi-frame-camera-data",
+    label: "Multi-Frame Camera Data",
+    short: "MFCD",
+    anchor: "term-multi-frame-camera-data",
+  ),
+  (
+    id: "multi-semi-dense-point-data",
+    label: "Multi-Semi-Dense Point Data",
+    short: "MSDPD",
+    anchor: "term-multi-semi-dense-point-data",
+  ),
   (id: "multi-view-stereo", label: "Multi-view Stereo", short: "MVS", anchor: "term-multi-view-stereo"),
   (id: "next-best-view", label: "Next-Best-View", short: "NBV", anchor: "term-next-best-view"),
-  (id: "observed-target-selection", label: "Observed Target Selection", short: "OBS-SEL", anchor: "term-observed-target-selection"),
+  (
+    id: "observed-target-selection",
+    label: "Observed Target Selection",
+    short: "OBS-SEL",
+    anchor: "term-observed-target-selection",
+  ),
   (id: "occupancy-grid", label: "Occupancy Grid", short: "Occupancy Grid", anchor: "term-occupancy-grid"),
-  (id: "oracle-rollout-state", label: "Oracle Rollout State", short: "oracle state", anchor: "term-oracle-rollout-state"),
+  (
+    id: "oracle-rollout-state",
+    label: "Oracle Rollout State",
+    short: "oracle state",
+    anchor: "term-oracle-rollout-state",
+  ),
   (id: "oracle-rri", label: "Oracle RRI", short: "oracle RRI", anchor: "term-oracle-rri"),
   (id: "oriented-bounding-box", label: "Oriented Bounding Box", short: "OBB", anchor: "term-oriented-bounding-box"),
-  (id: "persisted-offline-state", label: "Persisted Offline Sample State", short: "offline state", anchor: "term-persisted-offline-state"),
+  (
+    id: "persisted-offline-state",
+    label: "Persisted Offline Sample State",
+    short: "offline state",
+    anchor: "term-persisted-offline-state",
+  ),
   (id: "point-cloud", label: "Point Cloud", short: "PC", anchor: "term-point-cloud"),
   (id: "predicted-target-q", label: "Predicted-Target Q", short: "PRED-Q", anchor: "term-predicted-target-q"),
   (id: "project-aria", label: "Project Aria", short: "Project Aria", anchor: "term-project-aria"),
-  (id: "relative-reconstruction-improvement", label: "Relative Reconstruction Improvement", short: "RRI", anchor: "term-relative-reconstruction-improvement"),
+  (
+    id: "relative-reconstruction-improvement",
+    label: "Relative Reconstruction Improvement",
+    short: "RRI",
+    anchor: "term-relative-reconstruction-improvement",
+  ),
   (id: "rollout-state", label: "Rollout State", short: "state", anchor: "term-rollout-state"),
   (id: "scene-script-language", label: "SceneScript Language", short: "SSL", anchor: "term-scene-script-language"),
-  (id: "simultaneous-localization-and-mapping", label: "Simultaneous Localization and Mapping", short: "SLAM", anchor: "term-simultaneous-localization-and-mapping"),
+  (
+    id: "simultaneous-localization-and-mapping",
+    label: "Simultaneous Localization and Mapping",
+    short: "SLAM",
+    anchor: "term-simultaneous-localization-and-mapping",
+  ),
   (id: "six-degrees-of-freedom", label: "Six Degrees of Freedom", short: "6DoF", anchor: "term-six-degrees-of-freedom"),
   (id: "snippet", label: "Snippet", short: "snippet", anchor: "term-snippet"),
-  (id: "target-conditioned-nbv-mdp", label: "Target-Conditioned NBV MDP", short: "NBV MDP", anchor: "term-target-conditioned-nbv-mdp"),
-  (id: "target-conditioned-scorer", label: "Target-Conditioned Scorer", short: "target-conditioned scorer", anchor: "term-target-conditioned-scorer"),
+  (
+    id: "target-conditioned-nbv-mdp",
+    label: "Target-Conditioned NBV MDP",
+    short: "NBV MDP",
+    anchor: "term-target-conditioned-nbv-mdp",
+  ),
+  (
+    id: "target-conditioned-scorer",
+    label: "Target-Conditioned Scorer",
+    short: "target-conditioned scorer",
+    anchor: "term-target-conditioned-scorer",
+  ),
   (id: "target-of-interest", label: "Target of Interest", short: "target", anchor: "term-target-of-interest"),
   (id: "target-rri-reward", label: "Target-RRI Reward", short: "reward", anchor: "term-target-rri-reward"),
   (id: "target-specific-rri", label: "Target-Specific RRI", short: "target RRI", anchor: "term-target-specific-rri"),
-  (id: "three-dimensional-gaussian-splatting", label: "3D Gaussian Splatting", short: "3DGS", anchor: "term-three-dimensional-gaussian-splatting"),
+  (
+    id: "three-dimensional-gaussian-splatting",
+    label: "3D Gaussian Splatting",
+    short: "3DGS",
+    anchor: "term-three-dimensional-gaussian-splatting",
+  ),
   (id: "track", label: "Track", short: "track", anchor: "term-track"),
   (id: "validity-mask", label: "Validity Mask", short: "mask", anchor: "term-validity-mask"),
-  (id: "view-introspection-network", label: "View Introspection Network", short: "VIN", anchor: "term-view-introspection-network"),
-  (id: "virtual-reality-standard", label: "Virtual Reality Standard", short: "VRS", anchor: "term-virtual-reality-standard"),
-  (id: "visual-inertial-odometry", label: "Visual-Inertial Odometry", short: "VIO", anchor: "term-visual-inertial-odometry"),
+  (
+    id: "view-introspection-network",
+    label: "View Introspection Network",
+    short: "VIN",
+    anchor: "term-view-introspection-network",
+  ),
+  (
+    id: "virtual-reality-standard",
+    label: "Virtual Reality Standard",
+    short: "VRS",
+    anchor: "term-virtual-reality-standard",
+  ),
+  (
+    id: "visual-inertial-odometry",
+    label: "Visual-Inertial Odometry",
+    short: "VIO",
+    anchor: "term-visual-inertial-odometry",
+  ),
 )
 
 // Backwards-compatible Typst term constants generated from glossary records
@@ -101,122 +226,118 @@
 #let SSL_full = "SceneScript Language"
 
 #let gls(id) = {
-  if id == "acquisition-cost" { [cost]
-  } else if id == "area-under-curve" { [AUC]
-  } else if id == "aria-digital-twin" { [ADT]
-  } else if id == "aria-everyday-objects" { [AEO]
-  } else if id == "aria-synthetic-environments" { [ASE]
-  } else if id == "candidate-view" { [candidate]
-  } else if id == "central-pupil-frame" { [CPF]
-  } else if id == "chamfer-distance" { [CD]
-  } else if id == "counterfactual-transition" { [transition]
-  } else if id == "coverage-ratio" { [CR]
-  } else if id == "degrees-of-freedom" { [DoF]
-  } else if id == "egocentric-foundation-model-3d" { [EFM3D]
-  } else if id == "egocentric-voxel-lifting" { [EVL]
-  } else if id == "finite-candidate-action-set" { [action set]
-  } else if id == "finite-horizon-q-function" { [Q_H]
-  } else if id == "finite-horizon-return" { [return]
-  } else if id == "five-degrees-of-freedom" { [5DoF]
-  } else if id == "frustum" { [frustum]
-  } else if id == "geometry-rich-counterfactual-state" { [CF+ state]
-  } else if id == "ground-truth" { [GT]
-  } else if id == "ground-truth-target-evaluation" { [GT-EVAL]
-  } else if id == "historic-snippet-state" { [historic state]
-  } else if id == "left-up-forward" { [LUF]
-  } else if id == "machine-perception-services" { [MPS]
-  } else if id == "minimal-counterfactual-state" { [CF0 state]
-  } else if id == "motion-trajectory-data" { [MTD]
-  } else if id == "multi-frame-camera-data" { [MFCD]
-  } else if id == "multi-semi-dense-point-data" { [MSDPD]
-  } else if id == "multi-view-stereo" { [MVS]
-  } else if id == "next-best-view" { [NBV]
-  } else if id == "observed-target-selection" { [OBS-SEL]
-  } else if id == "occupancy-grid" { [Occupancy Grid]
-  } else if id == "oracle-rollout-state" { [oracle state]
-  } else if id == "oracle-rri" { [oracle RRI]
-  } else if id == "oriented-bounding-box" { [OBB]
-  } else if id == "persisted-offline-state" { [offline state]
-  } else if id == "point-cloud" { [PC]
-  } else if id == "predicted-target-q" { [PRED-Q]
-  } else if id == "project-aria" { [Project Aria]
-  } else if id == "relative-reconstruction-improvement" { [RRI]
-  } else if id == "rollout-state" { [state]
-  } else if id == "scene-script-language" { [SSL]
-  } else if id == "simultaneous-localization-and-mapping" { [SLAM]
-  } else if id == "six-degrees-of-freedom" { [6DoF]
-  } else if id == "snippet" { [snippet]
-  } else if id == "target-conditioned-nbv-mdp" { [NBV MDP]
-  } else if id == "target-conditioned-scorer" { [target-conditioned scorer]
-  } else if id == "target-of-interest" { [target]
-  } else if id == "target-rri-reward" { [reward]
-  } else if id == "target-specific-rri" { [target RRI]
-  } else if id == "three-dimensional-gaussian-splatting" { [3DGS]
-  } else if id == "track" { [track]
-  } else if id == "validity-mask" { [mask]
-  } else if id == "view-introspection-network" { [VIN]
-  } else if id == "virtual-reality-standard" { [VRS]
-  } else if id == "visual-inertial-odometry" { [VIO]
+  if id == "acquisition-cost" { [cost] } else if id == "area-under-curve" { [AUC] } else if id == "aria-digital-twin" {
+    [ADT]
+  } else if id == "aria-everyday-objects" { [AEO] } else if id == "aria-synthetic-environments" { [ASE] } else if (
+    id == "candidate-view"
+  ) { [candidate] } else if id == "central-pupil-frame" { [CPF] } else if id == "chamfer-distance" { [CD] } else if (
+    id == "counterfactual-transition"
+  ) { [transition] } else if id == "coverage-ratio" { [CR] } else if id == "degrees-of-freedom" { [DoF] } else if (
+    id == "egocentric-foundation-model-3d"
+  ) { [EFM3D] } else if id == "egocentric-voxel-lifting" { [EVL] } else if id == "finite-candidate-action-set" {
+    [action set]
+  } else if id == "finite-horizon-q-function" { [Q_H] } else if id == "finite-horizon-return" { [return] } else if (
+    id == "five-degrees-of-freedom"
+  ) { [5DoF] } else if id == "frustum" { [frustum] } else if id == "geometry-rich-counterfactual-state" {
+    [CF+ state]
+  } else if id == "ground-truth" { [GT] } else if id == "ground-truth-target-evaluation" { [GT-EVAL] } else if (
+    id == "historic-snippet-state"
+  ) { [historic state] } else if id == "left-up-forward" { [LUF] } else if id == "machine-perception-services" {
+    [MPS]
+  } else if id == "minimal-counterfactual-state" { [CF0 state] } else if id == "motion-trajectory-data" {
+    [MTD]
+  } else if id == "multi-frame-camera-data" { [MFCD] } else if id == "multi-semi-dense-point-data" { [MSDPD] } else if (
+    id == "multi-view-stereo"
+  ) { [MVS] } else if id == "next-best-view" { [NBV] } else if id == "observed-target-selection" { [OBS-SEL] } else if (
+    id == "occupancy-grid"
+  ) { [Occupancy Grid] } else if id == "oracle-rollout-state" { [oracle state] } else if id == "oracle-rri" {
+    [oracle RRI]
+  } else if id == "oriented-bounding-box" { [OBB] } else if id == "persisted-offline-state" {
+    [offline state]
+  } else if id == "point-cloud" { [PC] } else if id == "predicted-target-q" { [PRED-Q] } else if id == "project-aria" {
+    [Project Aria]
+  } else if id == "relative-reconstruction-improvement" { [RRI] } else if id == "rollout-state" { [state] } else if (
+    id == "scene-script-language"
+  ) { [SSL] } else if id == "simultaneous-localization-and-mapping" { [SLAM] } else if id == "six-degrees-of-freedom" {
+    [6DoF]
+  } else if id == "snippet" { [snippet] } else if id == "target-conditioned-nbv-mdp" { [NBV MDP] } else if (
+    id == "target-conditioned-scorer"
+  ) { [target-conditioned scorer] } else if id == "target-of-interest" { [target] } else if id == "target-rri-reward" {
+    [reward]
+  } else if id == "target-specific-rri" { [target RRI] } else if id == "three-dimensional-gaussian-splatting" {
+    [3DGS]
+  } else if id == "track" { [track] } else if id == "validity-mask" { [mask] } else if (
+    id == "view-introspection-network"
+  ) { [VIN] } else if id == "virtual-reality-standard" { [VRS] } else if id == "visual-inertial-odometry" {
+    [VIO]
   } else { id }
 }
 
 #let gls-full(id) = {
-  if id == "acquisition-cost" { [Acquisition Cost (cost)]
-  } else if id == "area-under-curve" { [Area Under Curve (AUC)]
-  } else if id == "aria-digital-twin" { [Aria Digital Twin (ADT)]
-  } else if id == "aria-everyday-objects" { [Aria Everyday Objects (AEO)]
-  } else if id == "aria-synthetic-environments" { [Aria Synthetic Environments (ASE)]
-  } else if id == "candidate-view" { [Candidate View (candidate)]
-  } else if id == "central-pupil-frame" { [Central Pupil Frame (CPF)]
-  } else if id == "chamfer-distance" { [Chamfer Distance (CD)]
-  } else if id == "counterfactual-transition" { [Counterfactual Transition (transition)]
-  } else if id == "coverage-ratio" { [Coverage Ratio (CR)]
-  } else if id == "degrees-of-freedom" { [Degrees of Freedom (DoF)]
-  } else if id == "egocentric-foundation-model-3d" { [Egocentric Foundation Model 3D (EFM3D)]
-  } else if id == "egocentric-voxel-lifting" { [Egocentric Voxel Lifting (EVL)]
-  } else if id == "finite-candidate-action-set" { [Finite Candidate Action Set (action set)]
-  } else if id == "finite-horizon-q-function" { [Finite-Horizon Q Function (Q_H)]
-  } else if id == "finite-horizon-return" { [Finite-Horizon Return (return)]
-  } else if id == "five-degrees-of-freedom" { [Five Degrees of Freedom (5DoF)]
-  } else if id == "frustum" { [Frustum (frustum)]
-  } else if id == "geometry-rich-counterfactual-state" { [Geometry-Rich Counterfactual State (CF+ state)]
-  } else if id == "ground-truth" { [Ground Truth (GT)]
-  } else if id == "ground-truth-target-evaluation" { [Ground-Truth Target Evaluation (GT-EVAL)]
-  } else if id == "historic-snippet-state" { [Historic Snippet State (historic state)]
-  } else if id == "left-up-forward" { [Left-Up-Forward (LUF)]
-  } else if id == "machine-perception-services" { [Machine Perception Services (MPS)]
-  } else if id == "minimal-counterfactual-state" { [Minimal Counterfactual Actor State (CF0 state)]
-  } else if id == "motion-trajectory-data" { [Motion Trajectory Data (MTD)]
-  } else if id == "multi-frame-camera-data" { [Multi-Frame Camera Data (MFCD)]
-  } else if id == "multi-semi-dense-point-data" { [Multi-Semi-Dense Point Data (MSDPD)]
-  } else if id == "multi-view-stereo" { [Multi-view Stereo (MVS)]
-  } else if id == "next-best-view" { [Next-Best-View (NBV)]
-  } else if id == "observed-target-selection" { [Observed Target Selection (OBS-SEL)]
-  } else if id == "occupancy-grid" { [Occupancy Grid]
-  } else if id == "oracle-rollout-state" { [Oracle Rollout State (oracle state)]
-  } else if id == "oracle-rri" { [Oracle RRI (oracle RRI)]
-  } else if id == "oriented-bounding-box" { [Oriented Bounding Box (OBB)]
-  } else if id == "persisted-offline-state" { [Persisted Offline Sample State (offline state)]
-  } else if id == "point-cloud" { [Point Cloud (PC)]
-  } else if id == "predicted-target-q" { [Predicted-Target Q (PRED-Q)]
-  } else if id == "project-aria" { [Project Aria]
-  } else if id == "relative-reconstruction-improvement" { [Relative Reconstruction Improvement (RRI)]
-  } else if id == "rollout-state" { [Rollout State (state)]
-  } else if id == "scene-script-language" { [SceneScript Language (SSL)]
-  } else if id == "simultaneous-localization-and-mapping" { [Simultaneous Localization and Mapping (SLAM)]
-  } else if id == "six-degrees-of-freedom" { [Six Degrees of Freedom (6DoF)]
-  } else if id == "snippet" { [Snippet (snippet)]
-  } else if id == "target-conditioned-nbv-mdp" { [Target-Conditioned NBV MDP (NBV MDP)]
-  } else if id == "target-conditioned-scorer" { [Target-Conditioned Scorer (target-conditioned scorer)]
-  } else if id == "target-of-interest" { [Target of Interest (target)]
-  } else if id == "target-rri-reward" { [Target-RRI Reward (reward)]
-  } else if id == "target-specific-rri" { [Target-Specific RRI (target RRI)]
-  } else if id == "three-dimensional-gaussian-splatting" { [3D Gaussian Splatting (3DGS)]
-  } else if id == "track" { [Track (track)]
-  } else if id == "validity-mask" { [Validity Mask (mask)]
-  } else if id == "view-introspection-network" { [View Introspection Network (VIN)]
-  } else if id == "virtual-reality-standard" { [Virtual Reality Standard (VRS)]
-  } else if id == "visual-inertial-odometry" { [Visual-Inertial Odometry (VIO)]
+  if id == "acquisition-cost" { [Acquisition Cost (cost)] } else if id == "area-under-curve" {
+    [Area Under Curve (AUC)]
+  } else if id == "aria-digital-twin" { [Aria Digital Twin (ADT)] } else if id == "aria-everyday-objects" {
+    [Aria Everyday Objects (AEO)]
+  } else if id == "aria-synthetic-environments" { [Aria Synthetic Environments (ASE)] } else if id == "candidate-view" {
+    [Candidate View (candidate)]
+  } else if id == "central-pupil-frame" { [Central Pupil Frame (CPF)] } else if id == "chamfer-distance" {
+    [Chamfer Distance (CD)]
+  } else if id == "counterfactual-transition" { [Counterfactual Transition (transition)] } else if (
+    id == "coverage-ratio"
+  ) { [Coverage Ratio (CR)] } else if id == "degrees-of-freedom" { [Degrees of Freedom (DoF)] } else if (
+    id == "egocentric-foundation-model-3d"
+  ) { [Egocentric Foundation Model 3D (EFM3D)] } else if id == "egocentric-voxel-lifting" {
+    [Egocentric Voxel Lifting (EVL)]
+  } else if id == "finite-candidate-action-set" { [Finite Candidate Action Set (action set)] } else if (
+    id == "finite-horizon-q-function"
+  ) { [Finite-Horizon Q Function (Q_H)] } else if id == "finite-horizon-return" {
+    [Finite-Horizon Return (return)]
+  } else if id == "five-degrees-of-freedom" { [Five Degrees of Freedom (5DoF)] } else if id == "frustum" {
+    [Frustum (frustum)]
+  } else if id == "geometry-rich-counterfactual-state" { [Geometry-Rich Counterfactual State (CF+ state)] } else if (
+    id == "ground-truth"
+  ) { [Ground Truth (GT)] } else if id == "ground-truth-target-evaluation" {
+    [Ground-Truth Target Evaluation (GT-EVAL)]
+  } else if id == "historic-snippet-state" { [Historic Snippet State (historic state)] } else if (
+    id == "left-up-forward"
+  ) { [Left-Up-Forward (LUF)] } else if id == "machine-perception-services" {
+    [Machine Perception Services (MPS)]
+  } else if id == "minimal-counterfactual-state" { [Minimal Counterfactual Actor State (CF0 state)] } else if (
+    id == "motion-trajectory-data"
+  ) { [Motion Trajectory Data (MTD)] } else if id == "multi-frame-camera-data" {
+    [Multi-Frame Camera Data (MFCD)]
+  } else if id == "multi-semi-dense-point-data" { [Multi-Semi-Dense Point Data (MSDPD)] } else if (
+    id == "multi-view-stereo"
+  ) { [Multi-view Stereo (MVS)] } else if id == "next-best-view" { [Next-Best-View (NBV)] } else if (
+    id == "observed-target-selection"
+  ) { [Observed Target Selection (OBS-SEL)] } else if id == "occupancy-grid" { [Occupancy Grid] } else if (
+    id == "oracle-rollout-state"
+  ) { [Oracle Rollout State (oracle state)] } else if id == "oracle-rri" { [Oracle RRI (oracle RRI)] } else if (
+    id == "oriented-bounding-box"
+  ) { [Oriented Bounding Box (OBB)] } else if id == "persisted-offline-state" {
+    [Persisted Offline Sample State (offline state)]
+  } else if id == "point-cloud" { [Point Cloud (PC)] } else if id == "predicted-target-q" {
+    [Predicted-Target Q (PRED-Q)]
+  } else if id == "project-aria" { [Project Aria] } else if id == "relative-reconstruction-improvement" {
+    [Relative Reconstruction Improvement (RRI)]
+  } else if id == "rollout-state" { [Rollout State (state)] } else if id == "scene-script-language" {
+    [SceneScript Language (SSL)]
+  } else if id == "simultaneous-localization-and-mapping" { [Simultaneous Localization and Mapping (SLAM)] } else if (
+    id == "six-degrees-of-freedom"
+  ) { [Six Degrees of Freedom (6DoF)] } else if id == "snippet" { [Snippet (snippet)] } else if (
+    id == "target-conditioned-nbv-mdp"
+  ) { [Target-Conditioned NBV MDP (NBV MDP)] } else if id == "target-conditioned-scorer" {
+    [Target-Conditioned Scorer (target-conditioned scorer)]
+  } else if id == "target-of-interest" { [Target of Interest (target)] } else if id == "target-rri-reward" {
+    [Target-RRI Reward (reward)]
+  } else if id == "target-specific-rri" { [Target-Specific RRI (target RRI)] } else if (
+    id == "three-dimensional-gaussian-splatting"
+  ) { [3D Gaussian Splatting (3DGS)] } else if id == "track" { [Track (track)] } else if id == "validity-mask" {
+    [Validity Mask (mask)]
+  } else if id == "view-introspection-network" { [View Introspection Network (VIN)] } else if (
+    id == "virtual-reality-standard"
+  ) { [Virtual Reality Standard (VRS)] } else if id == "visual-inertial-odometry" {
+    [Visual-Inertial Odometry (VIO)]
   } else { id }
 }
 
