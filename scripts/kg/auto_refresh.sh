@@ -165,6 +165,10 @@ dispatch() {
   fi
 
   touch "$STAMP"
+  # Opportunistic health snapshot. --soft keeps the hook from failing on red;
+  # the JSON payload lands in the refresh log alongside the make output.
+  log "doctor snapshot:"
+  python3 scripts/kg/doctor.py --soft --format json >> "$LOG" 2>&1 || true
   log "done: dispatch buckets=[${buckets% }] complete"
 }
 

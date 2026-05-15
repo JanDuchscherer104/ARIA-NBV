@@ -191,6 +191,36 @@ ORDER BY m.qualified_name;
 (use `kg-claim-check`), routing a high-level task (use `kg-route`). The MCP
 escape hatch is for typed queries the wrappers don't cover.
 
+## Health Check
+
+`make kg-doctor` runs nine probes and prints a green/yellow/red table:
+
+| Check | Red when |
+|---|---|
+| `ollama_reachable` | tunnel down at `127.0.0.1:11434` |
+| `ollama_embedding_smoke` | round-trip embedding fails or dim != expected |
+| `neo4j_http` | Neo4j HTTP API unreachable at `7474` |
+| `neo4j_apoc` | APOC procedure count < 100 (missing plugin) |
+| `neo4j_vector_index` | `kg_embedding_index_2560` missing or non-ONLINE |
+| `embedding_coverage` | embedded-node count < 30% of bundle rows |
+| `refresh_stamp_age` | last refresh > 24h ago (yellow, not red) |
+| `refresh_lock_stale` | lock file points at a non-running PID |
+| `kg_search_smoke` | lexical `kg-search RRI` returns 0 hits |
+
+Default: text table, exits non-zero on red. JSON via
+`KG_DOCTOR_ARGS='--format json'` for downstream tools.
+
+Hook integration: `scripts/kg/auto_refresh.sh` runs `--soft --format json`
+at the end of each refresh dispatch and appends the JSON snapshot to
+`.agents/kg/.refresh.log`. `--soft` prevents red from breaking the
+session.
+
+Common red recoveries:
+- Ollama down → bring up the SSH reverse tunnel (`ssh -N -R 11434:127.0.0.1:11434 ubuntu`).
+- Neo4j down → `make kg-up`.
+- Stale lock → `rm .agents/kg/.refresh.lock`.
+- Coverage low → `make kg-load-bundle && make kg-enrich`.
+
 ## Fallback
 
 If litkg is stale, unavailable, or returns broad/noisy context:

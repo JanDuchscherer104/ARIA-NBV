@@ -5,7 +5,7 @@
 .PHONY: context-match context-qmd-outline context-typst-outline context-typst-includes
 .PHONY: context-literature-index context-literature-search migrate-codex-memory codex-transcripts
 .PHONY: context-heavy context-uml context-uml-preview context-docstrings context-tree context-dir-tree context-dir-tree-external check-agent-memory new-debrief claude-skills install-git-hooks install-hooks
-.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-load-bundle kg-mcp-install kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-semantic kg-refresh-full
+.PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-load-bundle kg-mcp-install kg-doctor kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-semantic kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 .PHONY: mermaid-lint
 
@@ -86,6 +86,7 @@ KG_PAPER ?=
 KG_LIMIT ?= 24
 KG_FORMAT ?= text
 KG_DOC_PATHS ?=
+KG_DOCTOR_ARGS ?=
 PACKAGE_SMOKE_RUFF_PATHS := \
 	aria_nbv/data_handling/_offline_writer.py \
 	aria_nbv/pose_generation/types.py \
@@ -367,6 +368,9 @@ kg-load-bundle: ## 📚 Load the litkg Neo4j export bundle into the live Neo4j r
 
 kg-mcp-install: ## 🔌 Print the litkg-cypher MCP profile install steps (gateway-side)
 	@./scripts/kg/install_mcp_profile.sh
+
+kg-doctor: ## 🩺 Health + drift checks (tunnels, vector index, embedding coverage, smoke)
+	@python3 scripts/kg/doctor.py $(KG_DOCTOR_ARGS)
 
 kg-enrich: ## 📚 Refresh litkg runtime embeddings and code↔doc links
 	@KG_OLLAMA_CONFIG="$(LITKG_CONFIG)" \
