@@ -119,6 +119,78 @@ Question-answer synthesis is deferred until there is a real synthesis layer.
 Use `kg-search` for fast retrieval and `kg-route` when an agent needs a context
 pack with source ranking, backlog, risks, and verification.
 
+## Typed-Query Escape Hatch (neo4j-cypher MCP)
+
+`kg-search` and `kg-route` cover routine retrieval but cannot express
+multi-hop joins or filtered vector lookups (e.g. *"papers that cite Hestia
+AND have a section discussing hierarchical planning"*). For those, activate
+the `litkg-cypher` MCP profile and call raw Cypher.
+
+**One-time install** (gateway-side):
+
+```bash
+make kg-mcp-install
+```
+
+The target prints the exact `mcp-add` / `mcp-config-set` /
+`mcp-create-profile` commands to run from any agent session that has the
+`MCP_DOCKER` gateway tools loaded. The default config locks the server to
+read-only (`read_only=true`); flip with
+`mcp-config-set neo4j-cypher read_only=false` only when curating.
+
+**Per-session activation:**
+
+```text
+mcp-activate-profile litkg-cypher
+```
+
+After activation the session exposes:
+
+- `read_neo4j_cypher(query, params)` — arbitrary read-only Cypher (30 s
+  timeout, response token cap).
+- `get_neo4j_schema(sample_param=1000)` — live schema. Requires APOC
+  (already loaded in the repo's Neo4j docker via `NEO4J_PLUGINS='["apoc"]'`).
+- `write_neo4j_cypher(query, params)` — only if `read_only=false`.
+
+**Live schema highlights** (call `get_neo4j_schema` for the full thing):
+
+- Nodes: `Paper`, `PaperSection`, `Document`, `DocSection`, `ProjectMemory`,
+  `MemorySurface`, `GeneratedContext`, `DataContract`, `AgentBacklogIssue`,
+  `AgentBacklogTodo`, `Function`, `Module`, `Class`, `File`,
+  `KGEmbeddingNode` (marker label on anything embedded).
+- Vector index: `kg_embedding_index_2560` over `KGEmbeddingNode.kg_embedding`
+  (HNSW, cosine, dim 2560 from `qwen3-embedding:4b`).
+- Common edges: `(:Paper)-[:HAS_SECTION]->(:PaperSection)`,
+  `(:Paper)-[:CITES]->(:Citation)`,
+  `(:Function)-[:CALLS]->(:Function)`,
+  `(:File)-[:CONTAINS]->(:Class|:Function|:Module)`.
+
+**Example queries:**
+
+```cypher
+// 1. Sections of Hestia matching a topic.
+MATCH (p:Paper {paper_id: "hestia-lu2026"})-[:HAS_SECTION]->(s:PaperSection)
+WHERE toLower(s.title) CONTAINS "hierarchical"
+RETURN p.paper_id, s.title, s.line_start, s.line_end;
+
+// 2. Vector search with kind filter (hybrid retrieval beyond kg-search).
+//    The caller supplies the $qvec parameter from an Ollama embedding call.
+CALL db.index.vector.queryNodes('kg_embedding_index_2560', 10, $qvec)
+  YIELD node, score
+MATCH (node:Paper)
+RETURN node.paper_id, node.title, score ORDER BY score DESC LIMIT 5;
+
+// 3. Count code symbols per module under aria_nbv.pose_generation.
+MATCH (m:Module)
+WHERE m.qualified_name STARTS WITH "aria_nbv.pose_generation"
+RETURN m.qualified_name, m.function_count, m.class_count
+ORDER BY m.qualified_name;
+```
+
+**When NOT to use:** routine retrieval (use `kg-search`), claim verification
+(use `kg-claim-check`), routing a high-level task (use `kg-route`). The MCP
+escape hatch is for typed queries the wrappers don't cover.
+
 ## Fallback
 
 If litkg is stale, unavailable, or returns broad/noisy context:
