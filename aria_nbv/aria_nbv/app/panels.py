@@ -9,6 +9,7 @@ respective component modules (e.g., ``utils.data_plotting`` or
 from __future__ import annotations
 
 from .panels.candidates import render_candidates_page
+from .panels.counterfactual_rollouts import render_counterfactual_rollouts_page
 from .panels.data import render_data_page
 from .panels.depth import render_depth_page
 from .panels.offline_dataset import render_offline_dataset_page
@@ -22,6 +23,7 @@ from .panels.wandb import render_wandb_analysis_page
 
 __all__ = [
     "render_candidates_page",
+    "render_counterfactual_rollouts_page",
     "render_data_page",
     "render_depth_page",
     "render_offline_dataset_page",

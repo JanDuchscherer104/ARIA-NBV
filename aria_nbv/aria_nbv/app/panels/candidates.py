@@ -2,28 +2,16 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
 import streamlit as st
 import torch
 
-from ...data_handling import EfmSnippetView
-from ...pose_generation import (
-    CandidateViewGeneratorConfig,
-    CounterfactualPoseGeneratorConfig,
-    CounterfactualSelectionPolicy,
-)
 from ...pose_generation.plotting import (
     CandidatePlotBuilder,
-    CounterfactualPlotBuilder,
     _euler_histogram,
     plot_candidate_centers_simple,
     plot_candidate_frusta_simple,
-    plot_counterfactual_paths_simple,
-    plot_counterfactual_step_simple,
     plot_direction_marginals,
     plot_direction_polar,
     plot_direction_sphere,
@@ -43,25 +31,15 @@ from ...pose_generation.utils import (
     summarise_dirs_ref,
     summarise_offsets_ref,
 )
-from ...rollouts import RolloutZarrStoreReader
-from ...utils import Console
 from ...utils.frames import world_up_tensor
-from ..rerun_launch import (
-    build_rerun_rollout_spawn_command,
-    format_command,
-    repo_root,
-    spawn_background_command,
-)
 
 if TYPE_CHECKING:
-    from types import SimpleNamespace
-
     from efm3d.aria.pose import PoseTW
 
-    from ...pose_generation.counterfactuals import CounterfactualRolloutResult
+    from ...data_handling import EfmSnippetView
+    from ...pose_generation import CandidateViewGeneratorConfig
     from ...pose_generation.types import CandidateSamplingResult
-from ..state_types import config_signature, sample_key
-from .common import _info_popover, _pretty_label, _report_exception, _strip_ansi
+from .common import _info_popover, _pretty_label
 
 
 def _shell_offsets_dirs_ref(
@@ -143,65 +121,6 @@ def _render_pose_orthonormality(label: str, pose: PoseTW | None) -> None:
         f"[{stats['det_min']:.6f}, {stats['det_max']:.6f}] · "
         f"mean |axis_norm - 1|: {stats['axis_norm_mean']:.2e}",
     )
-
-
-def _counterfactual_cache_key(
-    sample: EfmSnippetView | SimpleNamespace | None,
-    cand_cfg: CandidateViewGeneratorConfig | None,
-    rollout_cfg: CounterfactualPoseGeneratorConfig,
-) -> str:
-    """Return a stable cache key for panel-scoped counterfactual rollouts."""
-
-    sample_sig = "no-sample"
-    if sample is not None and hasattr(sample, "scene_id") and hasattr(sample, "snippet_id"):
-        sample_sig = f"{sample.scene_id}:{sample.snippet_id}"
-        if isinstance(sample, EfmSnippetView):
-            sample_sig = sample_key(sample)
-    cand_sig = "no-candidate-config" if cand_cfg is None else config_signature(cand_cfg)
-    rollout_sig = config_signature(rollout_cfg)
-    return f"{sample_sig}|{cand_sig}|{rollout_sig}"
-
-
-def _counterfactual_trajectory_rows(
-    rollouts: CounterfactualRolloutResult,
-) -> list[dict[str, int | float | bool | None]]:
-    """Summarize rollout trajectories for compact panel tables."""
-
-    rows: list[dict[str, int | float | bool | None]] = []
-    for traj_idx, trajectory in enumerate(rollouts.trajectories):
-        final_pos = trajectory.final_pose_world().t.detach().cpu().reshape(-1).tolist()
-        rows.append(
-            {
-                "trajectory": traj_idx,
-                "steps": len(trajectory.steps),
-                "cumulative_score": float(trajectory.cumulative_score),
-                "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
-                "terminated_early": bool(trajectory.terminated_early),
-                "final_x": float(final_pos[0]),
-                "final_y": float(final_pos[1]),
-                "final_z": float(final_pos[2]),
-            }
-        )
-    return rows
-
-
-def _run_counterfactual_rollouts(
-    sample: EfmSnippetView,
-    rollout_cfg: CounterfactualPoseGeneratorConfig,
-) -> tuple[CounterfactualRolloutResult, str]:
-    """Execute rollouts while capturing Console output for the UI."""
-
-    lines: list[str] = []
-
-    def _sink(message: str) -> None:
-        lines.append(_strip_ansi(message))
-
-    Console.set_sink(_sink)
-    try:
-        rollouts = rollout_cfg.setup_target().generate_from_typed_sample(sample)
-    finally:
-        Console.set_sink(None)
-    return rollouts, "\n".join(lines)
 
 
 def _render_live_candidates_page(
@@ -616,193 +535,6 @@ def _render_live_candidates_page(
                 else:
                     st.info("Attach an EFM snippet to render rejected poses in 3D.")
 
-    with st.expander("Counterfactual Rollouts", expanded=False):
-        _info_popover(
-            "counterfactual rollouts",
-            "Generates multi-step candidate expansions by reusing the current one-step "
-            "candidate generator at every step. This is an exploratory planning view: "
-            "the rollout paths and per-step shell plots help diagnose branching behavior, "
-            "beam pruning, and the selected continuation under simple geometric policies.",
-        )
-
-        if sample is None:
-            st.info("Counterfactual rollouts require an attached EFM snippet.")
-        elif cand_cfg is None:
-            st.info("Counterfactual rollouts require a candidate generator config.")
-        elif sample.mesh is None or sample.mesh_verts is None or sample.mesh_faces is None:
-            st.info("Counterfactual rollouts require the sample's GT mesh, vertices, and faces.")
-        else:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                cf_horizon = st.slider("Horizon", min_value=1, max_value=5, value=3, step=1, key="cf_horizon")
-                cf_branch = st.slider(
-                    "Branch factor",
-                    min_value=1,
-                    max_value=4,
-                    value=2,
-                    step=1,
-                    key="cf_branch_factor",
-                )
-            with col2:
-                cf_beam_enabled = st.checkbox("Cap beam width", value=True, key="cf_beam_enabled")
-                cf_beam = st.slider("Beam width", min_value=1, max_value=8, value=4, step=1, key="cf_beam_width")
-                cf_policy = st.selectbox(
-                    "Selection policy",
-                    options=list(CounterfactualSelectionPolicy),
-                    format_func=lambda policy: policy.value.replace("_", " "),
-                    index=0,
-                    key="cf_policy",
-                )
-            with col3:
-                cf_hist_dist = st.slider(
-                    "Min history distance (m)",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.0,
-                    step=0.05,
-                    key="cf_min_history_distance",
-                )
-                cf_sibling_dist = st.slider(
-                    "Min sibling distance (m)",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.15,
-                    step=0.05,
-                    key="cf_min_sibling_distance",
-                )
-
-            cf_candidate_cfg = cand_cfg.model_copy(
-                update={
-                    "verbosity": int(cand_cfg.verbosity),
-                    "is_debug": bool(cand_cfg.is_debug),
-                }
-            )
-            cf_cfg = CounterfactualPoseGeneratorConfig(
-                candidate_config=cf_candidate_cfg,
-                horizon=int(cf_horizon),
-                branch_factor=int(cf_branch),
-                beam_width=int(cf_beam) if cf_beam_enabled else None,
-                selection_policy=cf_policy,
-                min_history_distance_m=float(cf_hist_dist),
-                min_sibling_distance_m=float(cf_sibling_dist),
-                verbosity=int(cand_cfg.verbosity),
-                is_debug=bool(cand_cfg.is_debug),
-            )
-
-            run_key = _counterfactual_cache_key(sample, cand_cfg, cf_cfg)
-            cache = st.session_state.setdefault("cand_counterfactual_cache", {})
-            run_counterfactuals = st.button("Run / refresh counterfactual rollouts", key="cand_run_counterfactuals")
-
-            if run_counterfactuals:
-                try:
-                    with st.spinner("Generating counterfactual rollouts..."):
-                        rollouts, log_text = _run_counterfactual_rollouts(sample, cf_cfg)
-                    cache[run_key] = {"rollouts": rollouts, "logs": log_text}
-                except Exception as exc:  # pragma: no cover - UI guard
-                    _report_exception(exc, context="Counterfactual rollout generation failed")
-
-            cached_payload = cache.get(run_key)
-            if cached_payload is None:
-                st.caption("Configure the rollout settings above, then click run to materialize trajectories.")
-            else:
-                rollouts = cached_payload["rollouts"]
-                log_text = cached_payload["logs"]
-                rows = _counterfactual_trajectory_rows(rollouts)
-
-                metric_col1, metric_col2, metric_col3 = st.columns(3)
-                with metric_col1:
-                    st.metric("Trajectories", len(rollouts.trajectories))
-                with metric_col2:
-                    st.metric("Horizon", rollouts.horizon)
-                with metric_col3:
-                    best_score = max((traj.cumulative_score for traj in rollouts.trajectories), default=0.0)
-                    st.metric("Best cumulative score", f"{best_score:.3f}")
-
-                st.dataframe(rows, width="stretch", hide_index=True)
-
-                plot_tab, step_tab, log_tab = st.tabs(["Paths", "Step Shell", "Logs"])
-
-                with plot_tab:
-                    show_selected_frusta = st.checkbox(
-                        "Overlay selected frusta",
-                        value=True,
-                        key="cf_show_selected_frusta",
-                    )
-                    if sample is not None:
-                        builder = (
-                            CounterfactualPlotBuilder.from_rollouts(
-                                sample,
-                                rollouts,
-                                title=_pretty_label("Counterfactual rollout paths"),
-                            )
-                            .add_mesh()
-                            .add_counterfactual_paths(show_step_markers=True)
-                        )
-                        if show_selected_frusta:
-                            builder = builder.add_counterfactual_selected_frusta(scale=0.45)
-                        st.plotly_chart(builder.finalize(), width="stretch")
-                    else:
-                        st.plotly_chart(
-                            plot_counterfactual_paths_simple(rollouts),
-                            width="stretch",
-                        )
-
-                with step_tab:
-                    trajectory_index = st.selectbox(
-                        "Trajectory",
-                        options=list(range(len(rollouts.trajectories))),
-                        format_func=lambda idx: (
-                            f"traj {idx} · steps={rows[idx]['steps']} · score={rows[idx]['cumulative_score']:.3f}"
-                        ),
-                        key="cf_step_traj_idx",
-                    )
-                    trajectory = rollouts.trajectories[int(trajectory_index)]
-                    if not trajectory.steps:
-                        st.info("Selected trajectory terminated before choosing any rollout step.")
-                    else:
-                        max_step = len(trajectory.steps)
-                        step_display_index = st.slider(
-                            "Step",
-                            min_value=1,
-                            max_value=max_step,
-                            value=min(2, max_step),
-                            step=1,
-                            key="cf_step_idx",
-                        )
-                        include_rejected = st.checkbox(
-                            "Show rejected candidates",
-                            value=False,
-                            key="cf_step_include_rejected",
-                        )
-                        if sample is not None:
-                            step_fig = (
-                                CounterfactualPlotBuilder.from_rollouts(
-                                    sample,
-                                    rollouts,
-                                    title=_pretty_label(f"Counterfactual step {step_display_index}"),
-                                )
-                                .add_mesh()
-                                .add_counterfactual_step_shell(
-                                    trajectory_index=int(trajectory_index),
-                                    step_index=int(step_display_index - 1),
-                                    include_rejected=include_rejected,
-                                    show_frusta=True,
-                                )
-                                .finalize()
-                            )
-                        else:
-                            step_fig = plot_counterfactual_step_simple(
-                                trajectory,
-                                step_index=int(step_display_index - 1),
-                            )
-                        st.plotly_chart(step_fig, width="stretch")
-
-                with log_tab:
-                    if log_text.strip():
-                        st.code(log_text, language="text")
-                    else:
-                        st.caption("No Console output was emitted during this rollout run.")
-
 
 def render_candidates_page(
     sample: EfmSnippetView | None,
@@ -812,196 +544,13 @@ def render_candidates_page(
     source_caption: str | None = None,
     source_note: str | None = None,
 ) -> None:
-    live_tab, rollout_tab = st.tabs(["Live Candidates", "Rollout Zarr"])
-    with live_tab:
-        _render_live_candidates_page(
-            sample,
-            candidates,
-            cand_cfg,
-            source_caption=source_caption,
-            source_note=source_note,
-        )
-    with rollout_tab:
-        _render_rollout_store_tab()
-
-
-def _render_rollout_store_tab() -> None:
-    st.header("Rollout Store")
-    st.caption("Load a standalone rollouts.zarr store, validate row contracts, and open selected rows in Rerun.")
-    default_store = repo_root() / ".artifacts" / "rollouts" / "rollouts.zarr"
-    default_config = repo_root() / ".configs" / "rerun_offline.toml"
-    store_path = Path(
-        st.text_input(
-            "rollouts.zarr path",
-            value=str(default_store),
-            key="rollout_store_path",
-        )
-    ).expanduser()
-    config_path = Path(
-        st.text_input(
-            "Rerun inspector config",
-            value=str(default_config),
-            key="rollout_rerun_config_path",
-        )
-    ).expanduser()
-
-    if not store_path.exists():
-        st.info("Enter an existing rollouts.zarr path to inspect generated rollout rows.")
-        return
-
-    try:
-        reader = RolloutZarrStoreReader(store_path)
-        validation = reader.validate()
-    except Exception as exc:  # pragma: no cover - UI guard
-        _report_exception(exc, context="Failed to load rollout store")
-        return
-
-    root_attrs = dict(reader.root.attrs)
-    meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
-    with meta_col1:
-        st.metric("Rollouts", validation.num_rollouts)
-    with meta_col2:
-        st.metric("Steps", validation.num_steps)
-    with meta_col3:
-        st.metric("Candidates", validation.num_candidates)
-    with meta_col4:
-        st.metric("Validation", "OK" if validation.ok else "FAILED")
-    if validation.ok:
-        st.success("Store validation passed.")
-    else:
-        st.error("Store validation failed.")
-        st.dataframe([{"error": error} for error in validation.errors], width="stretch", hide_index=True)
-
-    with st.expander("Root metadata", expanded=False):
-        st.json(root_attrs)
-
-    _render_rollout_store_summaries(reader)
-    rollout_ids = reader.array("rollouts/rollout_row_id").astype(int).tolist()
-    if not rollout_ids:
-        st.info("No rollout rows are present.")
-        return
-    selected_rollout = int(
-        st.selectbox(
-            "Rollout row",
-            options=rollout_ids,
-            format_func=lambda row_id: _format_rollout_option(reader, row_id),
-            key="rollout_row_selector",
-        )
+    _render_live_candidates_page(
+        sample,
+        candidates,
+        cand_cfg,
+        source_caption=source_caption,
+        source_note=source_note,
     )
-    st.dataframe(_candidate_rows_for_rollout(reader, selected_rollout), width="stretch", hide_index=True)
-    command = build_rerun_rollout_spawn_command(
-        config_path=config_path,
-        rollout_store=store_path,
-        rollout_row_id=selected_rollout,
-    )
-    st.code(format_command(command), language="bash")
-    if st.button("Open selected rollout in Rerun", key="rollout_open_rerun"):
-        try:
-            process = spawn_background_command(command)
-        except Exception as exc:  # pragma: no cover - UI guard
-            _report_exception(exc, context="Failed to spawn Rerun inspector")
-        else:
-            st.success(f"Spawned Rerun inspector with pid {process.pid}.")
-
-
-def _render_rollout_store_summaries(reader: RolloutZarrStoreReader) -> None:
-    target_rows = reader.array("targets/target_row_id")
-    rollout_rows = reader.array("rollouts/rollout_row_id")
-    step_rows = reader.array("steps/step_row_id")
-    candidate_rows = reader.array("candidates/candidate_row_id")
-    q_h = reader.q_h_view()
-    q_train = q_h["q_train_mask"]
-    valid_action = q_h["valid_action_mask"]
-    actor_action = reader.array("candidates/actor_action_mask")
-    oracle_label = reader.array("candidates/oracle_label_mask")
-    summary = [
-        {"table": "targets", "rows": int(target_rows.shape[0])},
-        {"table": "rollouts", "rows": int(rollout_rows.shape[0])},
-        {"table": "steps", "rows": int(step_rows.shape[0])},
-        {"table": "candidates", "rows": int(candidate_rows.shape[0])},
-        {"table": "actor_action candidates", "rows": int(actor_action.sum())},
-        {"table": "oracle_label candidates", "rows": int(oracle_label.sum())},
-        {"table": "q_h valid actions", "rows": int(valid_action.sum())},
-        {"table": "q_h train cells", "rows": int(q_train.sum())},
-    ]
-    st.dataframe(summary, width="stretch", hide_index=True)
-    target_summary = []
-    target_valid = reader.array("targets/target_valid_mask")
-    gt_valid = reader.array("targets/gt_label_valid_mask")
-    for row_id, valid, gt_label in zip(target_rows, target_valid, gt_valid, strict=True):
-        target_summary.append(
-            {
-                "target_row_id": int(row_id),
-                "target_valid": bool(valid),
-                "gt_label_valid": bool(gt_label),
-            }
-        )
-    if target_summary:
-        st.dataframe(target_summary, width="stretch", hide_index=True)
-
-
-def _candidate_rows_for_rollout(reader: RolloutZarrStoreReader, rollout_row_id: int) -> list[dict[str, object]]:
-    rollout_ids = reader.array("candidates/rollout_row_id")
-    mask = rollout_ids == int(rollout_row_id)
-    candidate_row_ids = reader.array("candidates/candidate_row_id")
-    step_indices = reader.array("candidates/step_index")
-    shell_indices = reader.array("candidates/shell_index")
-    selected_mask = reader.array("candidates/selected_mask")
-    actor_action_mask = reader.array("candidates/actor_action_mask")
-    q_train_mask = reader.array("candidates/q_train_mask")
-    target_rri = reader.array("candidates/target_rri")
-    scene_rri = reader.array("candidates/scene_rri")
-    strategy_id = reader.array("candidates/strategy_id")
-    mixture_id = reader.array("candidates/mixture_id")
-    rows: list[dict[str, object]] = []
-    for index in np.nonzero(mask)[0].tolist():
-        rows.append(
-            {
-                "candidate_row_id": int(candidate_row_ids[index]),
-                "step_index": int(step_indices[index]),
-                "shell_index": int(shell_indices[index]),
-                "selected": bool(selected_mask[index]),
-                "actor_action": bool(actor_action_mask[index]),
-                "q_train": bool(q_train_mask[index]),
-                "target_rri": _finite_or_none(target_rri[index]),
-                "scene_rri": _finite_or_none(scene_rri[index]),
-                "strategy_id": int(strategy_id[index]),
-                "mixture_id": int(mixture_id[index]),
-            }
-        )
-    return rows
-
-
-def _format_rollout_option(reader: RolloutZarrStoreReader, rollout_row_id: int) -> str:
-    rollout_rows = reader.array("rollouts/rollout_row_id")
-    matches = np.nonzero(rollout_rows == int(rollout_row_id))[0]
-    if matches.size != 1:
-        return f"rollout {rollout_row_id}"
-    index = int(matches[0])
-    policies = _string_list(reader, "dictionaries/policy")
-    scenes = _string_list(reader, "dictionaries/scene")
-    policy = _dict_value(policies, int(reader.array("rollouts/policy_id")[index]))
-    scene = _dict_value(scenes, int(reader.array("rollouts/scene_id")[index]))
-    target_row = int(reader.array("rollouts/target_row_id")[index])
-    return f"rollout {rollout_row_id} · target {target_row} · {policy} · {scene}"
-
-
-def _string_list(reader: RolloutZarrStoreReader, path: str) -> list[str]:
-    try:
-        return json.loads(bytes(reader.array(path).tolist()).decode("utf-8"))
-    except Exception:
-        return []
-
-
-def _dict_value(values: list[str], index: int) -> str:
-    if index < 0 or index >= len(values):
-        return ""
-    return values[index]
-
-
-def _finite_or_none(value: object) -> float | None:
-    value_float = float(value)
-    return value_float if np.isfinite(value_float) else None
 
 
 __all__ = ["render_candidates_page"]

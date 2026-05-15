@@ -14,6 +14,7 @@ from .config import NbvStreamlitAppConfig
 from .controller import PipelineController
 from .panels import (
     render_candidates_page,
+    render_counterfactual_rollouts_page,
     render_data_page,
     render_depth_page,
     render_offline_dataset_page,
@@ -153,6 +154,9 @@ class NbvStreamlitApp:
                 cand_cfg,
             )
 
+        def _page_counterfactual_rollouts() -> None:
+            render_counterfactual_rollouts_page()
+
         def _page_renders() -> None:
             with st.sidebar.form("depth_form"):
                 depth_cfg_prev = state.labeler_cfg.depth
@@ -246,6 +250,7 @@ class NbvStreamlitApp:
         pages = [
             st.Page(_page_data, title="Data", default=True),
             st.Page(_page_candidates, title="Candidate Poses"),
+            st.Page(_page_counterfactual_rollouts, title="Counterfactual Rollouts"),
             st.Page(_page_renders, title="Candidate Renders"),
             st.Page(_page_rri, title="RRI"),
         ]

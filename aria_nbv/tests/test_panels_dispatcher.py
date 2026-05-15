@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 from aria_nbv.app import panels
-from aria_nbv.app.panels import candidates, data, depth, offline_dataset, rl, rri, rri_binning, vin_diagnostics, wandb
+from aria_nbv.app.panels import (
+    candidates,
+    counterfactual_rollouts,
+    data,
+    depth,
+    offline_dataset,
+    rl,
+    rri,
+    rri_binning,
+    vin_diagnostics,
+    wandb,
+)
 
 
 def test_panels_dispatcher_reexports() -> None:
     """Ensure dispatcher re-exports dedicated panel renderers."""
     assert panels.render_candidates_page is candidates.render_candidates_page
+    assert panels.render_counterfactual_rollouts_page is counterfactual_rollouts.render_counterfactual_rollouts_page
     assert panels.render_data_page is data.render_data_page
     assert panels.render_depth_page is depth.render_depth_page
     assert panels.render_offline_dataset_page is offline_dataset.render_offline_dataset_page

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .candidates import render_candidates_page
+from .counterfactual_rollouts import render_counterfactual_rollouts_page
 from .data import render_data_page
 from .depth import render_depth_page
 from .offline_dataset import render_offline_dataset_page
@@ -15,6 +16,7 @@ from .wandb import render_wandb_analysis_page
 
 __all__ = [
     "render_candidates_page",
+    "render_counterfactual_rollouts_page",
     "render_data_page",
     "render_depth_page",
     "render_offline_dataset_page",

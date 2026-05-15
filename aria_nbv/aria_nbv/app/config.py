@@ -39,10 +39,10 @@ class NbvStreamlitAppConfig(TargetConfig["NbvStreamlitApp"]):
 
 
 class RlPageConfig(BaseConfig):
-    """Config-gated Streamlit controls for the RL inspection page."""
+    """Config-gated controls for the bridge RL inspection page."""
 
-    enabled: bool = True
-    """Whether to expose the RL page in Streamlit navigation."""
+    enabled: bool = False
+    """Whether to expose the deprecated RL page in Streamlit navigation."""
 
     enable_policy_comparison: bool = True
     """Whether to show the multi-policy comparison tab."""
