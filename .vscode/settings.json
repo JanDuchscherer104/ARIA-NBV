@@ -5,6 +5,13 @@
     "python-envs.pythonProjects": [],
     "python.defaultInterpreterPath": "${workspaceFolder}/aria_nbv/.venv/bin/python",
     "python.terminal.activateEnvironment": true,
+    "terminal.integrated.env.linux": {
+        "CONDA_PREFIX": "/home/jd/.local/share/mamba/envs/aria-nbv",
+        "CUDA_HOME": "/home/jd/.local/share/mamba/envs/aria-nbv",
+        "FORCE_CUDA": "1",
+        "TORCH_CUDA_ARCH_LIST": "8.6",
+        "PATH": "/home/jd/.local/share/mamba/envs/aria-nbv/bin:${env:PATH}"
+    },
     "python.analysis.extraPaths": [
         "${workspaceFolder}/external/PointNeXt"
     ],
@@ -24,7 +31,7 @@
         }
     },
     "[markdown]": {
-        "editor.formatOnSave": true,
+        "editor.formatOnSave": true
     },
     "tinymist.rootPath": "${workspaceFolder}/docs",
     "chatgpt.openOnStartup": false

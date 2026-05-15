@@ -11,7 +11,14 @@
                 "summarize-vin",
                 "--config-path",
                 "${workspaceFolder}/.configs/offline_only.toml"
-            ]
+            ],
+            "env": {
+                "CONDA_PREFIX": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "CUDA_HOME": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "FORCE_CUDA": "1",
+                "TORCH_CUDA_ARCH_LIST": "8.6",
+                "PATH": "/home/jd/.local/share/mamba/envs/aria-nbv/bin:${env:PATH}"
+            }
         },
         {
             "name": "ARIA: Build Rollouts V1 Smoke",
@@ -27,7 +34,12 @@
                 "${workspaceFolder}/.configs/build_rollouts_v1_smoke.toml"
             ],
             "env": {
-                "PYTHONUNBUFFERED": "1"
+                "PYTHONUNBUFFERED": "1",
+                "CONDA_PREFIX": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "CUDA_HOME": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "FORCE_CUDA": "1",
+                "TORCH_CUDA_ARCH_LIST": "8.6",
+                "PATH": "/home/jd/.local/share/mamba/envs/aria-nbv/bin:${env:PATH}"
             }
         },
         {
@@ -41,7 +53,14 @@
                 "--server.port",
                 "8501"
             ],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "env": {
+                "CONDA_PREFIX": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "CUDA_HOME": "/home/jd/.local/share/mamba/envs/aria-nbv",
+                "FORCE_CUDA": "1",
+                "TORCH_CUDA_ARCH_LIST": "8.6",
+                "PATH": "/home/jd/.local/share/mamba/envs/aria-nbv/bin:${env:PATH}"
+            }
         }
     ]
 }

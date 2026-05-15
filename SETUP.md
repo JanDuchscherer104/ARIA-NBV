@@ -63,6 +63,32 @@ print("cuda_version", torch.version.cuda)
 PY
 ```
 
+Torch CUDA availability is not sufficient for the rollout/oracle renderer.
+PyTorch3D is compiled locally and must pass its own CUDA rasterization smoke:
+
+```sh
+cd aria_nbv
+uv run python - <<'PY'
+import torch
+from pytorch3d.renderer import FoVPerspectiveCameras, MeshRasterizer, RasterizationSettings
+from pytorch3d.structures import Meshes
+
+if not torch.cuda.is_available():
+    raise SystemExit("Torch CUDA is unavailable.")
+
+device = torch.device("cuda")
+verts = torch.tensor([[-0.5, -0.5, 2.0], [0.5, -0.5, 2.0], [0.0, 0.5, 2.0]], device=device)
+faces = torch.tensor([[0, 1, 2]], dtype=torch.int64, device=device)
+mesh = Meshes(verts=[verts], faces=[faces])
+rasterizer = MeshRasterizer(
+    cameras=FoVPerspectiveCameras(device=device),
+    raster_settings=RasterizationSettings(image_size=8, blur_radius=0.0, faces_per_pixel=1),
+)
+rasterizer(mesh)
+print("pytorch3d_cuda_rasterization_ok")
+PY
+```
+
 ### CPU and GPU expectations
 
 CPU-only machines are suitable for docs work, config validation, lightweight
@@ -75,6 +101,19 @@ pins PyTorch CUDA 12.1 wheels on Linux, and `environment.yml` provides a CUDA
 12.1 toolchain for extension builds. Several configs use `device = "auto"` and
 will fall back to CPU when CUDA is unavailable, but a CPU fallback is a
 debugging convenience, not a performance target.
+
+Use the `aria-nbv` mamba environment as the CUDA build-toolchain context and
+the repo `.venv` as the `uv` runtime. If PyTorch3D reports `Not compiled with
+GPU support`, rebuild it from the activated toolchain environment:
+
+```sh
+cd aria_nbv
+mamba activate aria-nbv
+export CUDA_HOME="$CONDA_PREFIX"
+export FORCE_CUDA=1
+export TORCH_CUDA_ARCH_LIST="8.6"
+uv sync --all-extras --reinstall-package pytorch3d --no-build-isolation-package pytorch3d --no-cache
+```
 
 ### Optional xFormers
 
