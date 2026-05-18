@@ -33,3 +33,28 @@ machine-usable by the litkg-rs context-pack/KG pipeline.
    simulators are stretch or bridge work after the ASE rollout/Q_H path is
    stable.
 4. **Agentic Lifecycle**: Port PR and issue lifecycle workflows.
+
+## Current Rollout/Q_H Critical Path
+
+For multi-step offline sample generation, override generic high-priority sorting
+with this dependency order until the rollout/Q_H path is producing trusted
+samples:
+
+1. `issue-007` / `todo-007`: M1 data/cache/oracle contract gate.
+2. `issue-021` / `todo-031`: invalidity as hard masks and reason codes.
+3. `issue-020` / `todo-005`, `todo-029`, `todo-053`, `todo-028`: target RRI,
+   observed target selection, V1 OBS-SEL / PRED-Q / GT-EVAL, and target-aware
+   candidate mixture provenance.
+4. `issue-018` / `todo-058`, `todo-026`: rollout retention/schema and bounded
+   oracle lookahead evidence.
+5. `issue-022` / `todo-033`: LRZ deterministic sharding, resumable writes, and
+   campaign status/indexing.
+6. `issue-019` / `todo-027`: stochastic rollout support, with
+   temperature-softmax before first Q_H data and Gumbel as later evidence.
+7. `issue-028` / `todo-078`, `todo-052`: chunked Q_H training views and the
+   candidate-query Transformer baseline.
+8. `issue-013` / `todo-037`: evidence report once rollout and Q_H smoke outputs
+   exist.
+
+Advisor/docs, governance/scaffold, KG, GitHub mirroring, simulator, Gym, and
+continuous-control work stays parallel or deferred unless it blocks this path.

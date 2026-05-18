@@ -836,6 +836,46 @@ resolved_at = "2026-05-15"
 resolution_note = "Verdict canary closes via two-part fix in litkg-rs. (A) top_sources() adds a literature-class reservation pass (cap +2) between the score-ordered primary and the canonical rescue; literature-class = paths under docs/contents/literature/**, docs/literature/tex-src/**, or docs/references.bib. (B) classify_claim_span() gains three positive_* / evidence_* helper pairs for RRI definition, hierarchical NBV decomposition, and ARIA-NBV objective claims, slotted into the Supports ladder above the generic overlap>=0.45 fallback. deferred_main_simulator_claim() picks up 'only if' / 'thesis-grade' markers so Habitat's unverifiable verdict survives the broader top_sources admission. New unit test context_pack_claim_check_handles_diverse_research_shapes covers RRI / hierarchical NBV / ARIA-NBV objective + the three previously-resolved shapes. Live verification 2026-05-13: RRI canary -> supported(1.0), V0 GT-OBB -> supported(1.0), V1 actor-visible -> contradicted(0.9), Habitat -> unverifiable(0.2). Doctor stays all-green."
 resolved_from = ".agents/todos.toml"
 
+[[todo]]
+id = "todo-076"
+title = "Add LRZ rollout shard-manifest CLI and atomic promotion"
+description = "Make nbv-build-rollouts consume deterministic shard manifests and write each rollout shard through temp, validation, atomic promote, and completion markers before any multi-step offline sample scale-up."
+priority = "high"
+status = "resolved"
+labels = ["rollouts", "cluster", "lrz", "data-generation", "storage"]
+issue_ids = ["issue-022", "issue-018"]
+loc_min = 180
+loc_expected = 420
+loc_max = 900
+context = ["The current nbv-build-rollouts CLI loads one config path and writes one rollout store, which is sufficient for smoke tests but not LRZ array jobs.", "scripts/templates/lrz/rollout_generation_dry_run.sbatch still uses placeholder shard arguments and states that it does not generate rollout traces or Q_H data.", "Before large multi-step offline sample generation, each Slurm array task must own one final rollout shard path, skip only validated completed shards, write to a temp directory, validate, atomically promote, and write a completion marker plus owner sidecar.", "This is a prerequisite for high-throughput DSS-safe rollout generation rather than a training-model concern."]
+references = ["repo:aria_nbv/aria_nbv/rollouts/cli.py", "repo:aria_nbv/aria_nbv/rollouts/dataset_writer.py", "repo:aria_nbv/aria_nbv/rollouts/zarr_store.py", "repo:scripts/templates/lrz/rollout_generation_dry_run.sbatch", "repo:.configs/build_rollouts_v1_smoke.toml", "repo:.agents/issues.toml#issue-022"]
+implementation_notes = ["Extend the rollout CLI with shard-oriented options such as --shard-manifest, --shard-id, --output-tmp, --output-final, and --dry-run while retaining the existing config-path smoke path.", "Define a compact JSONL shard manifest over source rows, scene split, target/recipe/seed ranges, output shard id, retention profile, and expected source manifest hash.", "Write shard outputs to a temp path, run rollout store validation, replace or rename into the final shard directory atomically where the filesystem allows, then write _SUCCESS.json and _owner.json.", "On rerun, skip only shards with a valid store, matching manifest hash, and success marker; failed temp paths must not be treated as complete.", "Update the LRZ sbatch template to call the real entrypoint and pass Slurm array task metadata into owner/runtime provenance."]
+acceptance = ["A dry-run command can print the resolved shard manifest row and output paths without loading source data.", "One smoke shard can be generated through temp -> validate -> final -> _SUCCESS.json using the same CLI surface intended for LRZ.", "Rerunning the same shard skips only after validating the existing final shard and matching manifest/provenance.", "The owner sidecar records Slurm job/task ids when present, config hash, source manifest hash, shard id, retention profile, and runtime provenance.", "The existing single-config smoke flow remains available for local development."]
+verification = ["cd aria_nbv && uv run nbv-build-rollouts --config-path ../.configs/build_rollouts_v1_smoke.toml --dry-run", "cd aria_nbv && uv run pytest tests/rollouts", "rg -n \"shard-manifest|output-tmp|output-final|_SUCCESS|_owner|SLURM_ARRAY_TASK_ID\" aria_nbv/aria_nbv/rollouts scripts/templates/lrz .configs .agents"]
+resolved_at = "2026-05-15"
+resolution_note = "Implemented shard manifest planning, shard-aware nbv-build-rollouts, strict temp-to-final promotion with _owner/_SUCCESS sidecars, and LRZ template wiring."
+resolved_from = ".agents/todos.toml"
+
+[[todo]]
+id = "todo-077"
+title = "Populate VIN source-shard lineage in rollout stores"
+description = "Carry VIN offline shard id and shard-local row into rollout source lineage so rollout shards can be joined, debugged, and regenerated without scanning only global sample indices."
+priority = "high"
+status = "resolved"
+labels = ["rollouts", "data", "lineage", "zarr", "throughput"]
+issue_ids = ["issue-018", "issue-022"]
+loc_min = 60
+loc_expected = 160
+loc_max = 360
+context = ["Rollout Zarr already has sources/source_shard_id and sources/source_shard_row fields, but the rollout writer currently fills lineage from VinOfflineSample fields that do not expose the backing VinOfflineIndexRecord shard id and row.", "The VIN offline dataset owns sample_index.jsonl with global sample index, scene, snippet, split, shard_id, and row; large rollout shards need those fields persisted to avoid ambiguous source joins.", "This is a small blocker before scale generation because source-row provenance, DSS debugging, and partial regeneration should not depend on reconstructing shard membership externally."]
+references = ["repo:aria_nbv/aria_nbv/rollouts/zarr_store.py", "repo:aria_nbv/aria_nbv/rollouts/dataset_writer.py", "repo:aria_nbv/aria_nbv/data_handling/_offline_format.py", "repo:aria_nbv/aria_nbv/data_handling/_offline_dataset.py", "repo:aria_nbv/tests/rollouts/test_zarr_store.py", "repo:.agents/issues.toml#issue-018"]
+implementation_notes = ["Expose or carry the selected VinOfflineIndexRecord fields through VinOfflineSample or an internal rollout-writer lookup without changing the public VIN training batch DTO.", "Set RolloutLineage.source_shard_id and source_shard_row from the source record when building each RolloutZarrRecord.", "Add validation or tests that rollout sources contain non-placeholder shard ids and rows when the source dataset provides them.", "Keep source_row_id as the global sample index; do not replace it with shard-local row ids."]
+acceptance = ["A rollout store built from a VIN offline dataset records source_shard_id and source_shard_row for every sources row.", "Manifest source_coverage includes the same source shard id and shard-local row values.", "Validation fails or warns for missing shard lineage when the source dataset is known to provide it.", "Existing tests using synthetic rollout records can still use placeholder shard lineage intentionally."]
+verification = ["cd aria_nbv && uv run pytest tests/rollouts/test_zarr_store.py tests/rollouts/test_dataset_writer.py tests/data_handling/test_vin_offline_store.py", "rg -n \"source_shard_id|source_shard_row|VinOfflineIndexRecord\" aria_nbv/aria_nbv/rollouts aria_nbv/aria_nbv/data_handling aria_nbv/tests/rollouts"]
+resolved_at = "2026-05-15"
+resolution_note = "Implemented VinOfflineSample source_shard_id/source_shard_row propagation, rollout lineage persistence, manifest source_shard coverage, and validation for missing source shard lineage."
+resolved_from = ".agents/todos.toml"
+
 [[refactor]]
 id = "refactor-013"
 title = "Pilot optional OMX and Codex templates after scaffold cleanup"
