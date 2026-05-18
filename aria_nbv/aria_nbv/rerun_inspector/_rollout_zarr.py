@@ -27,13 +27,7 @@ if TYPE_CHECKING:
     )
 
 ENTITY_ROLLOUT_ROOT = "world/rollout"
-ENTITY_ROLLOUT_STEP_ROOT = f"{ENTITY_ROLLOUT_ROOT}/step"
-ENTITY_ROLLOUT_VALID_ROOT = f"{ENTITY_ROLLOUT_STEP_ROOT}/valid"
-ENTITY_ROLLOUT_INVALID_ROOT = f"{ENTITY_ROLLOUT_STEP_ROOT}/invalid"
-ENTITY_ROLLOUT_SELECTED_ROOT = f"{ENTITY_ROLLOUT_STEP_ROOT}/selected"
-ENTITY_ROLLOUT_SELECTED_PATH = f"{ENTITY_ROLLOUT_ROOT}/selected_path"
 ENTITY_ROLLOUT_METADATA = "metadata/rollout_zarr"
-ENTITY_ROLLOUT_STEP_METADATA = "metadata/rollout_zarr/current_step"
 ENTITY_ROLLOUT_RRI_ROOT = "plots/rollout/rri"
 ENTITY_ROLLOUT_DIAGNOSTICS_ROOT = "plots/rollout/diagnostics"
 ENTITY_ROLLOUT_VALID_COUNT = f"{ENTITY_ROLLOUT_DIAGNOSTICS_ROOT}/selected/valid_candidates"
@@ -58,6 +52,7 @@ class SelectedRolloutRows:
 
     rollout_row_id: int
     rollout_index: int
+    chain_id: int
     step_rows: NDArray[np.int64]
 
 
@@ -110,6 +105,7 @@ class RerunRolloutZarrLogger:
         reader = RolloutZarrStoreReader(store_dir)
         validation = validate_rollout_zarr_store(store_dir)
         rows = _resolve_rollout_rows(reader, rollout_index=rollout_index, rollout_row_id=rollout_row_id)
+        self._log_rollout_blueprint(reader=reader, rows=rows)
         self._log_static_context(reader=reader, rows=rows)
         self._log_static_metadata(reader=reader, rows=rows, validation_errors=validation.errors)
         self._log_rollout_plots(reader=reader, selected_rows=rows)
@@ -120,13 +116,23 @@ class RerunRolloutZarrLogger:
             step = _step_payload(
                 reader,
                 step_row_position=step_row_position,
+                rollout_row_id=rows.rollout_row_id,
+                chain_id=rows.chain_id,
                 rollout_depths=self.config.rollout_depths,
             )
             self._log_step(step)
             if step.selected_center is not None:
                 selected_path.append(step.selected_center.tolist())
-            self._log_selected_path(selected_path)
+            self._log_selected_path(rows=rows, selected_path=selected_path)
         return rows
+
+    def _log_rollout_blueprint(self, *, reader: RolloutZarrStoreReader, rows: SelectedRolloutRows) -> None:
+        """Send rollout-specific visibility defaults for the selected chain."""
+
+        log_default_inspector_blueprint(
+            self.rr,
+            hidden_world_paths=_rollout_candidate_group_hidden_paths(reader=reader, rows=rows),
+        )
 
     def _log_static_context(self, *, reader: RolloutZarrStoreReader, rows: SelectedRolloutRows) -> None:
         """Log matching VIN offline sample context before rollout-step layers."""
@@ -174,6 +180,7 @@ class RerunRolloutZarrLogger:
             "selected": {
                 "rollout_row_id": rows.rollout_row_id,
                 "rollout_index": rows.rollout_index,
+                "chain_id": rows.chain_id,
                 "step_rows": rows.step_rows.astype(int).tolist(),
             },
             "validation": {"ok": not validation_errors, "errors": validation_errors},
@@ -198,7 +205,7 @@ class RerunRolloutZarrLogger:
         self.rr.log(ENTITY_ROLLOUT_SELECTED_PROBABILITY, self.rr.Scalars(_finite_or_zero(step.selected_probability)))
         self.rr.log(ENTITY_ROLLOUT_SELECTED_TARGET_RRI, self.rr.Scalars(_finite_or_zero(step.selected_target_rri)))
         self.rr.log(
-            ENTITY_ROLLOUT_STEP_METADATA,
+            step.metadata_entity,
             self.rr.TextDocument(json.dumps(step.metadata, indent=2, sort_keys=True), media_type="application/json"),
         )
 
@@ -304,8 +311,13 @@ class RerunRolloutZarrLogger:
             pinhole,
             self.rr.AnyValues(
                 candidate_row_id=candidate.row_id,
+                rollout_row_id=candidate.rollout_row_id,
+                chain_id=candidate.chain_id,
+                step_index=candidate.step_index,
+                step_row_id=candidate.step_row_id,
                 shell_index=candidate.shell_index,
                 compact_valid_index=candidate.compact_valid_index,
+                candidate_status=candidate.status,
                 valid_mask=candidate.display_valid,
                 stored_valid_mask=candidate.stored_valid,
                 display_validity_trusted=candidate.display_validity_trusted,
@@ -343,11 +355,11 @@ class RerunRolloutZarrLogger:
             ),
         )
 
-    def _log_selected_path(self, selected_path: list[list[float]]) -> None:
+    def _log_selected_path(self, *, rows: SelectedRolloutRows, selected_path: list[list[float]]) -> None:
         strips = [[selected_path[index], selected_path[index + 1]] for index in range(max(len(selected_path) - 1, 0))]
         colors = step_to_rgba(np.arange(len(strips), dtype=np.int64), alpha=245).astype(int).tolist()
         self.rr.log(
-            ENTITY_ROLLOUT_SELECTED_PATH,
+            _rollout_selected_path_entity(rollout_row_id=rows.rollout_row_id, chain_id=rows.chain_id),
             self.rr.LineStrips3D(
                 strips,
                 colors=colors,
@@ -359,8 +371,13 @@ class RerunRolloutZarrLogger:
 @dataclass(frozen=True, slots=True)
 class _RolloutCandidatePayload:
     row_id: int
+    rollout_row_id: int
+    chain_id: int
+    step_index: int
+    step_row_id: int
     shell_index: int
     compact_valid_index: int
+    status: str
     stored_valid: bool
     display_valid: bool
     display_validity_trusted: bool
@@ -392,8 +409,11 @@ class _SelectedDepthPayload:
 
 @dataclass(frozen=True, slots=True)
 class _RolloutStepPayload:
+    rollout_row_id: int
+    chain_id: int
     step_row_id: int
     step_index: int
+    metadata_entity: str
     candidates: list[_RolloutCandidatePayload]
     selected_center: NDArray[np.float32] | None
     valid_candidate_count: int
@@ -468,6 +488,7 @@ def _resolve_rollout_rows(
     return SelectedRolloutRows(
         rollout_row_id=resolved_row_id,
         rollout_index=resolved_index,
+        chain_id=int(reader.array("rollouts/chain_id")[resolved_index]),
         step_rows=step_rows[order],
     )
 
@@ -508,10 +529,11 @@ def _branch_plot_descriptor(
     selected_row_id: int,
 ) -> _RolloutBranchPlot:
     policy = _rollout_dictionary_value(reader, group="policy", array_path="rollouts/policy_id", row=rows.rollout_index)
-    chain_id = int(reader.array("rollouts/chain_id")[rows.rollout_index])
     selected = rows.rollout_row_id == selected_row_id
-    suffix = f"{_safe_entity_token(policy or 'unknown_policy')}/chain_{rows.rollout_row_id:06d}"
-    label = f"{policy or 'unknown'} chain={chain_id} row={rows.rollout_row_id}"
+    suffix = (
+        f"{_safe_entity_token(policy or 'unknown_policy')}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}"
+    )
+    label = f"{policy or 'unknown'} chain={rows.chain_id} row={rows.rollout_row_id}"
     if selected:
         label = f"selected | {label}"
     return _RolloutBranchPlot(
@@ -528,6 +550,8 @@ def _step_payload(
     reader: RolloutZarrStoreReader,
     *,
     step_row_position: int,
+    rollout_row_id: int,
+    chain_id: int,
     rollout_depths: "RerunInspectorRolloutDepthConfig",
 ) -> _RolloutStepPayload:
     step_row_id = int(reader.array("steps/step_row_id")[step_row_position])
@@ -563,6 +587,9 @@ def _step_payload(
     )
     candidate_payloads = _candidate_payloads(
         candidate_row_ids=candidate_row_ids,
+        rollout_row_id=rollout_row_id,
+        chain_id=chain_id,
+        step_row_id=step_row_id,
         shell_indices=shell_indices,
         compact_valid=compact_valid,
         stored_valid=stored_valid,
@@ -581,6 +608,8 @@ def _step_payload(
         selected_depth=selected_depth,
     )
     metadata = {
+        "rollout_row_id": rollout_row_id,
+        "chain_id": chain_id,
         "step_row_id": step_row_id,
         "step_index": step_index,
         "selected_candidate_row_id": selected_candidate_row_id,
@@ -610,8 +639,15 @@ def _step_payload(
         "q_h": _q_h_metadata(reader, step_row_id=step_row_id),
     }
     return _RolloutStepPayload(
+        rollout_row_id=rollout_row_id,
+        chain_id=chain_id,
         step_row_id=step_row_id,
         step_index=step_index,
+        metadata_entity=_rollout_step_metadata_entity(
+            rollout_row_id=rollout_row_id,
+            chain_id=chain_id,
+            step_index=step_index,
+        ),
         candidates=candidate_payloads,
         selected_center=centers[selected_local] if selected_local >= 0 else None,
         valid_candidate_count=int(display_valid.sum()),
@@ -865,9 +901,64 @@ def _rollout_root_path(
     return [_pose_centers(root)[0].tolist()]
 
 
+def _rollout_chain_entity(*, rollout_row_id: int, chain_id: int) -> str:
+    return f"{ENTITY_ROLLOUT_ROOT}/rollout_{int(rollout_row_id):06d}/chain_{int(chain_id):06d}"
+
+
+def _rollout_step_entity(*, rollout_row_id: int, chain_id: int, step_index: int) -> str:
+    return f"{_rollout_chain_entity(rollout_row_id=rollout_row_id, chain_id=chain_id)}/step_{int(step_index):03d}"
+
+
+def _rollout_candidate_entity(
+    *,
+    rollout_row_id: int,
+    chain_id: int,
+    step_index: int,
+    status: str,
+    shell_index: int,
+) -> str:
+    return (
+        f"{_rollout_step_entity(rollout_row_id=rollout_row_id, chain_id=chain_id, step_index=step_index)}"
+        f"/{status}/candidate_shell_{int(shell_index):03d}"
+    )
+
+
+def _rollout_selected_path_entity(*, rollout_row_id: int, chain_id: int) -> str:
+    return f"{_rollout_chain_entity(rollout_row_id=rollout_row_id, chain_id=chain_id)}/selected_path"
+
+
+def _rollout_step_metadata_entity(*, rollout_row_id: int, chain_id: int, step_index: int) -> str:
+    return (
+        f"{ENTITY_ROLLOUT_METADATA}/rollout_{int(rollout_row_id):06d}/"
+        f"chain_{int(chain_id):06d}/step_{int(step_index):03d}"
+    )
+
+
+def _rollout_candidate_group_hidden_paths(
+    *,
+    reader: RolloutZarrStoreReader,
+    rows: SelectedRolloutRows,
+) -> tuple[str, ...]:
+    """Return exact rollout candidate subtrees hidden by default in the viewer."""
+
+    step_indices = reader.array("steps/step_index")[rows.step_rows].astype(np.int64).reshape(-1)
+    hidden_paths: list[str] = []
+    for step_index in step_indices.tolist():
+        step_entity = _rollout_step_entity(
+            rollout_row_id=rows.rollout_row_id,
+            chain_id=rows.chain_id,
+            step_index=int(step_index),
+        )
+        hidden_paths.extend((f"{step_entity}/valid", f"{step_entity}/invalid"))
+    return tuple(hidden_paths)
+
+
 def _candidate_payloads(
     *,
     candidate_row_ids: NDArray[Any],
+    rollout_row_id: int,
+    chain_id: int,
+    step_row_id: int,
     shell_indices: NDArray[Any],
     compact_valid: NDArray[Any],
     stored_valid: NDArray[Any],
@@ -920,23 +1011,29 @@ def _candidate_payloads(
             primary,
         ) = values
         shell_index = int(shell)
-        group = _candidate_group(display_valid=bool(is_display_valid), selected=bool(is_selected))
-        root = {
-            "selected": ENTITY_ROLLOUT_SELECTED_ROOT,
-            "valid": ENTITY_ROLLOUT_VALID_ROOT,
-            "invalid": ENTITY_ROLLOUT_INVALID_ROOT,
-        }[group]
+        status = _candidate_status(display_valid=bool(is_display_valid), selected=bool(is_selected))
         color = _candidate_color(
             display_valid=bool(is_display_valid),
             selected=bool(is_selected),
             step_index=step_index,
         )
-        candidate_root = f"{root}/candidate_{shell_index:03d}"
+        candidate_root = _rollout_candidate_entity(
+            rollout_row_id=rollout_row_id,
+            chain_id=chain_id,
+            step_index=step_index,
+            status=status,
+            shell_index=shell_index,
+        )
         payloads.append(
             _RolloutCandidatePayload(
                 row_id=int(row_id),
+                rollout_row_id=int(rollout_row_id),
+                chain_id=int(chain_id),
+                step_index=int(step_index),
+                step_row_id=int(step_row_id),
                 shell_index=shell_index,
                 compact_valid_index=int(compact),
+                status=status,
                 stored_valid=bool(is_stored_valid),
                 display_valid=bool(is_display_valid),
                 display_validity_trusted=display_validity_trusted,
@@ -958,7 +1055,7 @@ def _candidate_payloads(
     return payloads
 
 
-def _candidate_group(*, display_valid: bool, selected: bool) -> str:
+def _candidate_status(*, display_valid: bool, selected: bool) -> str:
     if selected:
         return "selected"
     return "valid" if display_valid else "invalid"
@@ -1082,14 +1179,10 @@ def run_rollout_zarr_inspector(
 
 
 __all__ = [
-    "ENTITY_ROLLOUT_INVALID_ROOT",
     "ENTITY_ROLLOUT_DIAGNOSTICS_ROOT",
     "ENTITY_ROLLOUT_METADATA",
     "ENTITY_ROLLOUT_RRI_ROOT",
-    "ENTITY_ROLLOUT_SELECTED_PATH",
-    "ENTITY_ROLLOUT_SELECTED_ROOT",
-    "ENTITY_ROLLOUT_STEP_ROOT",
-    "ENTITY_ROLLOUT_VALID_ROOT",
+    "ENTITY_ROLLOUT_ROOT",
     "RerunRolloutZarrLogger",
     "SelectedRolloutRows",
     "run_rollout_zarr_inspector",

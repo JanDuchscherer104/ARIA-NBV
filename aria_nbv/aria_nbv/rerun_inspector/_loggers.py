@@ -139,7 +139,33 @@ def deterministic_downsample(points: object, *, max_points: int, seed: int | Non
     return arr[indices]
 
 
-def log_default_inspector_blueprint(rr_module: RerunModule) -> None:
+def _world_view_contents() -> list[str]:
+    """Return the default world-view query rules for Rerun blueprints."""
+
+    return ["+ /world/**"]
+
+
+def _hidden_world_view_paths(*, hidden_world_paths: Sequence[str] = ()) -> tuple[str, ...]:
+    """Return rooted world-view entity paths hidden by default but still included."""
+
+    return (
+        _normalize_blueprint_entity_path(ENTITY_EFM_VOXELS),
+        _normalize_blueprint_entity_path(ENTITY_GT_OBBS),
+        *(_normalize_blueprint_entity_path(path) for path in hidden_world_paths),
+    )
+
+
+def _normalize_blueprint_entity_path(path: str) -> str:
+    """Return a rooted entity path suitable for Rerun blueprint query rules."""
+
+    return f"/{path.lstrip('/')}"
+
+
+def log_default_inspector_blueprint(
+    rr_module: RerunModule,
+    *,
+    hidden_world_paths: Sequence[str] = (),
+) -> None:
     """Send the default inspector layout when the installed Rerun SDK supports blueprints."""
 
     send_blueprint = getattr(rr_module, "send_blueprint", None)
@@ -153,7 +179,11 @@ def log_default_inspector_blueprint(rr_module: RerunModule) -> None:
                 rrb.Spatial3DView(
                     name="World",
                     origin="/world",
-                    contents=["/world/**"],
+                    contents=_world_view_contents(),
+                    overrides={
+                        path: rrb.EntityBehavior(visible=False)
+                        for path in _hidden_world_view_paths(hidden_world_paths=hidden_world_paths)
+                    },
                 ),
                 rrb.Vertical(
                     rrb.TimeSeriesView(name="Rollout RRI", origin="/plots/rollout/rri"),

@@ -17,13 +17,9 @@ from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
 from aria_nbv.rerun_inspector._loggers import ENTITY_WORLD
 from aria_nbv.rerun_inspector._rollout_zarr import (
     ENTITY_ROLLOUT_DIAGNOSTICS_ROOT,
-    ENTITY_ROLLOUT_INVALID_ROOT,
     ENTITY_ROLLOUT_METADATA,
+    ENTITY_ROLLOUT_ROOT,
     ENTITY_ROLLOUT_RRI_ROOT,
-    ENTITY_ROLLOUT_SELECTED_PATH,
-    ENTITY_ROLLOUT_SELECTED_ROOT,
-    ENTITY_ROLLOUT_STEP_METADATA,
-    ENTITY_ROLLOUT_VALID_ROOT,
     RerunRolloutZarrLogger,
     _candidate_rri_summary,
     _plot_step_payload,
@@ -74,6 +70,7 @@ class _FakeRerun:
         self.calls: list[tuple[str, Any]] = []
         self.logged: dict[str, _Archetype] = {}
         self.logged_extras: dict[str, tuple[Any, ...]] = {}
+        self.blueprints: list[object] = []
 
     def init(self, *args: Any, **kwargs: Any) -> None:
         self.calls.append(("init", args, kwargs))
@@ -97,6 +94,34 @@ class _FakeRerun:
         self.calls.append(("log", entity_path, args, kwargs))
         self.logged[entity_path] = entity
         self.logged_extras[entity_path] = args
+
+    def send_blueprint(self, blueprint: object, *args: Any, **kwargs: Any) -> None:
+        self.calls.append(("send_blueprint", args, kwargs))
+        self.blueprints.append(blueprint)
+
+
+def _world_view_from_blueprint(blueprint: object) -> object:
+    """Extract the world Spatial3DView from a captured blueprint."""
+
+    pending = [blueprint.root_container]  # type: ignore[attr-defined]
+    while pending:
+        part = pending.pop()
+        if getattr(part, "name", None) == "World":
+            return part
+        pending.extend(getattr(part, "contents", ()) or ())
+    raise AssertionError("World Spatial3DView not found in blueprint.")
+
+
+def _world_view_contents_from_blueprint(blueprint: object) -> list[str]:
+    """Extract the world Spatial3DView contents from a captured blueprint."""
+
+    return list(_world_view_from_blueprint(blueprint).contents)  # type: ignore[attr-defined]
+
+
+def _world_view_overrides_from_blueprint(blueprint: object) -> dict[str, object]:
+    """Extract the world Spatial3DView overrides from a captured blueprint."""
+
+    return dict(_world_view_from_blueprint(blueprint).overrides)  # type: ignore[attr-defined]
 
 
 def _fixture_rollout_store(tmp_path: Path, *, selected_depth_enabled: bool = True) -> Path:
@@ -193,22 +218,43 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
 
     assert [call[0] for call in fake.calls[:2]] == ["init", "save"]
     assert rows.rollout_row_id == 0
+    assert rows.chain_id == 0
     assert rows.step_rows.shape[0] == 2
     assert ENTITY_WORLD in fake.logged
     assert ENTITY_ROLLOUT_METADATA in fake.logged
-    assert ENTITY_ROLLOUT_SELECTED_PATH in fake.logged
-    assert any(path.startswith(f"{ENTITY_ROLLOUT_VALID_ROOT}/candidate_") for path in fake.logged)
-    assert any(path.startswith(f"{ENTITY_ROLLOUT_INVALID_ROOT}/candidate_") for path in fake.logged)
-    assert any(path.startswith(f"{ENTITY_ROLLOUT_SELECTED_ROOT}/candidate_") for path in fake.logged)
+    chain_root = f"{ENTITY_ROLLOUT_ROOT}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}"
+    assert len(fake.blueprints) == 2
+    rollout_contents = _world_view_contents_from_blueprint(fake.blueprints[-1])
+    rollout_overrides = _world_view_overrides_from_blueprint(fake.blueprints[-1])
+    assert rollout_contents == ["+ /world/**"]
+    assert all(not rule.startswith("- ") for rule in rollout_contents)
+    assert f"/{chain_root}/step_000/valid" in rollout_overrides
+    assert f"/{chain_root}/step_000/invalid" in rollout_overrides
+    assert f"/{chain_root}/step_001/valid" in rollout_overrides
+    assert f"/{chain_root}/step_001/invalid" in rollout_overrides
+    assert f"/{chain_root}/step_000/selected" not in rollout_overrides
+    assert all(override.visible.as_arrow_array().to_pylist() == [False] for override in rollout_overrides.values())
+    selected_path_entity = f"{chain_root}/selected_path"
+    assert selected_path_entity in fake.logged
+    assert "world/rollout/selected_path" not in fake.logged
+    assert not any(path.startswith("world/rollout/step/") for path in fake.logged)
+    assert any(f"{chain_root}/step_" in path and "/valid/candidate_shell_" in path for path in fake.logged)
+    assert any(f"{chain_root}/step_" in path and "/invalid/candidate_shell_" in path for path in fake.logged)
+    assert any(f"{chain_root}/step_" in path and "/selected/candidate_shell_" in path for path in fake.logged)
 
     depth_calls = [
         call
         for call in fake.calls
         if call[0] == "log"
-        and str(call[1]).startswith(f"{ENTITY_ROLLOUT_SELECTED_ROOT}/candidate_")
+        and str(call[1]).startswith(f"{chain_root}/step_")
+        and "/selected/candidate_shell_" in str(call[1])
         and str(call[1]).endswith("/camera/depth")
     ]
     assert len(depth_calls) == rows.step_rows.shape[0]
+    assert {str(call[1]).split("/selected/", maxsplit=1)[0].rsplit("/", maxsplit=1)[-1] for call in depth_calls} == {
+        "step_000",
+        "step_001",
+    }
     depth_path = str(depth_calls[0][1])
     camera_path = depth_path.removesuffix("/depth")
     depth_image = fake.logged[depth_path]
@@ -244,29 +290,49 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert isinstance(descriptor_calls[0][2][0], _Archetype)
 
     camera_calls = [
-        call for call in fake.calls if call[0] == "log" and str(call[1]).startswith(f"{ENTITY_ROLLOUT_VALID_ROOT}/")
+        call
+        for call in fake.calls
+        if call[0] == "log"
+        and str(call[1]).startswith(f"{chain_root}/step_")
+        and "/valid/candidate_shell_" in str(call[1])
     ]
     assert camera_calls
     assert len(camera_calls[0][2]) == 2
     assert "labels" not in camera_calls[0][2][0].kwargs
     assert camera_calls[0][2][1].kwargs["candidate_row_id"] >= 0
+    assert camera_calls[0][2][1].kwargs["rollout_row_id"] == rows.rollout_row_id
+    assert camera_calls[0][2][1].kwargs["chain_id"] == rows.chain_id
+    assert camera_calls[0][2][1].kwargs["candidate_status"] == "valid"
 
     metadata = json.loads(fake.logged[ENTITY_ROLLOUT_METADATA].args[0])
     assert metadata["validation"]["ok"]
     assert metadata["manifest"]["schema_version"]
     assert metadata["manifest"]["source_coverage"]["num_source_rows"] >= 1
     assert metadata["selected"]["rollout_row_id"] == 0
+    assert metadata["selected"]["chain_id"] == 0
     assert metadata["context"]["mode"] == "off"
 
-    step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
+    step_metadata_paths = [
+        path for path in fake.logged if path.startswith(f"{ENTITY_ROLLOUT_METADATA}/rollout_000000/chain_000000/step_")
+    ]
+    assert sorted(step_metadata_paths) == [
+        f"{ENTITY_ROLLOUT_METADATA}/rollout_000000/chain_000000/step_000",
+        f"{ENTITY_ROLLOUT_METADATA}/rollout_000000/chain_000000/step_001",
+    ]
+    step_metadata = json.loads(fake.logged[step_metadata_paths[0]].args[0])
+    assert step_metadata["rollout_row_id"] == rows.rollout_row_id
+    assert step_metadata["chain_id"] == rows.chain_id
+    assert step_metadata["step_row_id"] == int(rows.step_rows[0])
+    assert step_metadata["step_index"] == 0
     assert step_metadata["q_h"]["state_row_found"]
     assert step_metadata["q_h"]["selected_transition_available"]
     assert step_metadata["invalid_candidate_count"] > 0
     assert step_metadata["display_validity_trusted"]
     assert step_metadata["selected_depth"]["available"]
+    assert step_metadata["selected_depth"]["depth_entity"].startswith(f"{chain_root}/step_000/selected/")
     assert step_metadata["selected_depth"]["depth_entity"].endswith("/camera/depth")
 
-    selected_path = fake.logged[ENTITY_ROLLOUT_SELECTED_PATH]
+    selected_path = fake.logged[selected_path_entity]
     assert len(selected_path.args[0]) == 2
     np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape, (2, 3))
     assert len(selected_path.kwargs["colors"]) == 2
@@ -282,10 +348,14 @@ def test_rollout_zarr_logger_warns_when_selected_depth_is_unavailable(tmp_path: 
 
     logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
     logger.start()
-    logger.log_store(store_dir=store_dir, rollout_index=0)
+    rows = logger.log_store(store_dir=store_dir, rollout_index=0)
 
     assert not any(str(call[1]).endswith("/camera/depth") for call in fake.calls if call[0] == "log")
-    step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
+    step_metadata = json.loads(
+        fake.logged[
+            f"{ENTITY_ROLLOUT_METADATA}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}/step_000"
+        ].args[0]
+    )
     assert not step_metadata["selected_depth"]["available"]
     assert step_metadata["selected_depth"]["warnings"]
 

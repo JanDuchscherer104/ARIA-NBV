@@ -162,11 +162,14 @@ def test_rollout_zarr_selected_action_td_fields_align_with_step_rows(tmp_path) -
     td_selected = q_h["td_selected_candidate_row_id"]
     td_next = q_h["td_next_step_row_id"]
     td_terminal = q_h["td_terminal_mask"]
+    td_discount = q_h["td_discount"]
 
     assert np.array_equal(td_selected, step_selected)
     assert td_next.shape == td_terminal.shape == td_selected.shape
     assert np.any(~td_terminal)
     assert np.any(td_terminal)
+    assert np.all(td_discount[td_terminal] == 0.0)
+    assert np.all(td_discount[~td_terminal] > 0.0)
 
 
 def test_rollout_zarr_requires_explicit_target_rri_for_q_training(tmp_path) -> None:

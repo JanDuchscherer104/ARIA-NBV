@@ -657,6 +657,8 @@ class _RolloutZarrValidator:
         q_train_mask = q_h["q_train_mask"]
         valid_action_mask = q_h["valid_action_mask"]
         one_step_target_rri = q_h["one_step_target_rri"]
+        td_terminal_mask = q_h["td_terminal_mask"]
+        td_discount = q_h["td_discount"]
 
         real_q_ids = q_candidate_row_id[q_candidate_row_id >= 0]
         if not np.isin(real_q_ids, candidate_row_id).all():
@@ -665,6 +667,8 @@ class _RolloutZarrValidator:
             self.errors.append("Q_H q_train_mask is true for invalid or padded candidates.")
         if np.any(q_train_mask & (~np.isfinite(one_step_target_rri))):
             self.errors.append("Q_H q_train_mask is true without a finite explicit target-RRI label.")
+        if np.any(td_terminal_mask & (td_discount != 0.0)):
+            self.errors.append("Q_H td_discount must be zero for terminal selected transitions.")
 
     def _validate_persisted_q_h(self, persisted: dict[str, np.ndarray], derived: dict[str, np.ndarray]) -> None:
         group = self.root["q_h"]
@@ -1932,7 +1936,7 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
         "td_reward_target_rri": np.full((state_count,), np.nan, dtype=np.float32),
         "td_next_step_row_id": np.full((state_count,), -1, dtype=np.int64),
         "td_terminal_mask": np.ones((state_count,), dtype=np.bool_),
-        "td_discount": np.full((state_count,), float(gamma), dtype=np.float32),
+        "td_discount": np.zeros((state_count,), dtype=np.float32),
     }
 
     next_step_by_rollout: dict[tuple[int, int], int] = {}
@@ -1968,6 +1972,7 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
             q["td_next_step_row_id"][row] = next_step
             q["td_terminal_mask"][row] = next_step < 0
             if next_step >= 0:
+                q["td_discount"][row] = float(gamma)
                 q["terminal_mask"][row, selected_local_index] = False
                 q["bootstrap_next_step_row_id"][row, selected_local_index] = next_step
 

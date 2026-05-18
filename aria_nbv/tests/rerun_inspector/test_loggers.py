@@ -30,6 +30,7 @@ from aria_nbv.rerun_inspector._loggers import (
     ENTITY_TRAJECTORY,
     ENTITY_WORLD,
     RerunOfflineLogger,
+    log_default_inspector_blueprint,
 )
 from aria_nbv.rerun_inspector._metadata import OfflineVisualInventory, normalize_visual_inventory
 
@@ -96,6 +97,42 @@ class _FakeRerun:
         self.calls.append(("set_time_sequence", args, kwargs))
 
 
+class _FakeBlueprintRerun(_FakeRerun):
+    """Fake Rerun module that captures blueprint payloads."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.blueprints: list[object] = []
+
+    def send_blueprint(self, blueprint: object, *args: Any, **kwargs: Any) -> None:
+        self.calls.append(("send_blueprint", args, kwargs))
+        self.blueprints.append(blueprint)
+
+
+def _world_view_from_blueprint(blueprint: object) -> object:
+    """Extract the world Spatial3DView from a captured blueprint."""
+
+    pending = [blueprint.root_container]  # type: ignore[attr-defined]
+    while pending:
+        part = pending.pop()
+        if getattr(part, "name", None) == "World":
+            return part
+        pending.extend(getattr(part, "contents", ()) or ())
+    raise AssertionError("World Spatial3DView not found in blueprint.")
+
+
+def _world_view_contents_from_blueprint(blueprint: object) -> list[str]:
+    """Extract the world Spatial3DView contents from a captured blueprint."""
+
+    return list(_world_view_from_blueprint(blueprint).contents)  # type: ignore[attr-defined]
+
+
+def _world_view_overrides_from_blueprint(blueprint: object) -> dict[str, object]:
+    """Extract the world Spatial3DView overrides from a captured blueprint."""
+
+    return dict(_world_view_from_blueprint(blueprint).overrides)  # type: ignore[attr-defined]
+
+
 def _poses(translations: list[list[float]]) -> PoseTW:
     """Build a PoseTW batch from identity rotations and translations."""
 
@@ -156,6 +193,31 @@ def _obb_tensor(offset: float = 0.0, *, sem_id: int = 0, inst_id: int = 1, prob:
     data[0, 31] = float(inst_id)
     data[0, 32] = float(prob)
     return data
+
+
+def test_default_blueprint_hides_heavy_context_and_requested_world_subtrees() -> None:
+    fake = _FakeBlueprintRerun()
+
+    log_default_inspector_blueprint(
+        fake,
+        hidden_world_paths=(
+            "world/rollout/rollout_000000/chain_000000/step_000/valid",
+            "/world/rollout/rollout_000000/chain_000000/step_000/invalid",
+        ),
+    )
+
+    assert len(fake.blueprints) == 1
+    contents = _world_view_contents_from_blueprint(fake.blueprints[0])
+    overrides = _world_view_overrides_from_blueprint(fake.blueprints[0])
+    assert contents == ["+ /world/**"]
+    assert all(not rule.startswith("- ") for rule in contents)
+    assert f"/{ENTITY_EFM_VOXELS}" in overrides
+    assert f"/{ENTITY_GT_OBBS}" in overrides
+    assert "/world/rollout/rollout_000000/chain_000000/step_000/valid" in overrides
+    assert "/world/rollout/rollout_000000/chain_000000/step_000/invalid" in overrides
+    assert all(override.visible.as_arrow_array().to_pylist() == [False] for override in overrides.values())
+    assert fake.calls[0][0] == "send_blueprint"
+    assert fake.calls[0][2] == {"make_active": True, "make_default": True}
 
 
 def test_logger_initializes_save_sink_before_logging(tmp_path) -> None:

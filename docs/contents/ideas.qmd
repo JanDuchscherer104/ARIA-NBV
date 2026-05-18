@@ -180,3 +180,11 @@ here we also need to consider how to generate the multi-step samples in a way su
 - How do we determine suited objects for our current offline ATEK snippets?
   - min visibility of object in the reference view?
   - max distance from the reference pose?
+
+
+---
+
+## Issues
+
+- First RRI computation compares the reconstruction improvement of the first counterfactual view's *dense* pointcloud against the sparse SLAM pointcloud, whilst the subsequent RRIs compare the dense single step pointclouds against the fused PC which now includes the union of the semi-dense and previous dense pointclouds. This leads to a bias in the RRI computation, favoring the first candidate views.
+- We need to investigate the current target selection policy so that we get a well balanced distribution of targets for the multi-step rollouts.
