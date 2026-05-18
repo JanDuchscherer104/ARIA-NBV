@@ -392,11 +392,13 @@ The model class follows the structure of the decision problem. The action space 
 
 The one-step target scorer is adapted to counterfactual rollout rows rather than reusing the seminar VIN checkpoint unchanged. The inputs #symb.obs.points_t, #symb.rl.candidate_table, #symb.rl.candidate_mask, selected history, directional memory, and budget reflect the current rollout state. The scorer remains myopic and predicts immediate target-specific #RRI evidence for each candidate. #symb.rl.qh is residual around this calibrated base, with the dueling residual head as the canonical value definition.
 
-The CORAL interface remains an experimental choice. In all variants, #emph[CORAL threshold logits] are decoded as #emph[cumulative threshold probabilities], #emph[not softmax class probabilities]. They may be passed as uncertainty/ranking features, while the scalar base $hat(r)_psi^e$ is obtained by converting threshold probabilities into class marginals and taking an expected value over monotone bin representatives:
+The myopic scorer uses the CORAL ordinal-regression interface of Cao et al. and the `coral-pytorch` layer/loss implementation, adapted to ARIA-NBV's skewed oracle-RRI labels @CORAL-cao2019 @coral-pytorch-2025. The implemented seminar path first fits $K$ empirical quantile bins over oracle RRI values, converts each ordinal label to CORAL threshold targets, and decodes each threshold logit as a cumulative probability $p_k=P(y>k)$ rather than as a softmax class posterior. The scalar base $hat(r)_psi^e$ is then obtained by converting cumulative threshold probabilities into class marginals and taking an expectation over bin representatives:
 
 $
   #eqs.rl.qh_coral_interface
 $
+
+Relative to vanilla `coral-pytorch`, the ARIA-NBV adaptation adds RRI-specific label handling and calibration: ordinal labels are converted to threshold levels internally; bin representatives $u_k$ are initialized from fitted bin means and may be learned through monotone cumulative-softplus deltas; threshold biases may be initialized from fitted class priors; balanced or focal threshold losses and monotonicity / relative-to-random diagnostics remain training controls. These additions calibrate the one-step target-RRI scorer; they do not change the thesis utility, which remains oracle-evaluated target-specific #RRI and finite-candidate #symb.rl.qh recovery under matched budgets.
 
 Training is staged to preserve the residual interpretation: train and calibrate $hat(r)_psi^e$, then freeze or slow-finetune it while fitting the residual #symb.rl.qh, and finally ablate whether end-to-end fine-tuning improves oracle-evaluated policy performance.
 
