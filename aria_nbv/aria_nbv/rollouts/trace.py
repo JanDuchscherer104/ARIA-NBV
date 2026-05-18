@@ -59,7 +59,14 @@ _RULE_REASON_BITS = {
 
 @dataclass(slots=True)
 class RolloutLineage:
-    """Deterministic provenance for one rollout root and target."""
+    """Deterministic provenance for one rollout root, target, and policy.
+
+    These fields bridge the immutable VIN source row to the rollout replay
+    tables. Source lineage identifies the original shard-local VIN row, target
+    lineage describes the actor-visible target and GT evaluation match, and
+    config hashes bind candidate generation, oracle scoring, and rollout policy
+    choices without embedding heavy source artifacts.
+    """
 
     rollout_id: str = ""
     """Stable rollout identifier; filled from `RolloutZarrRecord` per retained chain."""
@@ -119,7 +126,13 @@ class RolloutLineage:
 
 @dataclass(slots=True)
 class RolloutZarrRecord:
-    """One counterfactual rollout result plus source/target lineage."""
+    """One counterfactual rollout result plus source/target lineage.
+
+    `CounterfactualRolloutResult` owns the generated trajectories and candidate
+    shells. `RolloutLineage` owns where those trajectories came from. The Zarr
+    writer flattens this pair into normalized source, target, rollout, step,
+    and candidate tables.
+    """
 
     result: CounterfactualRolloutResult
     lineage: RolloutLineage

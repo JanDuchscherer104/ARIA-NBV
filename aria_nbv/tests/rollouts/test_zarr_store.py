@@ -75,6 +75,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert manifest["counts"]["candidates"] == result.num_candidates
     assert manifest["generation"]["invocation"]["mode"] == "programmatic"
     assert manifest["source_coverage"]["scene_counts"] == {"fixture_box": 3}
+    assert manifest["source_coverage"]["source_shard_counts"] == {"vin-shard-000000": 3}
     assert "splits" not in reader.root
     assert "sources" in reader.root
     assert "q_h" not in reader.root
@@ -304,6 +305,9 @@ def test_rollout_zarr_records_per_rollout_lineage_and_split(tmp_path) -> None:
         assert int(reader.array(f"lineage/{name}")[0]) >= 0
     for name in ("source_cache_version_id", "source_offline_store_manifest_hash_id", "split_manifest_hash_id"):
         assert int(reader.array(f"sources/{name}")[0]) >= 0
+    source_shards = _json_list(reader, "dictionaries/source_shard")
+    assert source_shards[int(reader.array("sources/source_shard_id")[0])] == "vin-shard-000000"
+    assert int(reader.array("sources/source_shard_row")[0]) >= 0
     for rollout_owned_name in ("root_pose_world", "policy_id", "target_row_id"):
         assert rollout_owned_name not in reader.root["lineage"]
     for target_owned_name in ("target_selection_policy_id", "matched_gt_target_row_id", "gt_match_status_id"):
@@ -323,6 +327,31 @@ def test_rollout_zarr_rejects_mixed_split_shards(tmp_path) -> None:
     validation = validate_rollout_zarr_store(result.store_dir)
     assert not validation.ok
     assert any("exactly one split" in error for error in validation.errors)
+
+
+def test_rollout_zarr_validation_requires_vin_source_shard_lineage(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=23)[:1]
+    records[0].lineage.source_shard_id = None
+    records[0].lineage.source_shard_row = -1
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("source_shard_id" in error for error in validation.errors)
+    assert any("source_shard_row" in error for error in validation.errors)
+
+
+def test_rollout_zarr_rejects_conflicting_source_row_lineage(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=24)[:2]
+    records[0].lineage.source_row_id = 0
+    records[1].lineage.source_row_id = 0
+    records[1].lineage.source_sample_key = "different-source-row"
+    records[1].lineage.source_shard_id = "vin-shard-999999"
+    records[1].lineage.source_shard_row = 99
+
+    with pytest.raises(ValueError, match="Conflicting source lineage"):
+        write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
 
 
 def test_rollout_zarr_preserves_candidate_mixture_provenance_for_real_stores(tmp_path) -> None:

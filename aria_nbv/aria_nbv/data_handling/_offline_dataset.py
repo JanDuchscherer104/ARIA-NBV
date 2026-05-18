@@ -84,7 +84,14 @@ class VinOfflineOracleBlock:
 
 @dataclass(slots=True)
 class VinOfflineSample:
-    """Canonical offline sample used by diagnostics and compatibility wrappers."""
+    """Canonical root sample for diagnostics and rollout generation.
+
+    `VinOfflineSample` is intentionally richer than `VinOracleBatch`: it keeps
+    sample-index lineage, optional raw snippet/mesh attachments, and diagnostic
+    blocks needed to regenerate counterfactual candidates. Model training still
+    goes through `VinOracleBatch`, while rollout writers consume this sample
+    shape and carry its source shard fields into standalone rollout stores.
+    """
 
     sample_key: str
     """Stable dataset sample key."""
@@ -106,6 +113,12 @@ class VinOfflineSample:
 
     split: str = "all"
     """Split membership from ``sample_index.jsonl``."""
+
+    source_shard_id: str | None = None
+    """VIN offline shard id that stores this immutable source row."""
+
+    source_shard_row: int | None = None
+    """Zero-based row offset inside ``source_shard_id`` used for rollout lineage."""
 
     candidates: CandidateSamplingResult | None = None
     """Optional candidate-sampling payload preserved for diagnostics."""
@@ -793,6 +806,8 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
             oracle=oracle,
             sample_index=int(record.sample_index),
             split=record.split,
+            source_shard_id=record.shard_id,
+            source_shard_row=int(record.row),
             candidates=self._build_candidates(record),
             backbone_out=self._build_backbone(record),
             depths=self._build_depths(record, oracle),

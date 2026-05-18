@@ -98,6 +98,8 @@ def build_rollout_records(
                     source_sample_index=source_row_id,
                     source_sample_key=f"fixture:smoke:{source_row_id}",
                     split="train",
+                    source_shard_id="vin-shard-000000",
+                    source_shard_row=source_row_id,
                     source_offline_store_manifest_hash="fixture-source-manifest",
                     split_manifest_hash="fixture-split-manifest",
                     selection_rng_state_hash="fixture-rng",

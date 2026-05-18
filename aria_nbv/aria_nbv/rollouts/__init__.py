@@ -19,6 +19,22 @@ from .manifest import (
     RolloutStoreInvocation,
     RolloutStoreManifestContext,
 )
+from .shard_manifest import (
+    ROLLOUT_SHARD_MANIFEST_VERSION,
+    ROLLOUT_SHARD_OWNER_FILENAME,
+    ROLLOUT_SHARD_SUCCESS_FILENAME,
+    RolloutShardEntry,
+    RolloutShardRow,
+)
+from .shards import (
+    RolloutShardCampaignStatus,
+    RolloutShardRunResult,
+    RolloutShardStatus,
+    plan_rollout_shards,
+    run_rollout_shard,
+    summarize_rollout_shard_campaign,
+    write_rollout_shard_manifest_from_config,
+)
 from .trace import (
     INVALID_REASON_CODES,
     INVALID_REASON_VERSION,
@@ -45,11 +61,19 @@ __all__ = [
     "ROLLOUT_ZARR_SCHEMA_VERSION",
     "ROLLOUT_MANIFEST_FILENAME",
     "ROLLOUT_MANIFEST_VERSION",
+    "ROLLOUT_SHARD_MANIFEST_VERSION",
+    "ROLLOUT_SHARD_OWNER_FILENAME",
+    "ROLLOUT_SHARD_SUCCESS_FILENAME",
     "RolloutDatasetWriter",
     "RolloutDatasetWriterConfig",
     "RolloutDatasetWriterStats",
     "RolloutLineage",
     "RolloutRecipeConfig",
+    "RolloutShardCampaignStatus",
+    "RolloutShardEntry",
+    "RolloutShardRow",
+    "RolloutShardRunResult",
+    "RolloutShardStatus",
     "RolloutStoreInvocation",
     "RolloutStoreManifestContext",
     "RolloutZarrStoreConfig",
@@ -57,6 +81,10 @@ __all__ = [
     "RolloutZarrRecord",
     "RolloutZarrValidationResult",
     "RolloutZarrWriteResult",
+    "plan_rollout_shards",
+    "run_rollout_shard",
+    "summarize_rollout_shard_campaign",
     "validate_rollout_zarr_store",
+    "write_rollout_shard_manifest_from_config",
     "write_rollout_zarr_store",
 ]

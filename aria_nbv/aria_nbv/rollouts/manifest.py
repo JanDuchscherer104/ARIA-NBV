@@ -92,6 +92,9 @@ class RolloutStoreManifestContext:
     runtime: dict[str, Any] = field(default_factory=dict)
     """Runtime provenance such as git and package versions."""
 
+    shard: dict[str, Any] | None = None
+    """Optional rollout shard manifest entry for cluster generation runs."""
+
     @classmethod
     def programmatic(cls, *, writer_config: BaseConfig | None = None) -> "RolloutStoreManifestContext":
         """Build context for programmatic calls."""
@@ -100,6 +103,7 @@ class RolloutStoreManifestContext:
             writer_config=None if writer_config is None else writer_config.model_dump_jsonable(),
             invocation=RolloutStoreInvocation.programmatic(),
             runtime=collect_runtime_provenance(),
+            shard=None,
         )
 
     @classmethod
@@ -116,6 +120,7 @@ class RolloutStoreManifestContext:
             writer_config=writer_config.model_dump_jsonable(),
             invocation=RolloutStoreInvocation.from_cli(argv=argv, config_path=config_path),
             runtime=collect_runtime_provenance(),
+            shard=None,
         )
 
     def to_jsonable(self) -> dict[str, Any]:
@@ -125,6 +130,7 @@ class RolloutStoreManifestContext:
             "writer_config": self.writer_config,
             "invocation": self.invocation.to_jsonable(),
             "runtime": self.runtime,
+            "shard": self.shard,
         }
 
 

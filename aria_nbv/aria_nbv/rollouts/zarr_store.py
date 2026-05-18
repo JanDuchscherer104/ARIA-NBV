@@ -549,6 +549,20 @@ class _RolloutZarrValidator:
             self.errors.append("Rollout source_row_id contains ids not present in sources/source_row_id.")
         if np.unique(source_row_id).shape[0] != source_row_id.shape[0]:
             self.errors.append("sources/source_row_id must be unique within one rollout shard.")
+        source_shard_id = np.asarray(self.root["sources/source_shard_id"])
+        source_shard_row = np.asarray(self.root["sources/source_shard_row"])
+        try:
+            source_shard_names = _read_string_array(self.root, "dictionaries/source_shard")
+        except (KeyError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            self.errors.append(f"Failed to read source_shard dictionary: {exc}.")
+            return
+        for value in source_shard_id:
+            shard_index = int(value)
+            if shard_index < 0 or shard_index >= len(source_shard_names) or not source_shard_names[shard_index]:
+                self.errors.append("sources/source_shard_id must reference non-empty VIN source shard ids.")
+                break
+        if np.any(source_shard_row < 0):
+            self.errors.append("sources/source_shard_row must be non-negative.")
 
     def _validate_targets(self) -> None:
         target_row_id = np.asarray(self.root["targets/target_row_id"])
@@ -759,15 +773,19 @@ def _source_coverage(records: list[RolloutZarrRecord]) -> dict[str, Any]:
         }
     scene_counts: dict[str, int] = {}
     split_counts: dict[str, int] = {}
+    source_shard_counts: dict[str, int] = {}
     for row in rows.values():
         scene = str(row["scene_id"] or "unknown")
         split = str(row["split"] or "unknown")
+        source_shard = str(row["source_shard_id"] or "unknown")
         scene_counts[scene] = scene_counts.get(scene, 0) + 1
         split_counts[split] = split_counts.get(split, 0) + 1
+        source_shard_counts[source_shard] = source_shard_counts.get(source_shard, 0) + 1
     return {
         "num_source_rows": len(rows),
         "scene_counts": dict(sorted(scene_counts.items())),
         "split_counts": dict(sorted(split_counts.items())),
+        "source_shard_counts": dict(sorted(source_shard_counts.items())),
         "sources": [rows[key] for key in sorted(rows)],
     }
 
@@ -1263,7 +1281,7 @@ def _flatten_records(records: list[RolloutZarrRecord], dictionaries: dict[str, l
 
     candidate_row_id = 0
     step_row_id = 0
-    seen_source_row_ids: set[int] = set()
+    seen_source_rows: dict[int, tuple[object, ...]] = {}
     rollout_row_id = 0
     for record, trajectory, lineage in _record_items(records):
         final_target_rri = _trajectory_cumulative_metric(trajectory, ("target_rri", "rri"))
@@ -1271,9 +1289,16 @@ def _flatten_records(records: list[RolloutZarrRecord], dictionaries: dict[str, l
             final_target_rri = trajectory.cumulative_rri
         final_scene_rri = _trajectory_cumulative_metric(trajectory, ("scene_rri",))
         source_row_id = _lineage_source_row_id(lineage)
-        if source_row_id not in seen_source_row_ids:
-            seen_source_row_ids.add(source_row_id)
+        source_identity = _source_identity(lineage=lineage, source_row_id=source_row_id)
+        existing_source_identity = seen_source_rows.get(source_row_id)
+        if existing_source_identity is None:
+            seen_source_rows[source_row_id] = source_identity
             _append_source_row(source_rows, lineage=lineage, source_row_id=source_row_id, dictionaries=dictionaries)
+        elif existing_source_identity != source_identity:
+            raise ValueError(
+                f"Conflicting source lineage for source_row_id={source_row_id}; "
+                "rollout source rows must map one-to-one to VIN offline sample-index rows."
+            )
         rollout_rows["rollout_row_id"].append(rollout_row_id)
         rollout_rows["rollout_id"].append(_dict_id(dictionaries["rollout"], lineage.rollout_id))
         rollout_rows["chain_id"].append(lineage.chain_id)
@@ -1389,6 +1414,24 @@ def _append_source_row(
     rows["split_manifest_hash_id"].append(_dict_id(dictionaries["config"], lineage.split_manifest_hash or ""))
     rows["source_shard_id"].append(_dict_id(dictionaries["source_shard"], lineage.source_shard_id or ""))
     rows["source_shard_row"].append(-1 if lineage.source_shard_row is None else int(lineage.source_shard_row))
+
+
+def _source_identity(*, lineage: RolloutLineage, source_row_id: int) -> tuple[object, ...]:
+    """Return the source fields that must be stable for one source row id."""
+
+    return (
+        source_row_id,
+        None if lineage.source_sample_index is None else int(lineage.source_sample_index),
+        lineage.source_sample_key,
+        lineage.scene_id,
+        lineage.snippet_id,
+        lineage.split,
+        lineage.source_cache_version,
+        lineage.source_offline_store_manifest_hash,
+        lineage.split_manifest_hash,
+        lineage.source_shard_id,
+        None if lineage.source_shard_row is None else int(lineage.source_shard_row),
+    )
 
 
 def _lineage_source_row_id(lineage: RolloutLineage) -> int:
@@ -1595,6 +1638,11 @@ def _write_array(group: zarr.Group, name: str, values: np.ndarray) -> zarr.Array
 def _write_string_array(group: zarr.Group, name: str, values: list[str]) -> None:
     encoded = np.frombuffer(json.dumps(values, ensure_ascii=True).encode("utf-8"), dtype=np.uint8)
     _write_array(group, name, encoded)
+
+
+def _read_string_array(root: Any, path: str) -> list[str]:
+    encoded = np.asarray(root[path], dtype=np.uint8)
+    return json.loads(bytes(encoded.tolist()).decode("utf-8"))
 
 
 def _default_chunks(array: np.ndarray) -> tuple[int, ...] | None:

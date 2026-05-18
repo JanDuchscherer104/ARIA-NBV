@@ -16,11 +16,13 @@ ARIA_REPO="${ARIA_REPO:-$HOME/src/ARIA-NBV}"
 LRZ_CONTAINER_IMAGE="${LRZ_CONTAINER_IMAGE:-nvcr.io#nvidia/pytorch:24.10-py3}"
 RUN_ID="${RUN_ID:-rollout-dryrun-YYYYMMDD}"
 DATASET_VERSION="${DATASET_VERSION:-ORACLE_CACHE_VERSION_PLACEHOLDER}"
+CONFIG_PATH="${CONFIG_PATH:-$ARIA_REPO/.configs/build_rollouts_v1_smoke.toml}"
 SHARD_MANIFEST="${SHARD_MANIFEST:-$ARIA_DSS/data/staging/manifests/rollout_shards.jsonl}"
-SHARD_ID="${SLURM_ARRAY_TASK_ID:-0}"
+ARRAY_TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
+SHARD_ID="$(printf 'shard-%06d' "$ARRAY_TASK_ID")"
 JOB_ID="${SLURM_JOB_ID:-manual}"
-FINAL_SHARD_DIR="$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards/shard-$SHARD_ID"
-TEMP_SHARD_DIR="$ARIA_DSS/tmp/$JOB_ID/rollouts/$RUN_ID/shard-$SHARD_ID.tmp"
+FINAL_SHARD_DIR="$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards/$SHARD_ID"
+TEMP_SHARD_DIR="$ARIA_DSS/tmp/$JOB_ID/rollouts/$RUN_ID/$SHARD_ID.tmp"
 
 cat <<DRYRUN
 ARIA-NBV LRZ rollout generation dry run
@@ -31,7 +33,8 @@ Slurm/Pyxis shape and expected DSS paths for a future rollout writer.
 
 Slurm:
   job_id: $JOB_ID
-  array_task_id: $SHARD_ID
+  array_task_id: $ARRAY_TASK_ID
+  shard_id: $SHARD_ID
   partition_hint: lrz-v100x2 for smoke, A100/H100 80GB class partitions for scale
   gpu_request: --gres=gpu:1
 
@@ -41,6 +44,7 @@ Enroot/Pyxis:
 
 DSS:
   oracle_or_dataset_version: $DATASET_VERSION
+  config_path: $CONFIG_PATH
   shard_manifest: $SHARD_MANIFEST
   temp_shard_dir: $TEMP_SHARD_DIR
   final_shard_dir: $FINAL_SHARD_DIR
@@ -51,8 +55,8 @@ Dry-run Pyxis launch shape:
   srun --ntasks=1 \\
     --container-image="$LRZ_CONTAINER_IMAGE" \\
     --container-mounts="$HOME:$HOME,$ARIA_DSS:$ARIA_DSS,$ARIA_REPO:$ARIA_REPO" \\
-    bash -lc 'cd "$ARIA_REPO/aria_nbv" && uv run <ROLLOUT_GENERATION_ENTRYPOINT> \\
-      --input-version "$DATASET_VERSION" \\
+    bash -lc 'cd "$ARIA_REPO/aria_nbv" && uv run nbv-build-rollouts \\
+      --config-path "$CONFIG_PATH" \\
       --shard-manifest "$SHARD_MANIFEST" \\
       --shard-id "$SHARD_ID" \\
       --output-tmp "$TEMP_SHARD_DIR" \\

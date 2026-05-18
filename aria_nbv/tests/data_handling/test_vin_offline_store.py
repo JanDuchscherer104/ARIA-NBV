@@ -899,6 +899,8 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     first = sample_dataset[0]
     assert first.scene_id == "scene-a"  # noqa: S101
     assert first.oracle.candidate_count == 2  # noqa: S101
+    assert first.source_shard_id == "shard-000000"  # noqa: S101
+    assert first.source_shard_row == 0  # noqa: S101
     assert int(first.oracle.rri.shape[0]) == 4  # noqa: S101
     assert torch.isnan(first.oracle.rri[2:]).all()  # noqa: S101
     assert int(first.vin_snippet.lengths[0].item()) == 2  # noqa: S101
@@ -937,6 +939,7 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     batch = batch_dataset[0]
     assert isinstance(batch, VinOracleBatch)  # noqa: S101
     assert batch.scene_id == "scene-a"  # noqa: S101
+    assert not hasattr(batch, "source_shard_id")  # noqa: S101
     assert int(batch.rri.shape[0]) == 4  # noqa: S101
     assert int(batch.resolved_candidate_count().item()) == 2  # noqa: S101
     assert batch.candidate_valid_mask().tolist() == [True, True, False, False]  # noqa: S101

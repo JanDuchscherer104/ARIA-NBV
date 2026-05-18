@@ -1,0 +1,124 @@
+# Copy this template to an untracked LRZ run config and replace every
+# /ABS/PATH/TO/ARIA_DSS and RUN_ID placeholder before planning shards.
+# Environment variables are intentionally not interpolated by ARIA-NBV configs.
+
+max_samples = 1
+require_label_valid = true
+verbosity = 1
+
+[source]
+split = "all"
+limit = 1
+return_format = "sample"
+include_efm_snippet = true
+include_gt_mesh = true
+load_backbone = true
+load_candidates = false
+load_depths = false
+load_candidate_pcs = false
+load_gt_obbs = true
+load_detected_obbs = true
+load_trajectory_metadata = true
+map_location = "cpu"
+verbosity = 1
+
+[source.store]
+store_dir = "/ABS/PATH/TO/ARIA_DSS/caches/vin/vin_offline"
+
+[target_selector]
+k = 3
+source_mode = "v1_actor_visible"
+policy = "greedy_top_k"
+match_gt = true
+
+[candidate_mixture.base]
+num_samples = 8
+oversample_factor = 1.0
+ensure_collision_free = true
+ensure_free_space = true
+min_distance_to_mesh = 0.2
+device = "cpu"
+verbosity = 1
+collect_rule_masks = true
+view_max_azimuth_deg = 0.0
+view_max_elevation_deg = 0.0
+
+[[candidate_mixture.components]]
+name = "target_point"
+count = 3
+strategy = "target_point"
+view_max_azimuth_deg = 0.0
+view_max_elevation_deg = 0.0
+
+[[candidate_mixture.components]]
+name = "radial_towards"
+count = 2
+strategy = "radial_towards"
+view_max_azimuth_deg = 0.0
+view_max_elevation_deg = 0.0
+
+[[candidate_mixture.components]]
+name = "radial_away"
+count = 2
+strategy = "radial_away"
+view_max_azimuth_deg = 0.0
+view_max_elevation_deg = 0.0
+
+[[candidate_mixture.components]]
+name = "forward_rig"
+count = 1
+strategy = "forward_rig"
+view_max_azimuth_deg = 0.0
+view_max_elevation_deg = 0.0
+
+[target_scorer]
+backprojection_stride = 12
+target_crop_margin_m = 0.05
+min_current_target_points = 1
+include_scene_rri = false
+verbosity = 1
+
+[target_scorer.depth]
+device = "cpu"
+max_candidates_final = 8
+resolution_scale = 0.2
+verbosity = 1
+
+[store]
+store_dir = "/ABS/PATH/TO/ARIA_DSS/data/staging/rollouts/RUN_ID/nonsharded_preview.zarr"
+target_protocol_version = "v1_observed"
+field_retention_policy = "compact_selected_heavy"
+source_offline_store_version = "vin-offline-v7"
+split_manifest_hash = "configured-at-runtime"
+discount_gamma = 1.0
+
+[[recipes]]
+name = "random_valid"
+selection_policy = "random_valid"
+horizon = 1
+branch_factor = 1
+seed = 0
+
+[[recipes]]
+name = "oracle_greedy"
+selection_policy = "oracle_greedy"
+horizon = 1
+branch_factor = 1
+seed = 0
+
+[[recipes]]
+name = "oracle_lookahead"
+selection_policy = "oracle_greedy"
+horizon = 2
+branch_factor = 2
+beam_width = 2
+seed = 0
+
+[[recipes]]
+name = "temperature_softmax"
+selection_policy = "temperature_softmax"
+horizon = 2
+branch_factor = 2
+beam_width = 2
+selection_temperature = 1.0
+seed = 0

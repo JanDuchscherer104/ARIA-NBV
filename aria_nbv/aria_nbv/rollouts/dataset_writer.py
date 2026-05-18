@@ -39,6 +39,7 @@ from ..pose_generation import (
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.fingerprints import stable_config_hash, stable_msgspec_hash
 from .manifest import RolloutStoreInvocation, RolloutStoreManifestContext, collect_runtime_provenance
+from .shard_manifest import RolloutShardEntry
 from .trace import INVALID_REASON_VERSION, RolloutLineage, RolloutZarrRecord
 from .zarr_store import (
     RolloutZarrStoreConfig,
@@ -241,7 +242,13 @@ class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
 
 @dataclass(frozen=True, slots=True)
 class _RolloutSourceLineageBuilder:
-    """Build deterministic source/config lineage values for rollout records."""
+    """Build deterministic source/config lineage values for rollout records.
+
+    The VIN offline sample index is the root-of-truth for source rows, but a
+    rollout shard may be planned from a source reader exposing `split="all"`.
+    Lineage therefore hashes the concrete selected row split when records are
+    split-local, matching the shard manifest used by LRZ array jobs.
+    """
 
     source_manifest_hash: str
     split_manifest_hash: str
@@ -252,11 +259,13 @@ class _RolloutSourceLineageBuilder:
         """Hash the source manifest and ordered source rows used by a rollout shard."""
 
         source_manifest_hash = stable_msgspec_hash(dataset.manifest)
+        records = dataset._records[:max_samples]
+        split = _lineage_split(records=records, fallback=dataset.config.split)
         return cls(
             source_manifest_hash=source_manifest_hash,
             split_manifest_hash=cls.build_split_manifest_hash(
                 source_manifest_hash=source_manifest_hash,
-                split=dataset.config.split,
+                split=split,
                 records=cls.dataset_records_for_hash(dataset, limit=max_samples),
             ),
             source_cache_version=str(dataset.manifest.version),
@@ -293,8 +302,8 @@ class _RolloutSourceLineageBuilder:
                     "scene_id": str(record.scene_id),
                     "snippet_id": str(record.snippet_id),
                     "split": str(record.split),
-                    "shard_id": str(record.shard_id),
-                    "row": int(record.row),
+                    "source_shard_id": str(record.shard_id),
+                    "source_shard_row": int(record.row),
                 }
             )
         return output
@@ -317,6 +326,11 @@ class RolloutDatasetWriter:
     step from updated history/budget, scores candidates by target RRI, and
     persists compact replay records. Heavy diagnostics should be retained only
     for selected actions or retained chains through the downstream Zarr policy.
+
+    This class is the handoff point between `data_handling` and
+    `pose_generation`: it reads immutable `VinOfflineSample` roots, calls the
+    finite-candidate counterfactual generator, and emits `RolloutZarrRecord`
+    objects that are stored independently of the VIN offline cache.
     """
 
     def __init__(self, config: RolloutDatasetWriterConfig) -> None:
@@ -326,17 +340,34 @@ class RolloutDatasetWriter:
         )
         self.stats = RolloutDatasetWriterStats()
 
-    def run(self, *, invocation: RolloutStoreInvocation | None = None) -> RolloutZarrWriteResult:
-        """Build the configured rollout store."""
+    def run(
+        self,
+        *,
+        invocation: RolloutStoreInvocation | None = None,
+        shard_entry: RolloutShardEntry | None = None,
+    ) -> RolloutZarrWriteResult:
+        """Build the configured rollout store.
+
+        In normal mode the configured source split and `max_samples` decide the
+        rows. In shard mode the `RolloutShardEntry` is authoritative: source
+        rows are filtered and ordered from the manifest, `max_samples` is
+        ignored, and source/config hash mismatches fail before generation.
+        """
 
         dataset = self.config.source.setup_target()
         if dataset is None:
             raise RuntimeError("VinOfflineDatasetConfig did not instantiate a dataset.")
+        if shard_entry is not None:
+            self._apply_shard_manifest(dataset, shard_entry)
         selector = ActorVisibleTargetSelector(self.config.target_selector)
         max_samples = (
-            len(dataset) if self.config.max_samples is None else min(int(self.config.max_samples), len(dataset))
+            len(dataset)
+            if shard_entry is not None or self.config.max_samples is None
+            else min(int(self.config.max_samples), len(dataset))
         )
         source_lineage = _RolloutSourceLineageBuilder.from_dataset(dataset, max_samples=max_samples)
+        if shard_entry is not None:
+            self._validate_shard_lineage(source_lineage, shard_entry)
         records = []
 
         for sample_index in range(max_samples):
@@ -400,6 +431,7 @@ class RolloutDatasetWriter:
                 writer_config=self.config.model_dump_jsonable(),
                 invocation=invocation or RolloutStoreInvocation.programmatic(),
                 runtime=collect_runtime_provenance(),
+                shard=None if shard_entry is None else shard_entry.to_jsonable(),
             ),
         )
         self.stats.rollouts_written = int(result.num_rollouts)
@@ -413,6 +445,52 @@ class RolloutDatasetWriter:
             f"path={result.store_dir}",
         )
         return result
+
+    def _apply_shard_manifest(self, dataset: VinOfflineDataset, shard_entry: RolloutShardEntry) -> None:
+        """Filter a source dataset to the ordered rows owned by one shard entry."""
+
+        shard_entry.validate()
+        records_by_shard_row = {(str(record.shard_id), int(record.row)): record for record in dataset._records}
+        selected_records = []
+        for row in shard_entry.rows:
+            record = records_by_shard_row.get((row.source_shard_id, int(row.source_shard_row)))
+            if record is None:
+                raise ValueError(
+                    f"Rollout shard {shard_entry.shard_id!r} row {row.order} is not exposed by the configured "
+                    f"VIN source split/limit: source_shard_id={row.source_shard_id!r} "
+                    f"source_shard_row={row.source_shard_row}."
+                )
+            if not row.matches_record(record):
+                raise ValueError(
+                    f"Rollout shard {shard_entry.shard_id!r} row {row.order} does not match the configured "
+                    "VIN source sample_index.jsonl record."
+                )
+            selected_records.append(record)
+        dataset._records = selected_records
+        dataset._record_by_pair = {(record.scene_id, record.snippet_id): record for record in selected_records}
+
+    @staticmethod
+    def _validate_shard_lineage(
+        source_lineage: _RolloutSourceLineageBuilder,
+        shard_entry: RolloutShardEntry,
+    ) -> None:
+        """Verify that the active dataset matches the requested shard manifest entry."""
+
+        if source_lineage.source_manifest_hash != shard_entry.source_manifest_hash:
+            raise ValueError(
+                f"Rollout shard {shard_entry.shard_id!r} source manifest hash mismatch: "
+                f"config source={source_lineage.source_manifest_hash} manifest={shard_entry.source_manifest_hash}."
+            )
+        if source_lineage.source_cache_version != shard_entry.source_cache_version:
+            raise ValueError(
+                f"Rollout shard {shard_entry.shard_id!r} source cache version mismatch: "
+                f"config source={source_lineage.source_cache_version} manifest={shard_entry.source_cache_version}."
+            )
+        if source_lineage.split_manifest_hash != shard_entry.split_manifest_hash:
+            raise ValueError(
+                f"Rollout shard {shard_entry.shard_id!r} split manifest hash mismatch: "
+                f"config source={source_lineage.split_manifest_hash} manifest={shard_entry.split_manifest_hash}."
+            )
 
     def _rollout_target(
         self,
@@ -490,6 +568,8 @@ class RolloutDatasetWriter:
                         source_sample_index=sample.sample_index,
                         source_sample_key=sample.sample_key,
                         split=sample.split,
+                        source_shard_id=sample.source_shard_id,
+                        source_shard_row=sample.source_shard_row,
                         source_offline_store_manifest_hash=source_lineage.source_manifest_hash,
                         split_manifest_hash=source_lineage.split_manifest_hash,
                         rollout_config_hash=source_lineage.config_hash(rollout_cfg),
@@ -532,6 +612,13 @@ class RolloutDatasetWriter:
         if self.config.target_selector.policy.value == "temperature_softmax_top_k":
             return float(self.config.target_selector.temperature)
         return None
+
+
+def _lineage_split(*, records: list[object], fallback: str) -> str:
+    """Return the concrete shard split when selected records do not mix splits."""
+
+    splits = {str(record.split) for record in records}
+    return next(iter(splits)) if len(splits) == 1 else str(fallback)
 
 
 __all__ = [
