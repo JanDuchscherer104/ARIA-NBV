@@ -44,6 +44,8 @@ VIN rows and raw ASE assets by stable lineage. Joined readers should present a
 single training/inspection view without copying backbone tensors, full meshes,
 or raw camera streams into every rollout sample.
 
+![Offline-to-rollout persisted relation](../../../docs/figures/diagrams/data_handling/typst/offline_rollout_relation_tree.svg)
+
 ![Data-store architecture](../../../docs/figures/diagrams/data_handling/mermaid/data_store_architecture.svg)
 
 The current implementation writes one standalone shard-like `rollouts.zarr`
@@ -72,6 +74,8 @@ sidecar.
 ### Immutable VIN Offline Store
 
 The canonical one-step offline format is a strict indexed-shard store:
+
+![VIN offline tdtr tree](../../../docs/figures/diagrams/data_handling/typst/vin_offline_tree.svg)
 
 ```text
 vin_offline/
@@ -115,6 +119,8 @@ without loading snippets, EVL, or writing shards.
 
 The implemented rollout writer currently writes one standalone shard-like
 `rollouts.zarr` store:
+
+![Rollout Zarr tdtr tree](../../../docs/figures/diagrams/data_handling/typst/rollout_zarr_tree.svg)
 
 ```text
 rollouts.zarr/
@@ -199,6 +205,9 @@ inspect it without loading candidate, step, target, or depth arrays.
 
 The target collection layout generalizes the standalone store to independently
 valid shards:
+
+![Target rollout collection tdtr tree](../../../docs/figures/diagrams/data_handling/typst/rollout_sharded_target_tree.svg)
+
 <!-- TODO: use the edges from tree .data/offline_cache/rollouts_v1_microset.zarr -L 2
 ├── candidates
 │   ├── actor_action_mask
@@ -420,6 +429,8 @@ selected target, one rollout chain, its step rows, and the candidate rows at
 those steps.
 
 ![Multi-step sample tree](../../../docs/figures/diagrams/data_handling/mermaid/multi_step_sample_tree.svg)
+
+![Multi-step sample tdtr tree](../../../docs/figures/diagrams/data_handling/typst/rollout_sample_tree.svg)
 
 Shape notation follows thesis notation: `H` is the rollout horizon, `N_q` is
 the padded candidate width, `N_t <= N_q` is the valid row count at step `t`,
