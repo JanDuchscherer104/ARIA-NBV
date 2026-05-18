@@ -106,6 +106,7 @@ class TargetCandidateRow:
     projected_area_fraction: float
     semidense_support_count: int
     evl_support_count: int
+    effective_support_count: float
     visibility_score: float
     support_score: float
     deficit_score: float
@@ -151,6 +152,29 @@ class TargetSelectionResult:
     temperature: float | None
     warnings: tuple[str, ...] = ()
     reason_code_version: str = TARGET_INVALID_REASON_VERSION
+
+    def diagnostic_summary(self) -> dict[str, int | float]:
+        """Return compact stratified counts for selector threshold audits."""
+
+        summary: dict[str, int | float] = {
+            "num_rows": len(self.rows),
+            "num_ranked": len(self.ranked_rows),
+            "num_selected": len(self.selected_rows),
+            "num_gt_label_valid": sum(1 for row in self.selected_rows if row.gt_label_valid),
+            "num_gt_unmatched": sum(1 for row in self.selected_rows if row.gt_match_status == "unmatched_gt"),
+            "num_gt_ambiguous": sum("ambiguous" in row.gt_match_status for row in self.selected_rows),
+            "num_duplicate_gt": sum(row.gt_match_status == "ambiguous_pred_to_gt" for row in self.selected_rows),
+            "num_missing_projection": sum(1 for row in self.rows if row.projected_area_pixels <= 0.0),
+        }
+        if self.rows:
+            summary["mean_confidence"] = sum(row.confidence for row in self.rows) / float(len(self.rows))
+            summary["mean_projected_area_pixels"] = sum(row.projected_area_pixels for row in self.rows) / float(
+                len(self.rows)
+            )
+            summary["mean_effective_support_count"] = sum(row.effective_support_count for row in self.rows) / float(
+                len(self.rows)
+            )
+        return summary
 
 
 @dataclass(slots=True)
@@ -208,11 +232,17 @@ class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
     projected_area_full_score_fraction: float = Field(default=0.05, gt=0.0)
     """Projected-area fraction that saturates the visibility score."""
 
-    min_support_points: int = Field(default=1, ge=1)
-    """Minimum semidense plus EVL points inside the target OBB."""
+    min_support_points: int = Field(default=3, ge=1)
+    """Minimum effective semidense plus weighted EVL points inside the target OBB."""
 
     support_saturation_points: int = Field(default=128, ge=1)
     """Support count at which the deficit score reaches zero."""
+
+    evl_support_weight: float = Field(default=1.0, ge=0.0)
+    """Weight applied to EVL support points when computing effective support."""
+
+    missing_projection_visibility_score: float = Field(default=0.35, ge=0.0, le=1.0)
+    """Visibility multiplier for supported targets without any actor-visible 2D projection."""
 
     obb_support_scale: float = Field(default=1.0, gt=0.0)
     """OBB scale used when counting semidense/EVL points inside a target."""
@@ -225,6 +255,9 @@ class TargetSelectorConfig(TargetConfig["ActorVisibleTargetSelector"]):
 
     min_gt_iou: float = Field(default=0.1, ge=0.0)
     """Minimum sampled 3D OBB IoU for a GT target match."""
+
+    min_gt_match_score: float = Field(default=0.05, ge=0.0)
+    """Minimum combined GT-match reliability score for V1 label acceptance."""
 
     gt_iou_samples: int = Field(default=8, ge=1)
     """Samples per dimension for EFM's sampled OBB IoU fallback."""
@@ -368,10 +401,10 @@ class ActorVisibleTargetSelector:
             relative_pose = (reference_pose.inverse() @ obb.T_world_object).tensor().detach().cpu().reshape(-1)
             projected_area = _max_projected_area(obb)
             projected_fraction = projected_area / float(self.config.projected_area_normalizer_pixels)
-            visibility_score = (
-                1.0
-                if projected_area <= 0.0 and not self.config.require_projected_visibility
-                else max(0.0, min(float(projected_fraction / self.config.projected_area_full_score_fraction), 1.0))
+            visibility_score = _visibility_score(
+                projected_area=projected_area,
+                projected_fraction=projected_fraction,
+                config=self.config,
             )
             semidense_count = _points_inside_count(obb, semidense_points, scale=self.config.obb_support_scale)
             evl_count = _points_inside_count(
@@ -380,16 +413,16 @@ class ActorVisibleTargetSelector:
                 scale=self.config.obb_support_scale,
                 positive_counts=evl_counts,
             )
-            total_support = semidense_count + evl_count
-            support_score = max(0.0, min(float(total_support / float(self.config.min_support_points)), 1.0))
+            effective_support = float(semidense_count) + float(self.config.evl_support_weight) * float(evl_count)
+            support_score = max(0.0, min(float(effective_support / float(self.config.min_support_points)), 1.0))
             deficit_score = 1.0 - max(
-                0.0, min(float(total_support / float(self.config.support_saturation_points)), 1.0)
+                0.0, min(float(effective_support / float(self.config.support_saturation_points)), 1.0)
             )
             reason_bitset = _target_reason_bitset(
                 obb=obb,
                 confidence=confidence,
                 projected_area=projected_area,
-                total_support=total_support,
+                effective_support=effective_support,
                 config=self.config,
             )
             eligible = reason_bitset == (1 << TARGET_INVALID_REASON_CODES["VALID"])
@@ -423,6 +456,7 @@ class ActorVisibleTargetSelector:
                     projected_area_fraction=float(projected_fraction),
                     semidense_support_count=int(semidense_count),
                     evl_support_count=int(evl_count),
+                    effective_support_count=float(effective_support),
                     visibility_score=float(visibility_score),
                     support_score=float(support_score),
                     deficit_score=float(deficit_score),
@@ -518,15 +552,16 @@ class ActorVisibleTargetSelector:
                 matched.append(replace(row, gt_match_status="unmatched_gt"))
                 continue
             pred = ObbTW(pred_obbs._data[pred_index].unsqueeze(0))
-            candidate_matches: list[tuple[int, float]] = []
+            candidate_matches: list[tuple[int, float, float]] = []
             for gt_index in range(int(gt_obbs.shape[0])):
                 gt = ObbTW(gt_obbs._data[gt_index].unsqueeze(0))
                 if int(gt.sem_id.reshape(-1)[0].item()) != row.sem_id:
                     continue
                 iou = _safe_obb_iou(pred, gt, samples=self.config.gt_iou_samples)
-                if iou >= self.config.min_gt_iou:
-                    candidate_matches.append((gt_index, iou))
-            candidate_matches.sort(key=lambda item: item[1], reverse=True)
+                match_score = _gt_match_score(iou=iou, row=row)
+                if iou >= self.config.min_gt_iou and match_score >= self.config.min_gt_match_score:
+                    candidate_matches.append((gt_index, iou, match_score))
+            candidate_matches.sort(key=lambda item: item[2], reverse=True)
             if not candidate_matches:
                 matched.append(
                     replace(
@@ -542,14 +577,14 @@ class ActorVisibleTargetSelector:
                 )
                 continue
             if len(candidate_matches) > 1 and (
-                candidate_matches[0][1] - candidate_matches[1][1] <= self.config.gt_ambiguity_margin
+                candidate_matches[0][2] - candidate_matches[1][2] <= self.config.gt_ambiguity_margin
             ):
                 matched.append(
                     replace(
                         row,
                         gt_label_valid=False,
                         gt_match_iou=float(candidate_matches[0][1]),
-                        gt_match_score=float(candidate_matches[0][1]),
+                        gt_match_score=float(candidate_matches[0][2]),
                         gt_match_status="ambiguous_gt",
                         invalid_reason_bitset=_target_failure_bitset(
                             row.invalid_reason_bitset,
@@ -559,7 +594,7 @@ class ActorVisibleTargetSelector:
                     )
                 )
                 continue
-            gt_index, best_iou = candidate_matches[0]
+            gt_index, best_iou, best_match_score = candidate_matches[0]
             gt_source_index = int(gt_source_indices[gt_index])
             matched.append(
                 replace(
@@ -575,7 +610,7 @@ class ActorVisibleTargetSelector:
                         source_index=gt_source_index,
                     ),
                     gt_match_iou=float(best_iou),
-                    gt_match_score=float(best_iou),
+                    gt_match_score=float(best_match_score),
                     gt_match_status="matched",
                 )
             )
@@ -758,12 +793,33 @@ def _max_projected_area(obb: ObbTW) -> float:
     return max(areas) if areas else 0.0
 
 
+def _visibility_score(
+    *,
+    projected_area: float,
+    projected_fraction: float,
+    config: TargetSelectorConfig,
+) -> float:
+    """Compute a smooth actor-visible projected-area score."""
+
+    if projected_area <= 0.0:
+        return 0.0 if config.require_projected_visibility else float(config.missing_projection_visibility_score)
+    normalized = max(0.0, min(float(projected_fraction / config.projected_area_full_score_fraction), 1.0))
+    return float(normalized * normalized * (3.0 - 2.0 * normalized))
+
+
+def _gt_match_score(*, iou: float, row: TargetCandidateRow) -> float:
+    """Combine geometric overlap and observed support into a match reliability score."""
+
+    support_visibility = max(0.0, min(float(row.support_score * row.visibility_score), 1.0))
+    return float(max(0.0, iou) * support_visibility)
+
+
 def _target_reason_bitset(
     *,
     obb: ObbTW,
     confidence: float,
     projected_area: float,
-    total_support: int,
+    effective_support: float,
     config: TargetSelectorConfig,
 ) -> int:
     bitset = 0
@@ -780,7 +836,7 @@ def _target_reason_bitset(
             bitset |= 1 << TARGET_INVALID_REASON_CODES["NO_PROJECTED_VISIBILITY"]
         if projected_area < config.min_projected_area_pixels:
             bitset |= 1 << TARGET_INVALID_REASON_CODES["PROJECTED_AREA_TOO_SMALL"]
-    if total_support < config.min_support_points:
+    if effective_support < config.min_support_points:
         bitset |= 1 << TARGET_INVALID_REASON_CODES["TARGET_SUPPORT_TOO_LOW"]
     return (1 << TARGET_INVALID_REASON_CODES["VALID"]) if bitset == 0 else bitset
 

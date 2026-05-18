@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from math import radians
 from typing import TYPE_CHECKING, Protocol
 
 import torch
@@ -13,6 +14,8 @@ from .geometry import point_mesh_distance
 from .types import CandidateContext, CollisionBackend
 
 if TYPE_CHECKING:
+    from efm3d.aria.pose import PoseTW
+
     from .candidate_generation import CandidateViewGeneratorConfig
 
 
@@ -172,6 +175,64 @@ class PathCollisionRule(RuleBase):
         ctx.invalidate(collide)
 
 
+class MotionRealismRule(RuleBase):
+    """Reject candidates that violate local egocentric motion bounds."""
+
+    def __call__(self, ctx: CandidateContext) -> None:
+        """Apply step, height, backward-motion, and yaw-change constraints."""
+
+        if ctx.centers_world is None or ctx.mask_valid is None or ctx.shell_poses is None:
+            return
+
+        reject = torch.zeros(ctx.centers_world.shape[0], device=ctx.centers_world.device, dtype=torch.bool)
+        offsets_ref = ctx.shell_offsets_ref
+        if offsets_ref is None:
+            offsets_ref = ctx.reference_pose.inverse().transform(ctx.centers_world)
+
+        step_length = torch.linalg.norm(offsets_ref, dim=1)
+        if ctx.cfg.collect_debug_stats:
+            ctx.mark_debug("motion_step_length_m", step_length)
+        if self.config.max_step_distance_m is not None:
+            reject |= step_length > float(self.config.max_step_distance_m)
+
+        height_delta = (ctx.centers_world[:, 1] - ctx.reference_pose.t.reshape(1, 3)[:, 1]).abs()
+        if ctx.cfg.collect_debug_stats:
+            ctx.mark_debug("motion_height_delta_m", height_delta)
+        if self.config.max_height_delta_m is not None:
+            reject |= height_delta > float(self.config.max_height_delta_m)
+
+        backward_step = (-offsets_ref[:, 2]).clamp_min(0.0)
+        if ctx.cfg.collect_debug_stats:
+            ctx.mark_debug("motion_backward_step_m", backward_step)
+        if self.config.max_backward_step_m is not None:
+            reject |= backward_step > float(self.config.max_backward_step_m)
+
+        yaw_delta = _forward_yaw_delta(ctx.reference_pose, ctx.shell_poses)
+        if ctx.cfg.collect_debug_stats:
+            ctx.mark_debug("motion_yaw_delta_rad", yaw_delta)
+        if self.config.max_yaw_delta_deg is not None:
+            reject |= yaw_delta > radians(float(self.config.max_yaw_delta_deg))
+
+        if ctx.cfg.collect_debug_stats:
+            ctx.mark_debug("motion_realism_reject_mask", reject)
+        ctx.invalidate(reject)
+
+
+def _forward_yaw_delta(reference_pose: "PoseTW", shell_poses: "PoseTW") -> torch.Tensor:
+    """Return horizontal forward-axis angle from reference to shell poses."""
+
+    ref_forward = reference_pose.R.reshape(-1, 3, 3)[0, :, 2]
+    cand_forward = shell_poses.R.reshape(-1, 3, 3)[:, :, 2]
+    ref_h = ref_forward.clone()
+    cand_h = cand_forward.clone()
+    ref_h[1] = 0.0
+    cand_h[:, 1] = 0.0
+    ref_h = ref_h / ref_h.norm().clamp_min(1e-8)
+    cand_h = cand_h / cand_h.norm(dim=1, keepdim=True).clamp_min(1e-8)
+    cos = (cand_h * ref_h.reshape(1, 3)).sum(dim=1).clamp(-1.0, 1.0)
+    return torch.acos(cos)
+
+
 class FreeSpaceRule(RuleBase):
     """Restrict candidate centers to a world-space AABB."""
 
@@ -197,4 +258,4 @@ class FreeSpaceRule(RuleBase):
         ctx.mask_valid = ctx.mask_valid & in_box
 
 
-__all__ = ["Rule", "RuleBase", "MinDistanceToMeshRule", "PathCollisionRule", "FreeSpaceRule"]
+__all__ = ["Rule", "RuleBase", "MinDistanceToMeshRule", "MotionRealismRule", "PathCollisionRule", "FreeSpaceRule"]

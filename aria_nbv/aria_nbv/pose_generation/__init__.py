@@ -18,6 +18,7 @@ from .candidate_mixture import (
     CandidateMixtureComponentConfig,
     CandidateMixtureViewGenerator,
     CandidateMixtureViewGeneratorConfig,
+    candidate_position_id,
     candidate_strategy_id,
 )
 from .counterfactuals import (
@@ -43,6 +44,7 @@ from .target_counterfactuals import (
 )
 from .types import (
     CandidateGenerationRuntimeContext,
+    CandidatePositionMode,
     CandidateSamplingResult,
     CollisionBackend,
     SamplingStrategy,
@@ -61,7 +63,9 @@ __all__ = [
     "CandidateMixtureViewGenerator",
     "CandidateMixtureViewGeneratorConfig",
     "CandidateGenerationRuntimeContext",
+    "CandidatePositionMode",
     "ViewDirectionMode",
+    "candidate_position_id",
     "candidate_strategy_id",
     "CounterfactualPoseGenerator",
     "CounterfactualPoseGeneratorConfig",

@@ -138,7 +138,7 @@ rollouts.zarr/
     field_retention_policy              # JSON string bytes
   dictionaries/
     scene, snippet, split               # JSON string-list bytes
-    policy, rollout, transition         # JSON string-list bytes
+    policy, rollout                     # JSON string-list bytes
     target, class_name, target_source   # JSON string-list bytes
     config, score_source, ...           # JSON string-list bytes
   sources/
@@ -166,7 +166,10 @@ rollouts.zarr/
     horizon                             # int16[R]
     branch_factor, beam_width           # int16[R]
     root_pose_world                     # float32[R, 12]
+    root_time_ns                        # int64[R], -1 if unavailable
+    root_trajectory_index, root_frame_index # int32[R], -1 if unavailable
     final_cumulative_target_rri         # float32[R]
+    final_cumulative_target_root_gain   # float32[R], default Q_H return
   lineage/
     rollout_row_id                      # int64[R]
     candidate_config_id                 # int32[R] -> dictionaries/config
@@ -182,6 +185,7 @@ rollouts.zarr/
     num_candidates                      # int32[T]
     num_valid_candidates                # int32[T]
     cumulative_target_rri               # float32[T]
+    cumulative_target_root_gain         # float32[T]
   candidates/
     candidate_row_id                    # int64[C]
     step_row_id                         # int64[C] -> steps/step_row_id
@@ -196,6 +200,9 @@ rollouts.zarr/
     selected_mask                       # bool[C]
     target_rri                          # float32[C]
     scene_rri                           # float32[C]
+    target_root_gain, scene_root_gain   # float32[C], root-normalized rewards
+    target_log_error_gain               # float32[C], diagnostic
+    target_pm_dist_before/after         # float32[C], diagnostic
     strategy_id, mixture_id             # int32[C]
     invalid_reason_bitset               # uint32[C]
   selected_depth/
@@ -205,6 +212,13 @@ rollouts.zarr/
     valid_mask                          # compressed bool[T, 240, 240]
     focal_px, principal_point_px        # float32[T, 2]
     image_size_hw                       # int32[T, 2]
+  target_eval_crops/
+    crop_row_id                         # int64[K]
+    step_row_id                         # int64[K] -> steps/step_row_id
+    candidate_row_id                    # int64[K], -1 for current eval crop
+    source_role_id                      # int32[K], current_eval/candidate_eval
+    points_world                        # float32[K, 50000, 3], oracle/eval-only
+    lengths, mask                       # int32[K], bool[K, 50000]
   q_h/
     state_step_row_id                   # int64[T]
     source_row_id                       # int64[T]
@@ -214,15 +228,14 @@ rollouts.zarr/
     target_row_id                       # int64[T]
     selected_candidate_index            # int32[T]
     one_step_target_rri                 # float32[T, N_q]
-    one_step_scene_rri                  # float32[T, N_q]
-    bootstrap_next_step_row_id          # int64[T, N_q]
-    terminal_mask                       # bool[T, N_q]
+    one_step_target_root_gain           # float32[T, N_q], training reward field
     invalid_reason_bitset               # uint32[T, N_q]
     td_selected_candidate_row_id        # int64[T]
-    td_reward_target_rri                # float32[T]
+    td_reward                           # float32[T], selected target_root_gain
+    td_reward_target_rri                # float32[T], diagnostic state-relative RRI
     td_next_step_row_id                 # int64[T]
     td_terminal_mask                    # bool[T]
-    td_discount, discount               # float32 transition scalars
+    td_discount                         # float32[T], selected-transition discount
 ```
 
 `zarr.json` stays compact for Zarr tooling: schema id/version, manifest
@@ -244,13 +257,10 @@ valid shards:
 ├── candidates
 │   ├── actor_action_mask
 │   ├── candidate_row_id
-│   ├── candidate_valid_mask
 │   ├── compact_valid_index
-│   ├── heavy_diag_available_mask
 │   ├── invalid_reason_bitset
 │   ├── mixture_id
 │   ├── oracle_label_mask
-│   ├── padded_mask
 │   ├── pose_relative_root
 │   ├── pose_world_cam
 │   ├── primary_invalid_reason
@@ -260,7 +270,6 @@ valid shards:
 │   ├── scene_rri
 │   ├── score_source_id
 │   ├── selected_mask
-│   ├── selection_entropy
 │   ├── selection_logits
 │   ├── selection_log_probabilities
 │   ├── selection_probabilities
@@ -350,7 +359,6 @@ valid shards:
 │   ├── selected_shell_index
 │   ├── step_index
 │   ├── step_row_id
-│   ├── transition_id
 │   └── zarr.json
 ├── targets
 │   ├── gt_label_valid_mask
@@ -499,7 +507,8 @@ multi_step_sample/
     horizon                             # H; int16[1]
     branch_factor, beam_width           # int16[1]
     random_seed                         # int64[1]
-    final_cumulative_target_rri         # G_0^(H); float32[1]
+    final_cumulative_target_root_gain   # G_0^(H); float32[1], default return
+    final_cumulative_target_rri         # state-relative diagnostic; float32[1]
     final_cumulative_scene_rri          # scene diagnostic; float32[1]
   steps/                                # t = 0..H-1; up to H rows
     step_000/
@@ -507,7 +516,8 @@ multi_step_sample/
       step_index                        # int16[1], t
       selected_candidate_row_id         # int64[1], q_(t,i*)
       selected_shell_index              # int32[1], i*
-      cumulative_target_rri             # sum of selected r_t^e so far; float32[1]
+      cumulative_target_root_gain       # selected root-normalized gain so far; float32[1]
+      cumulative_target_rri             # diagnostic sum; float32[1]
       candidates/                       # cal(Q)_t; padded N_q rows
         candidate_row_id                # int64[N_q]
         shell_index                     # int32[N_q], i
@@ -520,7 +530,8 @@ multi_step_sample/
         q_train_mask                    # bool[N_q]
         selected_mask                   # bool[N_q]
         invalid_reason_bitset           # rho_(t,i); uint32[N_q]
-        target_rri                      # r_t^e(q_(t,i)); float32[N_q]
+        target_root_gain                # default reward; float32[N_q]
+        target_rri                      # state-relative diagnostic; float32[N_q]
         scene_rri                       # scene diagnostic; float32[N_q]
       selected_action_depth             # backlink to selected_depth/ row
     step_001/
@@ -530,13 +541,14 @@ multi_step_sample/
     candidate_row_id                    # int64[H, N_q]
     valid_action_mask                   # m_(t,i); bool[H, N_q]
     q_train_mask                        # bool[H, N_q]
-    one_step_target_rri                 # r_t^e; float32[H, N_q]
-    one_step_scene_rri                  # float32[H, N_q]
+    one_step_target_root_gain           # default reward; float32[H, N_q]
+    one_step_target_rri                 # diagnostic r_t^e; float32[H, N_q]
     selected_candidate_index            # int32[H]
-    td_reward_target_rri                # selected r_t^e; float32[H]
+    td_reward                           # selected target_root_gain; float32[H]
+    td_reward_target_rri                # diagnostic selected r_t^e; float32[H]
     td_next_step_row_id                 # selected transition link; int64[H]
-    bootstrap_next_step_row_id          # selected-action bootstrap link; int64[H, N_q]
-    terminal_mask                       # d_t; bool[H, N_q]
+    td_terminal_mask                    # selected-transition terminal flag; bool[H]
+    td_discount                         # selected-transition discount; float32[H]
     invalid_reason_bitset               # uint32[H, N_q]
 ```
 
@@ -568,7 +580,8 @@ Expected invalidity handling:
 - Candidate-level invalidity stays inside `candidates/` because invalid actions
   are part of the finite action set and future invalidity learning.
 - `q_train_mask` requires an actor-selectable candidate, a valid target record,
-  a valid GT label, a finite target-RRI label, and a non-padded row.
+  a valid GT label, a finite target-root-gain reward, finite diagnostic
+  target-RRI, and a non-padded row.
 
 ## Depth Retention Profiles
 
@@ -613,7 +626,7 @@ Current compatibility gates:
 
 - VIN offline stores must match `OFFLINE_DATASET_VERSION`, currently `7`.
 - Rollout stores must match `ROLLOUT_ZARR_SCHEMA_VERSION`, currently
-  `0.5-selected-depth`.
+  `0.7-root-gain-target-crops`.
 - A rollout store with the current schema can still be untrusted if validation
   reports missing `manifest.json`, empty `sources/source_shard_id`, negative
   `sources/source_shard_row`, or another lineage error.

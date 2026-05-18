@@ -29,7 +29,7 @@ flowchart LR
   end
 
   subgraph Rollout["Manifest-backed rollout shard"]
-    RollRoot["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr/}}\\\\\\text{schema 0.5 selected-depth shard}\\end{array}$$"]
+    RollRoot["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr/}}\\\\\\text{schema 0.6 rollout-core shard}\\end{array}$$"]
     RollZarr["$$\\begin{array}{c}\\texttt{zarr.json}\\\\\\text{compact attrs + manifest hash}\\end{array}$$"]
     RollManifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\text{resolved config + provenance}\\end{array}$$"]
     RollDict["$$\\begin{array}{c}\\texttt{dictionaries/}\\\\\\text{string dictionaries}\\end{array}$$"]

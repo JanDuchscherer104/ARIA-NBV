@@ -40,7 +40,7 @@ For multi-step offline sample generation, override generic high-priority sorting
 with this dependency order until the rollout/Q_H path is producing trusted
 samples:
 
-1. `issue-007` / `todo-007`: M1 data/cache/oracle contract gate.
+1. `issue-007` / `todo-007` plus `issue-031`: M1 data/cache/oracle contract gate and homogeneous RRI eval-stream lineage.
 2. `issue-021` / `todo-031`: invalidity as hard masks and reason codes.
 3. `issue-020` / `todo-005`, `todo-029`, `todo-053`, `todo-028`: target RRI,
    observed target selection, V1 OBS-SEL / PRED-Q / GT-EVAL, and target-aware

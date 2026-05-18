@@ -876,6 +876,26 @@ resolved_at = "2026-05-15"
 resolution_note = "Implemented VinOfflineSample source_shard_id/source_shard_row propagation, rollout lineage persistence, manifest source_shard coverage, and validation for missing source shard lineage."
 resolved_from = ".agents/todos.toml"
 
+[[todo]]
+id = "todo-079"
+title = "Implement ASE-depth-root RRI eval stream and root-normalized rollout rewards"
+description = "Finish and validate the oracle label contract that builds P_eval from ASE observed-prefix GT depth roots plus rendered counterfactual candidates, while keeping MPS semi-dense actor-visible only."
+priority = "high"
+status = "resolved"
+labels = ["rri", "depth", "rollouts", "oracle", "contracts", "thesis"]
+issue_ids = ["issue-031", "issue-007", "issue-010", "issue-018"]
+loc_min = 260
+loc_expected = 700
+loc_max = 1500
+context = ["GPT5.5 Pro's RRI mismatch review and follow-up local inspection agreed that semi-dense-root RRI biases first counterfactual steps because later steps compare dense candidate views against dense-fused history.", "The chosen thesis-core lane uses ASE `rgb/distance_m` GT depth for logged observed-prefix root frames, rendered PyTorch3D depth for counterfactual candidates, canonical fusion before scoring, and root-normalized additive gain for rollout/Q_H rewards.", "ASE depth is ray distance in metres after ATEK preprocessing; it must use EFM3D ray-distance unprojection and must not be passed through the PyTorch3D z-depth unprojection path.", "Actor-visible geometry remains MPS semi-dense/EVL/observed target data. GT depth, GT meshes, GT crops, and rendered candidate points are oracle label/evaluation assets."]
+references = ["repo:.agents/issues.toml#issue-031", "repo:.agents/work/rri-metrics/dense-semidense-rri-missmatch.md", "repo:aria_nbv/aria_nbv/rri_metrics/eval_pointclouds.py", "repo:aria_nbv/aria_nbv/rri_metrics/oracle_rri.py", "repo:aria_nbv/aria_nbv/pose_generation/counterfactuals.py", "repo:aria_nbv/aria_nbv/pose_generation/target_counterfactuals.py", "repo:aria_nbv/aria_nbv/data_handling/efm_views.py", "repo:external/efm3d/efm3d/utils/depth.py", "url:https://facebookresearch.github.io/projectaria_tools/docs/open_datasets/aria_synthetic_environments_dataset/ase_data_format", "bib:ProjectAria-ASE-2025", "bib:EFM3D-straub2024"]
+implementation_notes = ["Keep `ase_gt_depth_root` as the default eval point-cloud source for scene and target rollout scorers; keep `legacy_semidense_root` explicitly labeled as diagnostic.", "Build root eval points from all observed RGB/depth frames up to the rollout reference pose; for the default final-pose root this is the full snippet.", "Use `dist_im_to_point_cloud_im` for ASE ray-distance maps, filter finite depths >0 and <= zfar/default 20m, transform camera->rig->world with PoseTW, then canonical-fuse root/history points.", "Score rendered candidate point clouds against the canonical current eval state; persist state-relative RRI, root-normalized gain, root error, and log-error gain diagnostics.", "Add rendered-logged-depth root as a future parity ablation only after it can share renderer/backprojection lineage with candidate renders."]
+acceptance = ["Default scene and target oracle rollout scorers no longer use MPS semi-dense points as current evaluation geometry.", "Missing `rgb/distance_m` fails explicitly for ASE-depth-root mode instead of silently falling back to semi-dense.", "Observed-prefix root frame selection excludes frames after a non-final reference pose.", "Root-normalized gain is the default rollout score, while state-relative RRI remains present as a diagnostic metric.", "Legacy semi-dense-root RRI can still be requested explicitly for comparisons.", "Targeted tests cover ASE depth root construction, missing-depth failure, observed-prefix frame policy, canonical fusion, and root-normalized return preference."]
+verification = ["cd aria_nbv && uv run pytest tests/rri_metrics/test_eval_pointclouds.py tests/rri_metrics/test_rollout_metrics.py", "cd aria_nbv && uv run pytest tests/pose_generation/test_counterfactuals.py", "cd aria_nbv && uv run ruff check aria_nbv/rri_metrics aria_nbv/pose_generation tests/rri_metrics/test_eval_pointclouds.py tests/rri_metrics/test_rollout_metrics.py tests/pose_generation/test_counterfactuals.py", "make agents-db AGENTS_ARGS='validate'", "make agents-db"]
+resolved_at = "2026-05-18"
+resolution_note = "ASE-depth-root RRI eval stream and root-normalized rollout reward defaults are implemented and validated by targeted eval_pointclouds, rollout_metrics, and counterfactual tests. Remaining downstream lineage/audit propagation stays tracked by issue-031 and related target/rollout todos."
+resolved_from = ".agents/todos.toml"
+
 [[refactor]]
 id = "refactor-013"
 title = "Pilot optional OMX and Codex templates after scaffold cleanup"

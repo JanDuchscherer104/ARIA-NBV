@@ -28,9 +28,11 @@ silently converted to scene-level labels.
 from __future__ import annotations
 
 import torch
+from pydantic import Field
 
 from aria_nbv.utils.base_config import TargetConfig
 
+from .eval_pointclouds import canonical_fuse_points
 from .metrics import chamfer_point_mesh, chamfer_point_mesh_batched
 from .types import RriResult
 
@@ -42,12 +44,18 @@ class OracleRRIConfig(TargetConfig["OracleRRI"]):
     def target_type(self) -> type["OracleRRI"]:
         return OracleRRI
 
+    fusion_voxel_size_m: float = Field(default=0.0, ge=0.0)
+    """Optional deterministic voxel-fusion size for ``P_t`` and ``P_t ∪ P_q``."""
+
+    fusion_max_points: int | None = Field(default=None, ge=1)
+    """Optional deterministic point cap applied after voxel fusion."""
+
 
 class OracleRRI:
     """Facade to compute oracle RRI for one or more candidates.
 
     Conceptual steps:
-        1. Merge ``P_t`` (semi-dense SLAM) with candidate view point cloud
+        1. Merge ``P_t`` (current eval points) with candidate view point cloud
            ``P_q`` to obtain ``P_{t∪q}``.
         2. (Optional) Voxel-downsample both ``P_t`` and ``P_{t∪q}`` to ensure
            comparable density when evaluating point-mesh distances.
@@ -74,7 +82,7 @@ class OracleRRI:
         """Compute RRI for one or more candidates in a single forward pass.
 
         Args:
-            points_t: ``Tensor['N_t', 3]`` semi-dense SLAM point cloud up to time *t*.
+            points_t: ``Tensor['N_t', 3]`` current eval point cloud up to time *t*.
             points_q: ``Tensor['N_q', 3]`` candidate-view point cloud rendered from GT.
             gt_verts: ``Tensor['V', 3]`` ground-truth mesh vertices.
             gt_faces: ``Tensor['F', 3]`` ground-truth mesh face indices (int64).
@@ -86,11 +94,25 @@ class OracleRRI:
         gt_verts_crop, gt_faces_crop = _crop_mesh_to_aabb(gt_verts, gt_faces, extend)
         lengths_q = lengths_q.to(device=points_q.device)
 
+        points_t = canonical_fuse_points(
+            points_t,
+            voxel_size_m=float(self.config.fusion_voxel_size_m),
+            max_points=self.config.fusion_max_points,
+        )
         dist_before = chamfer_point_mesh(points_t, gt_verts_crop, gt_faces_crop)
-        num_t = points_t.shape[0]
-        points_t_exp = points_t.unsqueeze(0).expand(points_q.shape[0], num_t, 3)
-        points_tq = torch.cat([points_t_exp, points_q], dim=1)
-        lengths_tq = lengths_q + num_t
+        if self.config.fusion_voxel_size_m > 0.0 or self.config.fusion_max_points is not None:
+            points_tq, lengths_tq = _canonical_fused_unions(
+                points_t=points_t,
+                points_q=points_q,
+                lengths_q=lengths_q,
+                voxel_size_m=float(self.config.fusion_voxel_size_m),
+                max_points=self.config.fusion_max_points,
+            )
+        else:
+            num_t = points_t.shape[0]
+            points_t_exp = points_t.unsqueeze(0).expand(points_q.shape[0], num_t, 3)
+            points_tq = torch.cat([points_t_exp, points_q], dim=1)
+            lengths_tq = lengths_q + num_t
 
         dist_after = chamfer_point_mesh_batched(points_tq, lengths_tq, gt_verts_crop, gt_faces_crop)
 
@@ -165,6 +187,77 @@ def _crop_mesh_to_aabb(
     verts_crop = verts[unique_idx]
     faces_crop = new_idx.reshape(faces_kept.shape)
     return verts_crop, faces_crop
+
+
+def _canonical_fused_unions(
+    *,
+    points_t: torch.Tensor,
+    points_q: torch.Tensor,
+    lengths_q: torch.Tensor,
+    voxel_size_m: float,
+    max_points: int | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Fuse each ``P_t ∪ P_q`` row while reserving capped budget for ``P_q``.
+
+    If ``P_t`` is already at the global point cap, fusing the raw union with
+    the same cap can erase newly observed candidate evidence. The capped path
+    therefore keeps a deterministic source-balanced slice: candidate points get
+    all requested budget up to half of the cap, and root/current eval points get
+    the remainder. This preserves candidate-added voxels while keeping the
+    total distance batch bounded.
+    """
+
+    rows: list[torch.Tensor] = []
+    lengths: list[int] = []
+    for row_index in range(points_q.shape[0]):
+        q_len = int(lengths_q[row_index].detach().cpu().item())
+        query = canonical_fuse_points(points_q[row_index, :q_len, :3], voxel_size_m=voxel_size_m, max_points=None)
+        if max_points is None:
+            fused = canonical_fuse_points(
+                torch.cat([points_t, query], dim=0),
+                voxel_size_m=voxel_size_m,
+                max_points=None,
+            )
+        else:
+            fused = _source_balanced_capped_union(
+                points_t=points_t,
+                points_q=query,
+                voxel_size_m=voxel_size_m,
+                max_points=int(max_points),
+            )
+        rows.append(fused)
+        lengths.append(int(fused.shape[0]))
+
+    max_len = max(max(lengths), 1)
+    padded = torch.zeros((points_q.shape[0], max_len, 3), device=points_q.device, dtype=points_q.dtype)
+    for row_index, row in enumerate(rows):
+        if row.numel() > 0:
+            padded[row_index, : row.shape[0], :] = row
+    return padded, torch.tensor(lengths, device=points_q.device, dtype=torch.long)
+
+
+def _source_balanced_capped_union(
+    *,
+    points_t: torch.Tensor,
+    points_q: torch.Tensor,
+    voxel_size_m: float,
+    max_points: int,
+) -> torch.Tensor:
+    """Return a deterministic capped union that cannot drop all query points."""
+
+    if max_points < 1:
+        raise ValueError("max_points must be positive when source-balanced union capping is requested.")
+    root = canonical_fuse_points(points_t, voxel_size_m=voxel_size_m, max_points=None)
+    query = canonical_fuse_points(points_q, voxel_size_m=voxel_size_m, max_points=None)
+    if root.shape[0] + query.shape[0] <= max_points:
+        return canonical_fuse_points(torch.cat([root, query], dim=0), voxel_size_m=0.0, max_points=None)
+    if query.numel() == 0:
+        return canonical_fuse_points(root, voxel_size_m=0.0, max_points=max_points)
+    query_budget = min(int(query.shape[0]), max(1, min(max_points, max_points // 2)))
+    root_budget = max(0, max_points - query_budget)
+    root_keep = canonical_fuse_points(root, voxel_size_m=0.0, max_points=root_budget)
+    query_keep = canonical_fuse_points(query, voxel_size_m=0.0, max_points=query_budget)
+    return torch.cat([root_keep, query_keep], dim=0)
 
 
 __all__ = ["OracleRRI", "OracleRRIConfig"]

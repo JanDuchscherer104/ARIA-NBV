@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from math import radians
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,13 @@ from pydantic import Field, field_validator, model_validator
 
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
+from ..rri_metrics.eval_pointclouds import (
+    RootEvalPointCloud,
+    RriEvaluationPointCloudSource,
+    RriRewardMode,
+    build_root_eval_pointcloud,
+    canonical_fuse_points,
+)
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.frames import rotate_yaw_cw90
@@ -58,6 +66,172 @@ def _pose_at(poses: PoseTW, index: int) -> PoseTW:
     return ensure_unbatched_pose(poses[index])
 
 
+def _pose_token(pose: PoseTW) -> tuple[float, ...]:
+    tensor = ensure_unbatched_pose(pose).tensor().detach().cpu().reshape(-1)
+    return tuple(round(float(value), 6) for value in tensor.tolist())
+
+
+def _root_token(trajectory: "CounterfactualTrajectory") -> tuple[float, ...]:
+    return (
+        *_pose_token(trajectory.root_pose_world),
+        float(-1 if trajectory.root_time_ns is None else trajectory.root_time_ns),
+        float(-1 if trajectory.root_trajectory_index is None else trajectory.root_trajectory_index),
+        float(-1 if trajectory.root_frame_index is None else trajectory.root_frame_index),
+    )
+
+
+def _exact_pose_index(poses: PoseTW, pose: PoseTW) -> int | None:
+    pose_rows = poses.tensor().reshape(-1, 12)
+    query = ensure_unbatched_pose(pose).tensor().reshape(1, 12).to(device=pose_rows.device, dtype=pose_rows.dtype)
+    matches = torch.isclose(pose_rows, query, atol=1e-5, rtol=1e-5).all(dim=1)
+    indices = torch.nonzero(matches, as_tuple=False).reshape(-1)
+    if indices.numel() == 0:
+        return None
+    return int(indices[0].detach().cpu().item())
+
+
+def _time_value(time_ns: torch.Tensor, index: int) -> int:
+    times = time_ns.reshape(-1)
+    safe_index = max(0, min(int(index), int(times.numel()) - 1))
+    return int(times[safe_index].detach().cpu().item())
+
+
+def _root_error_for_metric(trajectory: "CounterfactualTrajectory", key: str) -> float | None:
+    for step in trajectory.steps:
+        value = step.selected_metrics.get(key)
+        if value is not None and bool(torch.isfinite(torch.tensor(float(value))).item()):
+            return float(value)
+    return None
+
+
+def _root_error_tensor(
+    value: float | None,
+    *,
+    fallback: torch.Tensor,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    if value is None:
+        return fallback.reshape(-1)[0].to(device=device, dtype=dtype)
+    return torch.tensor(float(value), device=device, dtype=dtype)
+
+
+def _root_normalized_gain(before: torch.Tensor, after: torch.Tensor, root_error: torch.Tensor) -> torch.Tensor:
+    return (before - after) / root_error.clamp_min(1e-12)
+
+
+def _log_error_gain(before: torch.Tensor, after: torch.Tensor) -> torch.Tensor:
+    return torch.log(before.clamp_min(1e-12)) - torch.log(after.clamp_min(1e-12))
+
+
+def _eval_depth_far_m(
+    *,
+    source: RriEvaluationPointCloudSource,
+    configured: float | None,
+    depth_renderer: object,
+) -> float | None:
+    if configured is not None or source is not RriEvaluationPointCloudSource.ASE_GT_DEPTH_ROOT:
+        return configured
+    renderer = getattr(depth_renderer, "renderer", None)
+    config = getattr(renderer, "config", None)
+    zfar = getattr(config, "zfar", None)
+    return 20.0 if zfar is None else float(zfar)
+
+
+def _robust_temperature_logits(*, scores: torch.Tensor, temperature: float) -> torch.Tensor:
+    """Return median/IQR-normalized logits for temperature-softmax selection."""
+
+    logits = torch.full_like(scores, float("nan"))
+    finite = torch.isfinite(scores)
+    if not bool(finite.any().item()):
+        return logits
+    finite_scores = scores[finite]
+    center = torch.median(finite_scores)
+    if finite_scores.numel() >= 4:
+        q1 = torch.quantile(finite_scores, 0.25)
+        q3 = torch.quantile(finite_scores, 0.75)
+        scale = (q3 - q1).abs()
+    else:
+        scale = torch.std(finite_scores, unbiased=False)
+    scale = scale.clamp_min(torch.finfo(scores.dtype).eps)
+    logits[finite] = (finite_scores - center) / (scale * float(temperature))
+    return logits
+
+
+def _valid_diversity_metadata(
+    *,
+    candidates: CandidateSamplingResult,
+    valid_poses: PoseTW,
+) -> _CandidateDiversityMetadata:
+    """Build valid-row metadata aligned with ``valid_poses``."""
+
+    shell_indices = candidates.candidate_shell_indices(device=valid_poses.t.device)
+    yaw_rad = _pose_yaw_rad(valid_poses)
+    strategy_id = None
+    if candidates.strategy_id is not None:
+        strategy_id = candidates.strategy_id.to(device=valid_poses.t.device, dtype=torch.long).reshape(-1)[
+            shell_indices
+        ]
+    target_bearing = candidates.extras.get("target_bearing_yaw_rad")
+    target_bearing_yaw_rad = None
+    if torch.is_tensor(target_bearing):
+        target_bearing_yaw_rad = target_bearing.to(device=valid_poses.t.device, dtype=valid_poses.t.dtype).reshape(-1)[
+            shell_indices
+        ]
+    return _CandidateDiversityMetadata(
+        yaw_rad=yaw_rad,
+        strategy_id=strategy_id,
+        target_bearing_yaw_rad=target_bearing_yaw_rad,
+    )
+
+
+def _pose_yaw_rad(poses: PoseTW) -> torch.Tensor:
+    """Return horizontal yaw of each pose's forward axis."""
+
+    forward = poses.R.reshape(-1, 3, 3)[:, :, 2]
+    return torch.atan2(forward[:, 0], forward[:, 2])
+
+
+def _angular_separation(value: torch.Tensor, selected: list[torch.Tensor]) -> torch.Tensor:
+    """Return smallest circular distance from ``value`` to selected angles."""
+
+    if not selected:
+        return torch.tensor(float("inf"), device=value.device, dtype=value.dtype)
+    selected_t = torch.stack(selected).to(device=value.device, dtype=value.dtype)
+    delta = torch.atan2(torch.sin(value - selected_t), torch.cos(value - selected_t)).abs()
+    return delta.min()
+
+
+def _circular_min_delta(values: torch.Tensor, selected: list[torch.Tensor]) -> torch.Tensor:
+    """Return per-value smallest circular distance to selected angles."""
+
+    if not selected:
+        return torch.full_like(values, float("inf"))
+    selected_t = torch.stack(selected).to(device=values.device, dtype=values.dtype)
+    delta = torch.atan2(
+        torch.sin(values.reshape(-1, 1) - selected_t.reshape(1, -1)),
+        torch.cos(values.reshape(-1, 1) - selected_t.reshape(1, -1)),
+    ).abs()
+    return delta.min(dim=1).values
+
+
+def _append_diversity_selection(
+    *,
+    index: int,
+    metadata: _CandidateDiversityMetadata,
+    selected_yaws: list[torch.Tensor],
+    selected_strategies: list[int],
+    selected_target_bearings: list[torch.Tensor],
+) -> None:
+    """Record metadata for an already selected sibling branch."""
+
+    selected_yaws.append(metadata.yaw_rad[index])
+    if metadata.strategy_id is not None:
+        selected_strategies.append(int(metadata.strategy_id[index].detach().cpu().item()))
+    if metadata.target_bearing_yaw_rad is not None:
+        selected_target_bearings.append(metadata.target_bearing_yaw_rad[index])
+
+
 class CounterfactualSelectionPolicy(StrEnum):
     """Built-in policies used to rank valid candidates during rollout expansion."""
 
@@ -81,13 +255,31 @@ class CounterfactualSelectionRecord:
     selected_log_probability: float
 
 
+@dataclass(frozen=True, slots=True)
+class _CandidateDiversityMetadata:
+    """Optional valid-candidate metadata used by branch diversity guards."""
+
+    yaw_rad: torch.Tensor
+    strategy_id: torch.Tensor | None = None
+    target_bearing_yaw_rad: torch.Tensor | None = None
+
+
 @dataclass(slots=True)
 class CounterfactualMetricBundle:
     """Typed per-valid-candidate metrics emitted by rollout evaluators."""
 
     rri: torch.Tensor | None = None
+    root_gain: torch.Tensor | None = None
+    root_pm_dist: torch.Tensor | None = None
+    log_error_gain: torch.Tensor | None = None
     target_rri: torch.Tensor | None = None
+    target_root_gain: torch.Tensor | None = None
+    target_root_pm_dist: torch.Tensor | None = None
+    target_log_error_gain: torch.Tensor | None = None
     scene_rri: torch.Tensor | None = None
+    scene_root_gain: torch.Tensor | None = None
+    scene_root_pm_dist: torch.Tensor | None = None
+    scene_log_error_gain: torch.Tensor | None = None
     target_pm_dist_before: torch.Tensor | None = None
     target_pm_dist_after: torch.Tensor | None = None
     target_pm_acc_before: torch.Tensor | None = None
@@ -145,6 +337,12 @@ class CounterfactualCandidateEvaluation:
     metrics: CounterfactualMetricBundle
     candidate_point_clouds_world: torch.Tensor | None
     candidate_point_cloud_lengths: torch.Tensor | None
+    target_eval_current_points_world: torch.Tensor | None
+    target_eval_candidate_points_world: torch.Tensor | None
+    target_eval_candidate_point_lengths: torch.Tensor | None
+    target_eval_crop_policy: str | None
+    target_eval_voxel_size_m: float | None
+    target_eval_max_points: int | None
 
     def __init__(
         self,
@@ -155,12 +353,24 @@ class CounterfactualCandidateEvaluation:
         metric_vectors: Mapping[str, torch.Tensor] | None = None,
         candidate_point_clouds_world: torch.Tensor | None = None,
         candidate_point_cloud_lengths: torch.Tensor | None = None,
+        target_eval_current_points_world: torch.Tensor | None = None,
+        target_eval_candidate_points_world: torch.Tensor | None = None,
+        target_eval_candidate_point_lengths: torch.Tensor | None = None,
+        target_eval_crop_policy: str | None = None,
+        target_eval_voxel_size_m: float | None = None,
+        target_eval_max_points: int | None = None,
     ) -> None:
         self.scores = scores
         self.score_label = score_label
         self.metrics = metrics if metrics is not None else CounterfactualMetricBundle.from_vectors(metric_vectors)
         self.candidate_point_clouds_world = candidate_point_clouds_world
         self.candidate_point_cloud_lengths = candidate_point_cloud_lengths
+        self.target_eval_current_points_world = target_eval_current_points_world
+        self.target_eval_candidate_points_world = target_eval_candidate_points_world
+        self.target_eval_candidate_point_lengths = target_eval_candidate_point_lengths
+        self.target_eval_crop_policy = target_eval_crop_policy
+        self.target_eval_voxel_size_m = target_eval_voxel_size_m
+        self.target_eval_max_points = target_eval_max_points
 
     @property
     def metric_vectors(self) -> dict[str, torch.Tensor]:
@@ -211,12 +421,56 @@ class CounterfactualCandidateEvaluation:
         elif candidate_point_cloud_lengths is not None:
             raise ValueError("candidate_point_cloud_lengths requires candidate_point_clouds_world.")
 
+        target_eval_current_points_world = self.target_eval_current_points_world
+        if target_eval_current_points_world is not None:
+            target_eval_current_points_world = torch.as_tensor(
+                target_eval_current_points_world,
+                device=device,
+                dtype=dtype,
+            ).reshape(-1, 3)
+
+        target_eval_candidate_points_world = self.target_eval_candidate_points_world
+        target_eval_candidate_point_lengths = self.target_eval_candidate_point_lengths
+        if target_eval_candidate_points_world is not None:
+            target_eval_candidate_points_world = torch.as_tensor(
+                target_eval_candidate_points_world,
+                device=device,
+                dtype=dtype,
+            )
+            if target_eval_candidate_points_world.ndim != 3 or target_eval_candidate_points_world.shape[0] != num_valid:
+                raise ValueError(
+                    "target_eval_candidate_points_world must have shape (num_valid, P, 3).",
+                )
+            if target_eval_candidate_point_lengths is None:
+                target_eval_candidate_point_lengths = torch.full(
+                    (num_valid,),
+                    target_eval_candidate_points_world.shape[1],
+                    dtype=torch.long,
+                    device=device,
+                )
+            else:
+                target_eval_candidate_point_lengths = torch.as_tensor(
+                    target_eval_candidate_point_lengths,
+                    device=device,
+                    dtype=torch.long,
+                ).reshape(-1)
+                if target_eval_candidate_point_lengths.shape[0] != num_valid:
+                    raise ValueError("target_eval_candidate_point_lengths must align with num_valid.")
+        elif target_eval_candidate_point_lengths is not None:
+            raise ValueError("target_eval_candidate_point_lengths requires target_eval_candidate_points_world.")
+
         return CounterfactualCandidateEvaluation(
             scores=scores,
             score_label=self.score_label,
             metrics=metrics,
             candidate_point_clouds_world=candidate_point_clouds_world,
             candidate_point_cloud_lengths=candidate_point_cloud_lengths,
+            target_eval_current_points_world=target_eval_current_points_world,
+            target_eval_candidate_points_world=target_eval_candidate_points_world,
+            target_eval_candidate_point_lengths=target_eval_candidate_point_lengths,
+            target_eval_crop_policy=self.target_eval_crop_policy,
+            target_eval_voxel_size_m=self.target_eval_voxel_size_m,
+            target_eval_max_points=self.target_eval_max_points,
         )
 
     def selected_metrics(self, valid_index: int) -> dict[str, float]:
@@ -259,6 +513,12 @@ class CounterfactualStepResult:
     selected_depth_focal_px: tuple[float, float] | None = None
     selected_depth_principal_point_px: tuple[float, float] | None = None
     selected_depth_image_size_hw: tuple[int, int] | None = None
+    target_eval_current_points_world: torch.Tensor | None = None
+    target_eval_candidate_points_world: torch.Tensor | None = None
+    target_eval_candidate_point_lengths: torch.Tensor | None = None
+    target_eval_crop_policy: str | None = None
+    target_eval_voxel_size_m: float | None = None
+    target_eval_max_points: int | None = None
 
     @property
     def selected_pose_world(self) -> PoseTW:
@@ -277,6 +537,9 @@ class CounterfactualTrajectory:
     """One rollout trajectory rooted at one initial pose."""
 
     root_pose_world: PoseTW
+    root_time_ns: int | None = None
+    root_trajectory_index: int | None = None
+    root_frame_index: int | None = None
     steps: list[CounterfactualStepResult] = field(default_factory=list)
     cumulative_score: float = 0.0
     cumulative_rri: float | None = None
@@ -307,6 +570,9 @@ class CounterfactualTrajectory:
             cumulative_rri = float(step_rri) if cumulative_rri is None else float(cumulative_rri + step_rri)
         return CounterfactualTrajectory(
             root_pose_world=self.root_pose_world,
+            root_time_ns=self.root_time_ns,
+            root_trajectory_index=self.root_trajectory_index,
+            root_frame_index=self.root_frame_index,
             steps=[*self.steps, step],
             cumulative_score=float(self.cumulative_score + step.selection_score),
             cumulative_rri=cumulative_rri,
@@ -335,6 +601,9 @@ class CounterfactualRolloutResult:
     beam_width: int | None
     selection_policy: str | CounterfactualSelectionPolicy
     score_label: str = "score"
+    root_time_ns: int | None = None
+    root_trajectory_index: int | None = None
+    root_frame_index: int | None = None
 
 
 CounterfactualEvaluatorFn = Callable[
@@ -367,9 +636,15 @@ class CounterfactualPoseGeneratorConfig(TargetConfig["CounterfactualPoseGenerato
     stochastic_branch_probabilities: list[float] | None = None
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY
     selection_temperature: float = Field(default=1.0, gt=0.0)
+    robust_temperature_logits: bool = True
+    """Normalize temperature-softmax scores by median/IQR before applying temperature."""
+
     branch_schedule_id: str | None = None
     min_history_distance_m: float = Field(default=0.0, ge=0.0)
     min_sibling_distance_m: float = Field(default=0.0, ge=0.0)
+    min_sibling_yaw_deg: float = Field(default=0.0, ge=0.0)
+    min_sibling_target_bearing_deg: float = Field(default=0.0, ge=0.0)
+    require_sibling_strategy_diversity: bool = False
     seed: int | None = Field(default=0, ge=0)
     log_timing: bool = False
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
@@ -411,8 +686,28 @@ class CounterfactualOracleRriScorerConfig(TargetConfig["CounterfactualOracleRriS
         return CounterfactualOracleRriScorer
 
     depth: CandidateDepthRendererConfig = Field(default_factory=CandidateDepthRendererConfig)
-    oracle: OracleRRIConfig = Field(default_factory=OracleRRIConfig)
+    oracle: OracleRRIConfig = Field(
+        default_factory=lambda: OracleRRIConfig(fusion_voxel_size_m=0.02, fusion_max_points=200_000)
+    )
     backprojection_stride: int = Field(default=1, ge=1)
+    eval_point_cloud_source: RriEvaluationPointCloudSource = RriEvaluationPointCloudSource.ASE_GT_DEPTH_ROOT
+    """Oracle current/root point-cloud source used for scene RRI labels."""
+
+    eval_camera_label: str = "rgb"
+    """Camera stream used for ASE-depth root evaluation points."""
+
+    eval_depth_far_m: float | None = None
+    """Maximum ASE root depth to retain; defaults to the renderer zfar."""
+
+    eval_fusion_voxel_size_m: float = Field(default=0.02, ge=0.0)
+    """Voxel size used to canonical-fuse root and selected-history eval points."""
+
+    eval_fusion_max_points: int | None = Field(default=200_000, ge=1)
+    """Maximum retained current-eval points after canonical fusion."""
+
+    reward_mode: RriRewardMode = RriRewardMode.ROOT_NORMALIZED_GAIN
+    """Candidate score used for rollout selection."""
+
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
     is_debug: bool = False
 
@@ -432,6 +727,8 @@ class CounterfactualOracleRriScorer:
         )
         self._depth_renderer = self.config.depth.setup_target()
         self._oracle = self.config.oracle.setup_target()
+        self._root_eval: RootEvalPointCloud | None = None
+        self._root_eval_token: tuple[float, ...] | None = None
 
     def __call__(
         self,
@@ -451,16 +748,9 @@ class CounterfactualOracleRriScorer:
             stride=self.config.backprojection_stride,
         )
 
-        history_points = trajectory.accumulated_points_world()
-        points_t = point_clouds.semidense_points
-        if history_points.numel() > 0:
-            points_t = torch.cat(
-                [
-                    points_t,
-                    history_points.to(device=points_t.device, dtype=points_t.dtype),
-                ],
-                dim=0,
-            )
+        points_t = self._current_eval_points(
+            trajectory, device=point_clouds.points.device, dtype=point_clouds.points.dtype
+        )
 
         rri = self._oracle.score(
             points_t=points_t,
@@ -470,14 +760,73 @@ class CounterfactualOracleRriScorer:
             gt_faces=self.sample.mesh_faces.to(device=point_clouds.points.device),
             extend=point_clouds.occupancy_bounds,
         )
+        root_error = _root_error_for_metric(trajectory, "root_pm_dist")
+        root_error_t = _root_error_tensor(
+            root_error,
+            fallback=rri.pm_dist_before,
+            device=rri.rri.device,
+            dtype=rri.rri.dtype,
+        )
+        root_gain = _root_normalized_gain(rri.pm_dist_before, rri.pm_dist_after, root_error_t)
+        log_gain = _log_error_gain(rri.pm_dist_before, rri.pm_dist_after)
+        scores = root_gain if self.config.reward_mode is RriRewardMode.ROOT_NORMALIZED_GAIN else rri.rri
+        score_label = (
+            "oracle_root_gain" if self.config.reward_mode is RriRewardMode.ROOT_NORMALIZED_GAIN else "oracle_rri"
+        )
 
         return CounterfactualCandidateEvaluation(
-            scores=rri.rri,
-            score_label="oracle_rri",
-            metrics=CounterfactualMetricBundle(rri=rri.rri),
+            scores=scores,
+            score_label=score_label,
+            metrics=CounterfactualMetricBundle(
+                rri=rri.rri,
+                root_gain=root_gain,
+                root_pm_dist=root_error_t.expand_as(rri.rri),
+                log_error_gain=log_gain,
+            ),
             candidate_point_clouds_world=point_clouds.points,
             candidate_point_cloud_lengths=point_clouds.lengths,
         )
+
+    def _current_eval_points(
+        self,
+        trajectory: CounterfactualTrajectory,
+        *,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        root_eval = self._root_eval_for(trajectory)
+        points_t = root_eval.points_world.to(device=device, dtype=dtype)
+        history_points = trajectory.accumulated_points_world()
+        if history_points.numel() > 0:
+            points_t = torch.cat([points_t, history_points.to(device=device, dtype=dtype)], dim=0)
+        return canonical_fuse_points(
+            points_t,
+            voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+            max_points=self.config.eval_fusion_max_points,
+        )
+
+    def _root_eval_for(self, trajectory: CounterfactualTrajectory) -> RootEvalPointCloud:
+        token = _root_token(trajectory)
+        if self._root_eval is None or self._root_eval_token != token:
+            self._root_eval = build_root_eval_pointcloud(
+                self.sample,
+                source=self.config.eval_point_cloud_source,
+                camera_label=self.config.eval_camera_label,  # type: ignore[arg-type]
+                reference_pose_world=trajectory.root_pose_world,
+                reference_time_ns=trajectory.root_time_ns,
+                reference_trajectory_index=trajectory.root_trajectory_index,
+                reference_frame_index=trajectory.root_frame_index,
+                stride=int(self.config.backprojection_stride),
+                far_m=_eval_depth_far_m(
+                    source=self.config.eval_point_cloud_source,
+                    configured=self.config.eval_depth_far_m,
+                    depth_renderer=self._depth_renderer,
+                ),
+                voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+                max_points=self.config.eval_fusion_max_points,
+            )
+            self._root_eval_token = token
+        return self._root_eval
 
 
 class CounterfactualPoseGenerator:
@@ -511,6 +860,48 @@ class CounterfactualPoseGenerator:
     def _generator_input_pose(reference_pose_world: PoseTW) -> PoseTW:
         return rotate_yaw_cw90(ensure_unbatched_pose(reference_pose_world), undo=True)
 
+    def _configured_reference_frame_index(self) -> int | None:
+        candidate_config = self.config.candidate_config
+        if hasattr(candidate_config, "base"):
+            return getattr(candidate_config.base, "reference_frame_index", None)
+        return getattr(candidate_config, "reference_frame_index", None)
+
+    def _typed_sample_root(
+        self,
+        sample: EfmSnippetView,
+        *,
+        reference_pose: PoseTW | None,
+        device: torch.device,
+    ) -> tuple[PoseTW, int | None, int | None, int | None]:
+        if reference_pose is not None:
+            traj_index = _exact_pose_index(sample.trajectory.t_world_rig, reference_pose)
+            root_time = None if traj_index is None else _time_value(sample.trajectory.time_ns, traj_index)
+            return reference_pose.to(device=device), root_time, traj_index, None
+
+        cam_view = sample.get_camera(self.config.candidate_config.camera_label)
+        frame_index = self._configured_reference_frame_index()
+        if frame_index is None:
+            traj_count = int(sample.trajectory.time_ns.reshape(-1).numel())
+            traj_index = max(traj_count - 1, 0) if traj_count else None
+            root_time = None if traj_index is None else _time_value(sample.trajectory.time_ns, traj_index)
+            root_frame_index = max(int(cam_view.num_frames) - 1, 0) if cam_view.num_frames else None
+            return sample.trajectory.final_pose.to(device=device), root_time, traj_index, root_frame_index
+
+        cam_idx, traj_idx = cam_view.nearest_traj_indices(
+            sample.trajectory.time_ns,
+            [int(frame_index)],
+            default_last=True,
+        )
+        root_frame_index = int(cam_idx.reshape(-1)[0].detach().cpu().item()) if cam_idx.numel() else int(frame_index)
+        if traj_idx.numel() == 0:
+            traj_count = int(sample.trajectory.time_ns.reshape(-1).numel())
+            traj_index = max(traj_count - 1, 0) if traj_count else None
+            root_time = None if traj_index is None else _time_value(sample.trajectory.time_ns, traj_index)
+            return sample.trajectory.final_pose.to(device=device), root_time, traj_index, root_frame_index
+        traj_index = int(traj_idx.reshape(-1)[0].detach().cpu().item())
+        root_time = _time_value(sample.trajectory.time_ns, traj_index)
+        return sample.trajectory.t_world_rig[traj_idx].to(device=device), root_time, traj_index, root_frame_index
+
     def generate_from_typed_sample(
         self,
         sample: EfmSnippetView,
@@ -525,9 +916,13 @@ class CounterfactualPoseGenerator:
             raise ValueError("Counterfactual rollouts require sample mesh, mesh_verts, and mesh_faces.")
         device = torch.device(self.config.candidate_config.device)
         cam_view = sample.get_camera(self.config.candidate_config.camera_label)
-        resolved_pose = sample.trajectory.final_pose if reference_pose is None else reference_pose
+        resolved_pose, root_time_ns, root_trajectory_index, root_frame_index = self._typed_sample_root(
+            sample,
+            reference_pose=reference_pose,
+            device=device,
+        )
         return self.generate(
-            reference_pose=resolved_pose.to(device=device),
+            reference_pose=resolved_pose,
             gt_mesh=sample.mesh,
             mesh_verts=sample.mesh_verts.to(device=device),
             mesh_faces=sample.mesh_faces.to(device=device),
@@ -535,6 +930,9 @@ class CounterfactualPoseGenerator:
             occupancy_extent=sample.get_occupancy_extend().to(device=device, dtype=torch.float32),
             score_candidates=score_candidates,
             candidate_runtime_context=candidate_runtime_context,
+            root_time_ns=root_time_ns,
+            root_trajectory_index=root_trajectory_index,
+            root_frame_index=root_frame_index,
         )
 
     def generate(
@@ -548,11 +946,21 @@ class CounterfactualPoseGenerator:
         occupancy_extent: torch.Tensor,
         score_candidates: CounterfactualEvaluatorFn | None = None,
         candidate_runtime_context: CandidateGenerationRuntimeContext | None = None,
+        root_time_ns: int | None = None,
+        root_trajectory_index: int | None = None,
+        root_frame_index: int | None = None,
     ) -> CounterfactualRolloutResult:
         """Generate multi-step counterfactual rollouts from one root pose."""
 
         root_pose_world = self._canonicalize_pose(reference_pose)
-        frontier = [CounterfactualTrajectory(root_pose_world=root_pose_world)]
+        frontier = [
+            CounterfactualTrajectory(
+                root_pose_world=root_pose_world,
+                root_time_ns=root_time_ns,
+                root_trajectory_index=root_trajectory_index,
+                root_frame_index=root_frame_index,
+            )
+        ]
         score_label = self.config.selection_policy.value
         candidate_total_s = 0.0
         evaluate_total_s = 0.0
@@ -605,6 +1013,7 @@ class CounterfactualPoseGenerator:
                 branch_count = self._branch_factor_for_step(step_index)
                 selection_records = self._select_valid_candidates(
                     scores=evaluation.scores,
+                    candidates=candidates,
                     valid_poses=candidates.poses_world_cam(),
                     trajectory=trajectory,
                     branch_count=branch_count,
@@ -655,12 +1064,38 @@ class CounterfactualPoseGenerator:
                             if evaluation.selected_point_cloud(valid_index) is None
                             else evaluation.selected_point_cloud(valid_index).detach().clone()
                         ),
+                        target_eval_current_points_world=(
+                            None
+                            if evaluation.target_eval_current_points_world is None
+                            else evaluation.target_eval_current_points_world.detach().clone()
+                        ),
+                        target_eval_candidate_points_world=(
+                            None
+                            if evaluation.target_eval_candidate_points_world is None
+                            else evaluation.target_eval_candidate_points_world.detach().clone()
+                        ),
+                        target_eval_candidate_point_lengths=(
+                            None
+                            if evaluation.target_eval_candidate_point_lengths is None
+                            else evaluation.target_eval_candidate_point_lengths.detach().clone()
+                        ),
+                        target_eval_crop_policy=evaluation.target_eval_crop_policy,
+                        target_eval_voxel_size_m=evaluation.target_eval_voxel_size_m,
+                        target_eval_max_points=evaluation.target_eval_max_points,
                     )
                     next_frontier.append(trajectory.with_appended_step(step))
 
             frontier = self._apply_beam_width(next_frontier)
             if not frontier:
-                frontier = [CounterfactualTrajectory(root_pose_world=root_pose_world, terminated_early=True)]
+                frontier = [
+                    CounterfactualTrajectory(
+                        root_pose_world=root_pose_world,
+                        root_time_ns=root_time_ns,
+                        root_trajectory_index=root_trajectory_index,
+                        root_frame_index=root_frame_index,
+                        terminated_early=True,
+                    )
+                ]
                 break
 
         self._log_timing(
@@ -677,6 +1112,9 @@ class CounterfactualPoseGenerator:
             beam_width=self.config.beam_width,
             selection_policy=self.config.selection_policy,
             score_label=score_label,
+            root_time_ns=root_time_ns,
+            root_trajectory_index=root_trajectory_index,
+            root_frame_index=root_frame_index,
         )
 
     def _evaluate_valid_candidates(
@@ -735,6 +1173,7 @@ class CounterfactualPoseGenerator:
         self,
         *,
         scores: torch.Tensor,
+        candidates: CandidateSamplingResult,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
         branch_count: int,
@@ -746,12 +1185,14 @@ class CounterfactualPoseGenerator:
         ):
             return self._sample_valid_candidates(
                 scores=scores,
+                candidates=candidates,
                 valid_poses=valid_poses,
                 trajectory=trajectory,
                 branch_count=branch_count,
             )
         return self._greedy_valid_candidates(
             scores=scores,
+            candidates=candidates,
             valid_poses=valid_poses,
             trajectory=trajectory,
             branch_count=branch_count,
@@ -761,6 +1202,7 @@ class CounterfactualPoseGenerator:
         self,
         *,
         scores: torch.Tensor,
+        candidates: CandidateSamplingResult,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
         branch_count: int,
@@ -772,18 +1214,38 @@ class CounterfactualPoseGenerator:
         order = torch.argsort(ranked_scores, descending=True)
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
+        metadata = _valid_diversity_metadata(candidates=candidates, valid_poses=valid_poses)
 
         selected: list[int] = []
         selected_centers: list[torch.Tensor] = []
+        selected_yaws: list[torch.Tensor] = []
+        selected_strategies: list[int] = []
+        selected_target_bearings: list[torch.Tensor] = []
         for index_tensor in order:
             index = int(index_tensor.item())
             if not bool(finite_scores[index].item()):
                 continue
             center = centers[index]
-            if not self._passes_distance_guards(center=center, history=history, selected_centers=selected_centers):
+            if not self._passes_diversity_guards(
+                index=index,
+                center=center,
+                history=history,
+                selected_centers=selected_centers,
+                metadata=metadata,
+                selected_yaws=selected_yaws,
+                selected_strategies=selected_strategies,
+                selected_target_bearings=selected_target_bearings,
+            ):
                 continue
             selected.append(index)
             selected_centers.append(center)
+            _append_diversity_selection(
+                index=index,
+                metadata=metadata,
+                selected_yaws=selected_yaws,
+                selected_strategies=selected_strategies,
+                selected_target_bearings=selected_target_bearings,
+            )
             if len(selected) >= branch_count:
                 break
 
@@ -795,6 +1257,7 @@ class CounterfactualPoseGenerator:
         self,
         *,
         scores: torch.Tensor,
+        candidates: CandidateSamplingResult,
         valid_poses: PoseTW,
         trajectory: CounterfactualTrajectory,
         branch_count: int,
@@ -802,7 +1265,11 @@ class CounterfactualPoseGenerator:
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
         remaining = torch.isfinite(scores).to(device=scores.device, dtype=torch.bool)
+        metadata = _valid_diversity_metadata(candidates=candidates, valid_poses=valid_poses)
         selected_centers: list[torch.Tensor] = []
+        selected_yaws: list[torch.Tensor] = []
+        selected_strategies: list[int] = []
+        selected_target_bearings: list[torch.Tensor] = []
         records: list[CounterfactualSelectionRecord] = []
 
         for _draw_index in range(branch_count):
@@ -812,6 +1279,12 @@ class CounterfactualPoseGenerator:
                 centers=centers,
                 history=history,
                 selected_centers=selected_centers,
+            )
+            eligible &= self._metadata_guard_mask(
+                metadata=metadata,
+                selected_yaws=selected_yaws,
+                selected_strategies=selected_strategies,
+                selected_target_bearings=selected_target_bearings,
             )
             if not bool(eligible.any().item()):
                 eligible = remaining.clone()
@@ -825,7 +1298,7 @@ class CounterfactualPoseGenerator:
                 logits = torch.zeros_like(scores)
                 distribution = self._masked_softmax(logits=logits, mask=eligible)
             else:
-                logits = scores / float(self.config.selection_temperature)
+                logits = self._temperature_logits(scores)
                 distribution = self._masked_softmax(logits=logits, mask=eligible)
 
             selected_tensor = torch.multinomial(
@@ -846,8 +1319,20 @@ class CounterfactualPoseGenerator:
             )
             remaining[selected_index] = False
             selected_centers.append(centers[selected_index])
+            _append_diversity_selection(
+                index=selected_index,
+                metadata=metadata,
+                selected_yaws=selected_yaws,
+                selected_strategies=selected_strategies,
+                selected_target_bearings=selected_target_bearings,
+            )
 
         return records
+
+    def _temperature_logits(self, scores: torch.Tensor) -> torch.Tensor:
+        if not self.config.robust_temperature_logits:
+            return scores / float(self.config.selection_temperature)
+        return _robust_temperature_logits(scores=scores, temperature=float(self.config.selection_temperature))
 
     def _one_hot_selection_record(
         self,
@@ -940,12 +1425,45 @@ class CounterfactualPoseGenerator:
 
         return mask
 
-    def _passes_distance_guards(
+    def _metadata_guard_mask(
         self,
         *,
+        metadata: _CandidateDiversityMetadata,
+        selected_yaws: list[torch.Tensor],
+        selected_strategies: list[int],
+        selected_target_bearings: list[torch.Tensor],
+    ) -> torch.Tensor:
+        mask = torch.ones(metadata.yaw_rad.shape[0], device=metadata.yaw_rad.device, dtype=torch.bool)
+        if self.config.min_sibling_yaw_deg > 0.0 and selected_yaws:
+            min_delta = radians(float(self.config.min_sibling_yaw_deg))
+            yaw_deltas = _circular_min_delta(metadata.yaw_rad, selected_yaws)
+            mask &= yaw_deltas >= min_delta
+        if self.config.require_sibling_strategy_diversity and selected_strategies and metadata.strategy_id is not None:
+            selected = torch.tensor(
+                selected_strategies, device=metadata.strategy_id.device, dtype=metadata.strategy_id.dtype
+            )
+            mask &= ~(metadata.strategy_id.reshape(-1, 1) == selected.reshape(1, -1)).any(dim=1)
+        if (
+            self.config.min_sibling_target_bearing_deg > 0.0
+            and selected_target_bearings
+            and metadata.target_bearing_yaw_rad is not None
+        ):
+            min_delta = radians(float(self.config.min_sibling_target_bearing_deg))
+            bearing_deltas = _circular_min_delta(metadata.target_bearing_yaw_rad, selected_target_bearings)
+            mask &= bearing_deltas >= min_delta
+        return mask
+
+    def _passes_diversity_guards(
+        self,
+        *,
+        index: int,
         center: torch.Tensor,
         history: torch.Tensor,
         selected_centers: list[torch.Tensor],
+        metadata: _CandidateDiversityMetadata,
+        selected_yaws: list[torch.Tensor],
+        selected_strategies: list[int],
+        selected_target_bearings: list[torch.Tensor],
     ) -> bool:
         if self.config.min_history_distance_m > 0.0 and history.numel() > 0:
             history_dists = torch.linalg.norm(history - center.reshape(1, 3), dim=1)
@@ -956,6 +1474,25 @@ class CounterfactualPoseGenerator:
             sibling = torch.stack(selected_centers, dim=0)
             sibling_dists = torch.linalg.norm(sibling - center.reshape(1, 3), dim=1)
             if bool((sibling_dists < self.config.min_sibling_distance_m).any().item()):
+                return False
+
+        if self.config.min_sibling_yaw_deg > 0.0 and selected_yaws:
+            yaw_delta = _angular_separation(metadata.yaw_rad[index], selected_yaws)
+            if bool((yaw_delta < radians(float(self.config.min_sibling_yaw_deg))).item()):
+                return False
+
+        if self.config.require_sibling_strategy_diversity and selected_strategies and metadata.strategy_id is not None:
+            strategy = int(metadata.strategy_id[index].detach().cpu().item())
+            if strategy in selected_strategies:
+                return False
+
+        if (
+            self.config.min_sibling_target_bearing_deg > 0.0
+            and selected_target_bearings
+            and metadata.target_bearing_yaw_rad is not None
+        ):
+            bearing_delta = _angular_separation(metadata.target_bearing_yaw_rad[index], selected_target_bearings)
+            if bool((bearing_delta < radians(float(self.config.min_sibling_target_bearing_deg))).item()):
                 return False
 
         return True

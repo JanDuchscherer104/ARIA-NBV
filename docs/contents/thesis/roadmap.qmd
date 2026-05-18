@@ -57,8 +57,9 @@ The September deliverable is a reproducible target-aware
   diversity evidence;
 - a mandatory target-conditioned finite-candidate value model $Q_H$ trained from
   ASE oracle rollout traces, first implemented as a candidate-query Transformer;
-- final figures, ablations, and failure cases that report cumulative target
-  RRI together with {{< gls acquisition-cost >}};
+- final figures, ablations, and failure cases that report cumulative
+  root-normalized target gain, diagnostic target RRI, and
+  {{< gls acquisition-cost >}};
 - final experiments scaled toward the full 100 GT-mesh ASE scenes and 4,608
   snippet windows after small-subset correctness passes, or a scene-level
   held-out subset with explicit coverage reporting if full coverage is blocked;
@@ -67,12 +68,12 @@ The September deliverable is a reproducible target-aware
   time-permitting continuous policies.
 
 M5 first measures non-myopic headroom:
-bounded oracle lookahead selects actions by the same cumulative target-RRI
+bounded oracle lookahead selects actions by the same root-normalized target-gain
 return used for $Q_H$ training and must improve endpoint target-quality gain
 over one-step oracle greedy before learned $Q_H$ gains are interpreted as
 planning gains. If that headroom is positive, learned $Q_H$ is evaluated by
-oracle re-evaluation of its selected actions, by endpoint gain and cumulative
-target RRI under matched budgets, and by recovered headroom over the learned
+oracle re-evaluation of its selected actions, by endpoint gain, cumulative
+target root gain, diagnostic target RRI under matched budgets, and by recovered headroom over the learned
 one-step target-conditioned scorer. If headroom is near zero, the thesis reports
 no measurable non-myopic headroom for the evaluated split, target set, horizon,
 branch factor, and candidate distribution. Scaling then tests whether more
@@ -228,7 +229,7 @@ $$
 
 Non-myopic planning is interpreted through oracle-lookahead headroom. The
 lookahead policy selects the first action of a bounded search maximizing
-cumulative target RRI; endpoint gain evaluates the resulting trajectory:
+root-normalized target-gain return; endpoint gain evaluates the resulting trajectory:
 
 $$
 \Delta_{\mathrm{look}}
@@ -343,7 +344,7 @@ gantt
 | 2026-06-01 to 2026-06-21 | **M2 - VIN baseline and scale check** | One-step VIN baseline reproducible; calibration and ranking plots available; ablation matrix fixed; LRZ sharding/storage plan and Zarr rollout/Q schema are ready enough for M3 scale work. |
 | 2026-06-22 to 2026-07-12 | **M3 - Entity/target-aware RRI and generation readiness** | V0 GT-OBB target RRI trusted on a small subset; V1 observed-target / GT-label contract and observed-only target selector defined; deterministic sharding, Slurm/DSS staging, and Zarr store checks pass before full-scale generation. |
 | 2026-07-13 to 2026-08-09 | **M4 - Target-conditioned VIN** | Model accepts observed/predicted target encoding and predicts target-specific RRI with matched GT labels; scene-level and target-level scorers compared. |
-| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollout data are stable; oracle lookahead headroom is measured with cumulative target RRI; if headroom is positive, finite-candidate $Q_H$ is trained and oracle-evaluated by endpoint gain, cumulative target RRI, and recovered headroom over learned one-step scoring. |
+| 2026-08-10 to 2026-08-30 | **M5 - Multi-step target-aware rollouts and Q_H** | Random-valid, oracle-greedy/lookahead, and oracle-scored temperature-softmax rollout data are stable; oracle lookahead headroom is measured with root-normalized target gain; if headroom is positive, finite-candidate $Q_H$ is trained and oracle-evaluated by endpoint gain, cumulative target root gain, diagnostic target RRI, and recovered headroom over learned one-step scoring. |
 | 2026-08-31 to 2026-09-13 | **M6 - Scaling and online/continuous escalation** | Evaluate whether offline scale, external mesh/oracle-compatible substrates, or online discrete $Q_H$ are justified after M5; continuous target-then-pose actor-critic remains time-permitting and requires online training evidence. |
 | 2026-09-14 to 2026-09-27 | **M7 - Full-scale experiments and writing** | Full 100 GT-mesh ASE scenes / 4,608 snippet windows are generated, or a scene-level held-out subset reports scenes, snippets, targets, trajectories, rollout seeds, transitions, and exact coverage gaps; final tables, figures, failure cases, and thesis narrative frozen. |
 | 2026-09-28 to 2026-09-30 | **M8 - Release freeze** | Reproducible configs, docs, demo path, and final smoke checks complete. |
@@ -504,15 +505,15 @@ the [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd).
   schedule permits;
 - make bounded oracle-RRI lookahead versus one-step greedy under equal budget
   the trusted headroom estimate before interpreting $Q_H$; the lookahead policy
-  selects by cumulative target RRI, while endpoint gain evaluates the trajectory;
+  selects by cumulative root-normalized target gain, while endpoint gain evaluates the trajectory;
 - report $\Delta_{\mathrm{look}}$ and, when it is positive, the recovered
   headroom $\eta_Q$ of $Q_H$ over the learned one-step target scorer;
 - require $Q_H$ to beat the learned one-step scorer and one-step model/greedy
-  selection on endpoint target gain and report cumulative target RRI under
+  selection on endpoint target gain and report cumulative target-root gain under
   matched acquisition and candidate budgets;
-- report cumulative target RRI, endpoint target gain, scene RRI, number of
-  views, path length, invalid action rate, and runtime;
-- use cumulative target RRI as the main multi-step return while preserving
+- report cumulative target-root gain, diagnostic target RRI, endpoint target
+  gain, scene RRI, number of views, path length, invalid action rate, and runtime;
+- use cumulative root-normalized target gain as the main multi-step return while preserving
   current one-step RRI labels; keep log-improvement and episode-normalized
   rewards as follow-up ablations;
 - keep rollout complexity bounded by explicit horizon, branch factor, and beam
@@ -604,7 +605,7 @@ architecture toggles.
 |---|---|---|
 | Target input | V0 GT OBB sanity; V1 observed/predicted OBB; V1 plus crop descriptor; optional entity token | target-RRI rank correlation, target top-k hit, endpoint target gain |
 | Candidate mixture | generic shell; target-point only; mixed target plus exploration; PB-NBV/frontier shortlist | valid fraction, target visibility, RRI distribution, selected-view diversity |
-| Objective | scene RRI; target RRI; target RRI plus cost; log-gain ablation | endpoint target gain, cumulative target RRI, quality-cost curves |
+| Objective | scene RRI; target root gain; target RRI diagnostic; log-gain ablation | endpoint target gain, cumulative target-root gain, quality-cost curves |
 | Planner | random-valid; learned one-step scorer; one-step oracle greedy; bounded oracle lookahead; $Q_H$ | oracle-lookahead headroom, recovered headroom, and oracle-evaluated endpoint gain under equal budget |
 | Invalidity | hard mask; hard mask plus validity head; scalar penalty only after masks work | invalid-action rate, value leakage, invalid-reason distribution |
 | Ordinal/scalar loss | CORAL; balanced CORAL; focal threshold; auxiliary Huber | calibration, Spearman correlation, top-k hit, confusion structure |

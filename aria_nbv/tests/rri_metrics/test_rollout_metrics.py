@@ -12,6 +12,7 @@ from aria_nbv.rri_metrics import (
     endpoint_log_gain,
     endpoint_target_gain,
     finite_horizon_target_return,
+    selected_target_reward,
     selected_target_rri,
     summarize_target_rollout_metrics,
     target_point_mesh_error_after,
@@ -23,6 +24,29 @@ def test_selected_target_return_uses_target_rri_with_discount() -> None:
     rows = [{"target_rri": 0.2}, {"target_rri": 0.3}, {"target_rri": float("nan")}, {"rri": 0.4}]
 
     assert finite_horizon_target_return(rows, gamma=0.5) == pytest.approx(0.2 + 0.5 * 0.3 + 0.5**3 * 0.4)
+
+
+def test_selected_target_return_prefers_root_normalized_gain() -> None:
+    rows = [
+        {"target_root_gain": 0.1, "target_rri": 0.9},
+        {"root_gain": 0.2, "rri": 0.8},
+    ]
+
+    assert selected_target_reward(rows[0]) == 0.1
+    assert finite_horizon_target_return(rows, gamma=0.5) == pytest.approx(0.1 + 0.5 * 0.2)
+
+
+def test_undiscounted_root_normalized_return_matches_endpoint_gain() -> None:
+    rows = [
+        {"target_root_gain": 0.3, "target_pm_dist_before": 10.0, "target_pm_dist_after": 7.0},
+        {"target_root_gain": 0.3, "target_pm_dist_before": 7.0, "target_pm_dist_after": 4.0},
+        {"target_root_gain": 0.3, "target_pm_dist_before": 4.0, "target_pm_dist_after": 1.0},
+    ]
+
+    summary = summarize_target_rollout_metrics(rows, gamma=1.0)
+
+    assert summary.cumulative_return == pytest.approx(0.9)
+    assert summary.endpoint_gain == pytest.approx(0.9)
 
 
 def test_endpoint_gain_uses_direct_point_mesh_error() -> None:

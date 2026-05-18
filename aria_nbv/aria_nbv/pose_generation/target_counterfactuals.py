@@ -21,12 +21,25 @@ from pydantic import Field, field_validator
 from ..data_handling._target_selection import target_gt_obb_world
 from ..rendering.candidate_depth_renderer import CandidateDepthRendererConfig
 from ..rendering.candidate_pointclouds import build_candidate_pointclouds
+from ..rri_metrics.eval_pointclouds import (
+    RootEvalPointCloud,
+    RriEvaluationPointCloudSource,
+    RriRewardMode,
+    build_root_eval_pointcloud,
+    canonical_fuse_points,
+)
 from ..rri_metrics.oracle_rri import OracleRRIConfig
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from .counterfactuals import (
     CounterfactualCandidateEvaluation,
     CounterfactualMetricBundle,
     CounterfactualTrajectory,
+    _eval_depth_far_m,
+    _log_error_gain,
+    _root_error_for_metric,
+    _root_error_tensor,
+    _root_normalized_gain,
+    _root_token,
 )
 
 if TYPE_CHECKING:
@@ -58,7 +71,9 @@ class CounterfactualTargetOracleRriScorerConfig(TargetConfig["CounterfactualTarg
     depth: CandidateDepthRendererConfig = Field(default_factory=lambda: CandidateDepthRendererConfig())
     """Depth renderer used once per candidate table before target/scene scoring."""
 
-    oracle: OracleRRIConfig = Field(default_factory=lambda: OracleRRIConfig())
+    oracle: OracleRRIConfig = Field(
+        default_factory=lambda: OracleRRIConfig(fusion_voxel_size_m=0.02, fusion_max_points=200_000)
+    )
     """Point-mesh oracle metric configuration shared by target and scene RRI."""
 
     backprojection_stride: int = Field(default=1, ge=1)
@@ -72,6 +87,27 @@ class CounterfactualTargetOracleRriScorerConfig(TargetConfig["CounterfactualTarg
 
     include_scene_rri: bool = True
     """Whether to compute diagnostic scene RRI from the same point-cloud batch."""
+
+    eval_point_cloud_source: RriEvaluationPointCloudSource = RriEvaluationPointCloudSource.ASE_GT_DEPTH_ROOT
+    """Oracle current/root point-cloud source used for target and scene labels."""
+
+    eval_camera_label: str = "rgb"
+    """Camera stream used for ASE-depth root evaluation points."""
+
+    eval_depth_far_m: float | None = None
+    """Maximum ASE root depth to retain; defaults to the renderer zfar."""
+
+    eval_fusion_voxel_size_m: float = Field(default=0.02, ge=0.0)
+    """Voxel size used to canonical-fuse root and selected-history eval points."""
+
+    eval_fusion_max_points: int | None = Field(default=200_000, ge=1)
+    """Maximum retained current-eval points after canonical fusion."""
+
+    target_eval_max_points: int = Field(default=50_000, ge=1)
+    """Maximum retained oracle/eval points after target-local crop fusion."""
+
+    reward_mode: RriRewardMode = RriRewardMode.ROOT_NORMALIZED_GAIN
+    """Candidate score used for rollout selection."""
 
     target_crop_policy: str = TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
     """Explicit target mesh crop policy stored as rollout lineage."""
@@ -133,6 +169,8 @@ class CounterfactualTargetOracleRriScorer:
         )
         self._depth_renderer = self.config.depth.setup_target()
         self._oracle = self.config.oracle.setup_target()
+        self._root_eval: RootEvalPointCloud | None = None
+        self._root_eval_token: tuple[float, ...] | None = None
         try:
             self._target_obb_world = target_gt_obb_world(target_row, target_sample)
         except ValueError as exc:
@@ -174,15 +212,15 @@ class CounterfactualTargetOracleRriScorer:
         )
         target_extent = _aabb_from_points(target_mesh_verts, margin_m=self.config.target_crop_margin_m)
 
-        history_points = trajectory.accumulated_points_world()
-        points_t = point_clouds.semidense_points
-        if history_points.numel() > 0:
-            points_t = torch.cat([points_t, history_points.to(device=device, dtype=dtype)], dim=0)
-
         target_points_t = _crop_points_to_obb(
-            points_t,
+            self._current_eval_points(trajectory, device=device, dtype=dtype, max_points=None),
             target_obb,
             margin_m=self.config.target_crop_margin_m,
+        )
+        target_points_t = canonical_fuse_points(
+            target_points_t,
+            voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+            max_points=int(self.config.target_eval_max_points),
         )
         if target_points_t.shape[0] < int(self.config.min_current_target_points):
             raise TargetRriInvalidError("Target crop contains too few current points for target-RRI evaluation.")
@@ -192,6 +230,8 @@ class CounterfactualTargetOracleRriScorer:
             point_clouds.lengths,
             target_obb,
             margin_m=self.config.target_crop_margin_m,
+            voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+            max_points=int(self.config.target_eval_max_points),
         )
         crop_s = perf_counter() - crop_start_s
 
@@ -205,9 +245,24 @@ class CounterfactualTargetOracleRriScorer:
             extend=target_extent,
         )
         target_oracle_s = perf_counter() - target_oracle_start_s
+        target_root_error = _root_error_for_metric(trajectory, "target_root_pm_dist")
+        target_root_error_t = _root_error_tensor(
+            target_root_error,
+            fallback=target_rri.pm_dist_before,
+            device=device,
+            dtype=dtype,
+        )
+        target_root_gain = _root_normalized_gain(
+            target_rri.pm_dist_before,
+            target_rri.pm_dist_after,
+            target_root_error_t,
+        )
         metrics = CounterfactualMetricBundle(
             rri=target_rri.rri,
             target_rri=target_rri.rri,
+            target_root_gain=target_root_gain,
+            target_root_pm_dist=target_root_error_t.expand_as(target_rri.rri),
+            target_log_error_gain=_log_error_gain(target_rri.pm_dist_before, target_rri.pm_dist_after),
             target_pm_dist_before=target_rri.pm_dist_before,
             target_pm_dist_after=target_rri.pm_dist_after,
             target_pm_acc_before=target_rri.pm_acc_before,
@@ -220,9 +275,15 @@ class CounterfactualTargetOracleRriScorer:
 
         scene_oracle_s = 0.0
         if self.config.include_scene_rri:
+            scene_points_t = self._current_eval_points(
+                trajectory,
+                device=device,
+                dtype=dtype,
+                max_points=self.config.eval_fusion_max_points,
+            )
             scene_oracle_start_s = perf_counter()
             scene_rri = self._oracle.score(
-                points_t=points_t,
+                points_t=scene_points_t,
                 points_q=point_clouds.points,
                 lengths_q=point_clouds.lengths,
                 gt_verts=mesh_verts,
@@ -231,6 +292,20 @@ class CounterfactualTargetOracleRriScorer:
             )
             scene_oracle_s = perf_counter() - scene_oracle_start_s
             metrics.scene_rri = scene_rri.rri
+            scene_root_error = _root_error_for_metric(trajectory, "scene_root_pm_dist")
+            scene_root_error_t = _root_error_tensor(
+                scene_root_error,
+                fallback=scene_rri.pm_dist_before,
+                device=device,
+                dtype=dtype,
+            )
+            metrics.scene_root_gain = _root_normalized_gain(
+                scene_rri.pm_dist_before,
+                scene_rri.pm_dist_after,
+                scene_root_error_t,
+            )
+            metrics.scene_root_pm_dist = scene_root_error_t.expand_as(scene_rri.rri)
+            metrics.scene_log_error_gain = _log_error_gain(scene_rri.pm_dist_before, scene_rri.pm_dist_after)
             metrics.scene_pm_dist_before = scene_rri.pm_dist_before
             metrics.scene_pm_dist_after = scene_rri.pm_dist_after
             metrics.scene_pm_acc_before = scene_rri.pm_acc_before
@@ -247,13 +322,66 @@ class CounterfactualTargetOracleRriScorer:
                 f"total_s={perf_counter() - call_start_s:.3f}",
             )
 
+        scores = target_root_gain if self.config.reward_mode is RriRewardMode.ROOT_NORMALIZED_GAIN else target_rri.rri
+        score_label = (
+            "target_root_gain" if self.config.reward_mode is RriRewardMode.ROOT_NORMALIZED_GAIN else "target_rri"
+        )
+
         return CounterfactualCandidateEvaluation(
-            scores=target_rri.rri,
-            score_label="target_rri",
+            scores=scores,
+            score_label=score_label,
             metrics=metrics,
             candidate_point_clouds_world=point_clouds.points,
             candidate_point_cloud_lengths=point_clouds.lengths,
+            target_eval_current_points_world=target_points_t,
+            target_eval_candidate_points_world=target_points_q,
+            target_eval_candidate_point_lengths=target_lengths_q,
+            target_eval_crop_policy=self.config.target_crop_policy,
+            target_eval_voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+            target_eval_max_points=int(self.config.target_eval_max_points),
         )
+
+    def _current_eval_points(
+        self,
+        trajectory: CounterfactualTrajectory,
+        *,
+        device: torch.device,
+        dtype: torch.dtype,
+        max_points: int | None,
+    ) -> torch.Tensor:
+        root_eval = self._root_eval_for(trajectory)
+        points_t = root_eval.points_world.to(device=device, dtype=dtype)
+        history_points = trajectory.accumulated_points_world()
+        if history_points.numel() > 0:
+            points_t = torch.cat([points_t, history_points.to(device=device, dtype=dtype)], dim=0)
+        return canonical_fuse_points(
+            points_t,
+            voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+            max_points=max_points,
+        )
+
+    def _root_eval_for(self, trajectory: CounterfactualTrajectory) -> RootEvalPointCloud:
+        token = _root_token(trajectory)
+        if self._root_eval is None or self._root_eval_token != token:
+            self._root_eval = build_root_eval_pointcloud(
+                self.sample,
+                source=self.config.eval_point_cloud_source,
+                camera_label=self.config.eval_camera_label,  # type: ignore[arg-type]
+                reference_pose_world=trajectory.root_pose_world,
+                reference_time_ns=trajectory.root_time_ns,
+                reference_trajectory_index=trajectory.root_trajectory_index,
+                reference_frame_index=trajectory.root_frame_index,
+                stride=int(self.config.backprojection_stride),
+                far_m=_eval_depth_far_m(
+                    source=self.config.eval_point_cloud_source,
+                    configured=self.config.eval_depth_far_m,
+                    depth_renderer=self._depth_renderer,
+                ),
+                voxel_size_m=float(self.config.eval_fusion_voxel_size_m),
+                max_points=None,
+            )
+            self._root_eval_token = token
+        return self._root_eval
 
 
 def _crop_points_to_obb(points: torch.Tensor, obb: ObbTW, *, margin_m: float = 0.0) -> torch.Tensor:
@@ -270,12 +398,15 @@ def _crop_padded_pointclouds_to_obb(
     obb: ObbTW,
     *,
     margin_m: float = 0.0,
+    voxel_size_m: float = 0.0,
+    max_points: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     cropped: list[torch.Tensor] = []
     lengths_out: list[int] = []
     for row_index in range(points.shape[0]):
         length = int(lengths[row_index].detach().cpu().item())
         row = _crop_points_to_obb(points[row_index, :length, :3], obb, margin_m=margin_m)
+        row = canonical_fuse_points(row, voxel_size_m=voxel_size_m, max_points=max_points)
         cropped.append(row)
         lengths_out.append(int(row.shape[0]))
     max_len = max(max(lengths_out), 1)

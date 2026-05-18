@@ -14,7 +14,7 @@ import torch
 pytest.importorskip("efm3d")
 
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
-from aria_nbv.rerun_inspector._loggers import ENTITY_WORLD
+from aria_nbv.rerun_inspector._entities import ENTITY_WORLD
 from aria_nbv.rerun_inspector._rollout_zarr import (
     ENTITY_ROLLOUT_DIAGNOSTICS_ROOT,
     ENTITY_ROLLOUT_METADATA,
@@ -151,6 +151,7 @@ def _fixture_rollout_store(tmp_path: Path, *, selected_depth_enabled: bool = Tru
                 candidate_valid[invalid] = False
                 step.candidates.mask_valid = candidate_valid
                 step.candidates.masks["FixtureInvalidRule"] = candidate_valid
+                _reset_target_eval_candidate_rows(step)
                 _mask_vector(step.selection_scores, invalid, fill=float("nan"))
                 _mask_vector(step.selection_logits, invalid, fill=float("nan"))
                 _mask_vector(step.selection_probabilities, invalid, fill=0.0, renormalize=True, valid=candidate_valid)
@@ -175,6 +176,19 @@ def _fixture_rollout_store(tmp_path: Path, *, selected_depth_enabled: bool = Tru
         selected_depth_enabled=selected_depth_enabled,
     )
     return result.store_dir
+
+
+def _reset_target_eval_candidate_rows(step: Any) -> None:
+    """Realign fixture target-eval compact rows after mutating candidate validity."""
+
+    valid_count = int(step.candidates.mask_valid.detach().cpu().to(dtype=torch.bool).sum().item())
+    step.target_eval_candidate_points_world = torch.zeros((valid_count, 2, 3), dtype=torch.float32)
+    step.target_eval_candidate_point_lengths = torch.full((valid_count,), 2, dtype=torch.long)
+    for valid_index in range(valid_count):
+        step.target_eval_candidate_points_world[valid_index, :, :] = torch.tensor(
+            [[float(valid_index), 0.0, 0.0], [float(valid_index), 0.1, 0.0]],
+            dtype=torch.float32,
+        )
 
 
 def _mask_vector(
@@ -214,6 +228,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
 
     logger.start()
+    assert fake.blueprints == []
     rows = logger.log_store(store_dir=store_dir, rollout_index=0)
 
     assert [call[0] for call in fake.calls[:2]] == ["init", "save"]
@@ -223,7 +238,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert ENTITY_WORLD in fake.logged
     assert ENTITY_ROLLOUT_METADATA in fake.logged
     chain_root = f"{ENTITY_ROLLOUT_ROOT}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}"
-    assert len(fake.blueprints) == 2
+    assert len(fake.blueprints) == 1
     rollout_contents = _world_view_contents_from_blueprint(fake.blueprints[-1])
     rollout_overrides = _world_view_overrides_from_blueprint(fake.blueprints[-1])
     assert rollout_contents == ["+ /world/**"]
@@ -264,6 +279,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     depth_array = np.asarray(depth_image.args[0])
     assert depth_array.shape == (240, 240)
     assert np.isnan(depth_array[0, 0])
+    assert not any(str(call[1]).endswith("/camera/points") for call in fake.calls if call[0] == "log")
 
     pinhole = fake.logged_extras[camera_path][0]
     assert pinhole.kwargs["resolution"] == [240.0, 240.0]
@@ -327,16 +343,78 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert step_metadata["q_h"]["state_row_found"]
     assert step_metadata["q_h"]["selected_transition_available"]
     assert step_metadata["invalid_candidate_count"] > 0
-    assert step_metadata["display_validity_trusted"]
+    assert "display_validity_trusted" not in step_metadata
+    assert "stored_invalid_candidate_count" not in step_metadata
     assert step_metadata["selected_depth"]["available"]
+    assert step_metadata["selected_depth"]["representation"] == "depth_image"
     assert step_metadata["selected_depth"]["depth_entity"].startswith(f"{chain_root}/step_000/selected/")
     assert step_metadata["selected_depth"]["depth_entity"].endswith("/camera/depth")
+    assert step_metadata["selected_depth"]["points_entity"] is None
 
     selected_path = fake.logged[selected_path_entity]
     assert len(selected_path.args[0]) == 2
     np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape, (2, 3))
     assert len(selected_path.kwargs["colors"]) == 2
     assert selected_path.kwargs["colors"][0] != selected_path.kwargs["colors"][1]
+
+
+def test_rollout_zarr_logger_can_log_selected_depth_as_point_cloud(tmp_path: Path) -> None:
+    store_dir = _fixture_rollout_store(tmp_path)
+    cfg = RerunOfflineInspectorConfig()
+    cfg.output.save_path = tmp_path / "rollout.rrd"
+    cfg.selection.rollout_context_mode = "off"
+    cfg.rollout_depths.representation = "point_cloud"
+    cfg.rollout_depths.max_points = 8
+    cfg.rollout_depths.point_radius = 0.012
+    fake = _FakeRerun()
+
+    logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
+    logger.start()
+    rows = logger.log_store(store_dir=store_dir, rollout_index=0)
+
+    chain_root = f"{ENTITY_ROLLOUT_ROOT}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}"
+    point_calls = [
+        call
+        for call in fake.calls
+        if call[0] == "log"
+        and str(call[1]).startswith(f"{chain_root}/step_")
+        and "/selected/candidate_shell_" in str(call[1])
+        and str(call[1]).endswith("/camera/points")
+    ]
+    assert len(point_calls) == rows.step_rows.shape[0]
+    assert not any(str(call[1]).endswith("/camera/depth") for call in fake.calls if call[0] == "log")
+
+    points_path = str(point_calls[0][1])
+    points = np.asarray(fake.logged[points_path].args[0])
+    assert points.shape == (8, 3)
+    assert np.isfinite(points).all()
+    assert not np.any(points[:, 2] == 42.0)
+    assert fake.logged[points_path].kwargs["radii"] == pytest.approx(0.012)
+
+    step_metadata = json.loads(fake.logged[f"{ENTITY_ROLLOUT_METADATA}/rollout_000000/chain_000000/step_000"].args[0])
+    assert step_metadata["selected_depth"]["representation"] == "point_cloud"
+    assert step_metadata["selected_depth"]["depth_entity"] is None
+    assert step_metadata["selected_depth"]["points_entity"].endswith("/camera/points")
+
+
+def test_rollout_zarr_logger_can_log_selected_depth_as_depth_and_points(tmp_path: Path) -> None:
+    store_dir = _fixture_rollout_store(tmp_path)
+    cfg = RerunOfflineInspectorConfig()
+    cfg.output.save_path = tmp_path / "rollout.rrd"
+    cfg.selection.rollout_context_mode = "off"
+    cfg.rollout_depths.representation = "both"
+    cfg.rollout_depths.max_points = 3
+    fake = _FakeRerun()
+
+    logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
+    logger.start()
+    rows = logger.log_store(store_dir=store_dir, rollout_index=0)
+
+    depth_paths = [str(call[1]) for call in fake.calls if call[0] == "log" and str(call[1]).endswith("/camera/depth")]
+    point_paths = [str(call[1]) for call in fake.calls if call[0] == "log" and str(call[1]).endswith("/camera/points")]
+    assert len(depth_paths) == rows.step_rows.shape[0]
+    assert len(point_paths) == rows.step_rows.shape[0]
+    assert all(np.asarray(fake.logged[path].args[0]).shape == (3, 3) for path in point_paths)
 
 
 def test_rollout_zarr_logger_warns_when_selected_depth_is_unavailable(tmp_path: Path) -> None:
@@ -390,7 +468,7 @@ def test_candidate_rri_summary_keeps_invalid_nan_rows_out_of_fanout() -> None:
         target_rri=np.asarray([np.nan, 0.1, 0.3, np.nan], dtype=np.float32),
         scene_rri=np.asarray([np.nan, 0.2, 0.4, np.nan], dtype=np.float32),
         probabilities=np.asarray([0.0, 0.25, 0.75, 0.0], dtype=np.float32),
-        entropy=np.asarray([np.nan, 0.5, 0.5, np.nan], dtype=np.float32),
+        entropy=0.5,
         valid_mask=np.asarray([False, True, True, False]),
         selected_mask=np.asarray([False, False, True, False]),
         top_k=2,
@@ -410,7 +488,7 @@ def test_candidate_rri_summary_all_invalid_has_no_fake_low_rri() -> None:
         target_rri=np.asarray([np.nan, np.nan], dtype=np.float32),
         scene_rri=np.asarray([np.nan, np.nan], dtype=np.float32),
         probabilities=np.asarray([0.0, 0.0], dtype=np.float32),
-        entropy=np.asarray([np.nan, np.nan], dtype=np.float32),
+        entropy=float("nan"),
         valid_mask=np.asarray([False, False]),
         selected_mask=np.asarray([False, False]),
         top_k=5,

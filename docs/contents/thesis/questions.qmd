@@ -123,11 +123,12 @@ quality of a selected target under a fixed view budget while keeping the
 training return, endpoint evaluation metric, and acquisition costs separate?
 
 **Working hypothesis.** Endpoint target-quality gain should be the main
-equal-budget trajectory metric. Cumulative target RRI should remain the
-finite-horizon return for rollout ranking and $Q_H$ training. Log target-error
-gain, episode normalization, and scalarized motion or feasibility costs are
+equal-budget trajectory metric. The default finite-horizon return for rollout
+ranking and $Q_H$ training is root-normalized additive target gain, while
+state-relative target RRI remains a one-step diagnostic and VIN-compatible
+label. Log target-error gain and scalarized motion or feasibility costs are
 explicit ablations after the quality-only baseline is stable, not silent
-replacements for RRI.
+replacements for the root-normalized reward.
 
 For a rollout rooted at state $s_0$, target $e$, horizon $H$, and valid action
 sequence $\tau=(a_0,\ldots,a_{H-1})$, let $q_t=q_{t,a_t}$ be the selected
@@ -167,25 +168,23 @@ Conceptually, $J_{e,\Delta}^{(H)}$ is the fraction of the initial target error
 removed after $H$ selected views. It is relative to the rollout root $\mathcal{P}_0$ and
 is comparable only under a fixed horizon or fixed acquisition budget.
 
-The immediate RRI reward remains state-relative to the previous fused
-counterfactual state:
+The default immediate rollout/Q_H reward is root-normalized against the initial
+target error:
 $$
-r_t^e =
-\operatorname{RRI}_e(q_t \mid \mathcal{P}_t,M_e)=
-\frac{\Delta_t^e-\Delta_{t+1}^e}{\Delta_t^e+\varepsilon}.
+r_{t,\mathrm{root}}^e =
+\frac{\Delta_t^e-\Delta_{t+1}^e}{\Delta_0^e+\varepsilon}.
 $$
 The finite-horizon learning return is
 $$
 G_0^{(H)}(\tau)=
-\sum_{t=0}^{H-1}\gamma^t r_t^e.
+\sum_{t=0}^{H-1}\gamma^t r_{t,\mathrm{root}}^e.
 $$
-This split keeps $G_0^{(H)}$ additive for fitted value learning while keeping
-$J_{e,\Delta}^{(H)}$ interpretable as an endpoint quality score. Because each
-immediate RRI term is normalized by the current error $\Delta_t^e$,
-$G_0^{(H)}$ is not algebraically identical to endpoint gain. The return is used
-for rollout ranking and Bellman-style training; endpoint gain is used for the
-fixed-budget evaluation metric. The existing one-step RRI label remains
-unchanged for VIN compatibility and one-step greedy/model comparisons. Valid
+With $\gamma=1$, this cumulative reward equals endpoint gain up to numerical
+epsilon. The return is used for rollout ranking and Bellman-style training;
+endpoint gain is still reported as the fixed-budget evaluation metric. The
+state-relative one-step RRI
+$(\Delta_t^e-\Delta_{t+1}^e)/(\Delta_t^e+\varepsilon)$ remains stored as a
+diagnostic and VIN compatibility label, not as the default $Q_H$ reward. Valid
 actions may have negative reward if they worsen target distance; invalid
 candidates are hard-masked constraints, not low-RRI examples.
 
@@ -369,7 +368,7 @@ J_{e,\Delta}^{(H)}(\pi_{\mathrm{oracle\text{-}1}}).
 $$
 
 Here $\pi_{\mathrm{oracle\text{-}look}}$ selects the first action of a bounded
-$H$-step oracle search that maximizes the same cumulative target-RRI return used
+$H$-step oracle search that maximizes the same root-normalized return used
 for $Q_H$ training; endpoint gain evaluates the resulting trajectory. If
 $\Delta_{\mathrm{look}}\approx 0$, the thesis reports no measurable non-myopic
 headroom for the evaluated candidate distribution, horizon, branch factor,
@@ -426,7 +425,7 @@ claim, but it is the required myopic control.
 **Success bar.** Learned $Q_{H,\theta}$ selected actions must be
 oracle-evaluated under equal acquisition and candidate budgets. The primary
 comparison is endpoint target-quality gain; the secondary training-aligned
-comparison is cumulative target RRI. When $\Delta_{\mathrm{look}}>0$,
+comparison is cumulative root-normalized target gain. When $\Delta_{\mathrm{look}}>0$,
 $Q_{H,\theta}$ should beat the learned one-step target-conditioned scorer and
 one-step model/greedy selection, while bounded oracle lookahead remains the
 upper reference and random-valid remains the lower reference. Also report the
@@ -580,10 +579,10 @@ large-scale generation.
 
 | Question | Roadmap gate | Primary evidence | Main linked surface |
 |---|---|---|---|
-| [RQ1](#rq1-objective) | M1, M5 | endpoint target-quality gain, cumulative target RRI, acquisition-cost curves | [RRI theory](../theory/rri_theory.qmd) |
+| [RQ1](#rq1-objective) | M1, M5 | endpoint target-quality gain, cumulative target-root gain, diagnostic target RRI, acquisition-cost curves | [RRI theory](../theory/rri_theory.qmd) |
 | [RQ2](#rq2-target-encoding) | M3, M4 | actor-visible target encoding and crop-descriptor ablation | [EVL notes](../literature/efm3d.qmd) |
 | [RQ3](#rq3-candidates) | M3, M5 | mixed candidate sampler, branch/beam support, stochastic rollout diversity, and validity statistics | [Candidate API](../../reference/aria_nbv.pose_generation.CandidateViewGenerator.qmd) |
-| [RQ4](#rq4-planning) | M4, M5 | one-step scorer evidence gate, oracle lookahead, rollout traces, endpoint gain, cumulative target RRI, and $Q_{H,\theta}$ success bar | [Rollout/Q_H contract](../theory/rl_planning.qmd) |
+| [RQ4](#rq4-planning) | M4, M5 | one-step scorer evidence gate, oracle lookahead, rollout traces, endpoint gain, cumulative target-root gain, diagnostic target RRI, and $Q_{H,\theta}$ success bar | [Rollout/Q_H contract](../theory/rl_planning.qmd) |
 | [RQ5](#rq5-scaling) | M2 to M7 | ASE scale, external mesh/oracle-compatible expansion, online discrete scale, and coverage reports | [M1 contract report](m1_contract_report.qmd) |
 | [RQ6](#rq6-escalation) | M6 | online discrete Q_H and time-permitting continuous target-then-pose policy escalation | [Roadmap M6](roadmap.qmd#roadmap-m6) |
 | [Protocol](#rq-evidence-protocol) | M1 to M7 | invalidity masks/reason metrics, scene-level splits, no sample leakage, coverage reports, calibration/stage-shift diagnostics, Zarr/LRZ gates, and ablation tables | [M1 contract report](m1_contract_report.qmd) |

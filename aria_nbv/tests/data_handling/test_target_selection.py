@@ -227,6 +227,24 @@ def test_backbone_obb_without_2d_projection_can_use_3d_support() -> None:
 
     assert len(result.selected_rows) == 1
     assert result.selected_rows[0].projected_area_pixels == 0.0
+    assert 0.0 < result.selected_rows[0].visibility_score < 1.0
+
+
+def test_missing_projection_is_penalized_against_visible_supported_target() -> None:
+    sample = _sample(
+        detected_obbs=_obb_block([[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]], box_size=0.0),
+        points=[[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]],
+    )
+    visible = _obb_block([[3.0, 0.0, 0.0]], box_size=100.0)
+    detected = torch.cat([sample.detected_obbs.obbs[:1], visible.obbs], dim=0)
+    sample.detected_obbs = CompactObbBlock(obbs=detected, sem_id_to_name={0: "chair"})
+
+    result = _selector(k=2).select(sample)
+
+    assert result.rows[0].projected_area_pixels == 0.0
+    assert result.rows[0].visibility_score == pytest.approx(0.35)
+    assert result.rows[1].visibility_score == pytest.approx(1.0)
+    assert result.selected_rows[0].source_index == 1
 
 
 def test_projected_visibility_can_still_be_required() -> None:
@@ -272,6 +290,20 @@ def test_selected_target_matches_compatible_gt_obb() -> None:
     assert row.gt_match_status == "matched"
     assert row.gt_target_row_id == 0
     assert np.isclose(row.gt_match_iou, 1.0)
+    assert np.isclose(row.gt_match_score, 1.0)
+
+
+def test_gt_match_score_keeps_iou_distinct_from_observed_reliability() -> None:
+    detected = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[10], box_size=0.0)
+    gt = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[99])
+    sample = _sample(detected_obbs=detected, gt_obbs=gt, points=[[0.0, 0.0, 0.0]])
+
+    row = _selector(k=1).select(sample).selected_rows[0]
+
+    assert row.gt_label_valid
+    assert row.gt_match_iou == pytest.approx(1.0)
+    assert row.gt_match_score == pytest.approx(row.visibility_score * row.support_score)
+    assert row.gt_match_score < row.gt_match_iou
 
 
 def test_duplicate_predicted_targets_make_gt_match_ambiguous() -> None:
@@ -310,3 +342,17 @@ def test_v0_gt_sanity_source_is_opt_in() -> None:
     assert len(result.selected_rows) == 1
     assert result.selected_rows[0].gt_label_valid
     assert result.selected_rows[0].gt_match_status == "v0_gt_input"
+
+
+def test_target_selection_diagnostic_summary_counts_selection_strata() -> None:
+    detected = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[10], box_size=0.0)
+    gt = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[99])
+    sample = _sample(detected_obbs=detected, gt_obbs=gt, points=[[0.0, 0.0, 0.0]])
+
+    summary = _selector(k=1).select(sample).diagnostic_summary()
+
+    assert summary["num_rows"] == 1
+    assert summary["num_selected"] == 1
+    assert summary["num_gt_label_valid"] == 1
+    assert summary["num_missing_projection"] == 1
+    assert summary["mean_effective_support_count"] == pytest.approx(1.0)

@@ -12,10 +12,10 @@ from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.pose import PoseTW
 from pytorch3d.renderer.cameras import PerspectiveCameras
 
+from aria_nbv.rerun_inspector._blueprint import log_default_inspector_blueprint
 from aria_nbv.rerun_inspector._colors import TARGET_OBB_RGBA
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
-from aria_nbv.rerun_inspector._loggers import (
-    ENTITY_ASE_KEYFRAME_MEDIA,
+from aria_nbv.rerun_inspector._entities import (
     ENTITY_CANDIDATE_ROOT,
     ENTITY_DEPTH_KEYFRAMES,
     ENTITY_DETECTED_OBBS,
@@ -29,8 +29,9 @@ from aria_nbv.rerun_inspector._loggers import (
     ENTITY_SEMIDENSE,
     ENTITY_TRAJECTORY,
     ENTITY_WORLD,
+)
+from aria_nbv.rerun_inspector._loggers import (
     RerunOfflineLogger,
-    log_default_inspector_blueprint,
 )
 from aria_nbv.rerun_inspector._metadata import OfflineVisualInventory, normalize_visual_inventory
 
@@ -195,6 +196,35 @@ def _obb_tensor(offset: float = 0.0, *, sem_id: int = 0, inst_id: int = 1, prob:
     return data
 
 
+def _minimal_context_cfg() -> RerunOfflineInspectorConfig:
+    """Return a config that logs semidense context without candidate/reference layers."""
+
+    cfg = RerunOfflineInspectorConfig()
+    cfg.primitives.log_reference_pose = False
+    cfg.primitives.log_candidate_frusta = False
+    cfg.primitives.log_top_oracle_frustum = False
+    cfg.primitives.log_invalid_frusta = False
+    cfg.primitives.log_candidate_centers = False
+    return cfg
+
+
+def _minimal_candidate_cfg() -> RerunOfflineInspectorConfig:
+    """Return a config for selected candidate/detail tests without context layers."""
+
+    cfg = _minimal_context_cfg()
+    cfg.primitives.log_semidense = False
+    return cfg
+
+
+def _minimal_keyframe_cfg() -> RerunOfflineInspectorConfig:
+    """Return a config that logs only opt-in ASE keyframe media."""
+
+    cfg = _minimal_candidate_cfg()
+    cfg.primitives.log_rgb_keyframes = True
+    cfg.primitives.log_depth_keyframes = True
+    return cfg
+
+
 def test_default_blueprint_hides_heavy_context_and_requested_world_subtrees() -> None:
     fake = _FakeBlueprintRerun()
 
@@ -211,6 +241,7 @@ def test_default_blueprint_hides_heavy_context_and_requested_world_subtrees() ->
     overrides = _world_view_overrides_from_blueprint(fake.blueprints[0])
     assert contents == ["+ /world/**"]
     assert all(not rule.startswith("- ") for rule in contents)
+    assert f"/{ENTITY_CANDIDATE_ROOT}" in overrides
     assert f"/{ENTITY_EFM_VOXELS}" in overrides
     assert f"/{ENTITY_GT_OBBS}" in overrides
     assert "/world/rollout/rollout_000000/chain_000000/step_000/valid" in overrides
@@ -325,15 +356,10 @@ def test_worker_b_candidate_pcs_semidense_flag_does_not_disable_required_semiden
 def test_semidense_downsampling_is_deterministic(tmp_path) -> None:
     """Configured seed should make semidense downsampling repeatable."""
 
-    cfg = RerunOfflineInspectorConfig()
+    cfg = _minimal_context_cfg()
     cfg.output.save_path = tmp_path / "out.rrd"
     cfg.performance.max_semidense_points = 8
     cfg.performance.seed = 123
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
     sample = _sample(num_points=80)
 
     fake_a = _FakeRerun()
@@ -358,12 +384,7 @@ def test_semidense_downsampling_is_deterministic(tmp_path) -> None:
 def test_semidense_logging_uses_valid_xyz_prefix() -> None:
     """VIN semidense logging should handle padded point features with extra channels."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_context_cfg()
     points = torch.arange(5 * 4, dtype=torch.float32).reshape(5, 4)
     sample = _sample()
     sample.vin_snippet = SimpleNamespace(points_world=points, lengths=torch.tensor([3]))
@@ -383,14 +404,8 @@ def test_semidense_logging_uses_valid_xyz_prefix() -> None:
 def test_candidate_points_are_logged_only_when_inventory_reports_present() -> None:
     """Candidate point clouds are optional and gated by inventory."""
 
-    cfg = RerunOfflineInspectorConfig()
+    cfg = _minimal_candidate_cfg()
     cfg.primitives.log_candidate_points = True
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
     sample = _sample()
 
     missing = _FakeRerun()
@@ -413,10 +428,8 @@ def test_candidate_points_are_logged_only_when_inventory_reports_present() -> No
 def test_selected_candidate_index_overrides_detail_layers() -> None:
     """Explicit selected candidate index should control selected-only modalities."""
 
-    cfg = RerunOfflineInspectorConfig()
+    cfg = _minimal_candidate_cfg()
     cfg.candidate.selected_index = 0
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
     cfg.primitives.log_candidate_points = True
     cfg.primitives.log_candidate_depths = True
     sample = _sample()
@@ -429,16 +442,14 @@ def test_selected_candidate_index_overrides_detail_layers() -> None:
     )
 
     assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/points" in fake.logged  # noqa: S101
-    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/depth" in fake.logged  # noqa: S101
+    assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/camera/depth" in fake.logged  # noqa: S101
     assert f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/points" not in fake.logged  # noqa: S101
 
 
 def test_zero_candidate_samples_log_no_candidate_layers() -> None:
     """A no-candidate sample should not visualize padded candidate poses."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
+    cfg = _minimal_candidate_cfg()
     sample = _sample(candidate_count=0, validity=[False, False, False])
     fake = _FakeRerun()
 
@@ -454,9 +465,8 @@ def test_zero_candidate_samples_log_no_candidate_layers() -> None:
 def test_all_invalid_candidates_do_not_log_top_oracle_frustum() -> None:
     """Top-oracle visualization should be omitted when every candidate is invalid."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
+    cfg = _minimal_candidate_cfg()
+    cfg.primitives.log_candidate_frusta = True
     sample = _sample(validity=[False, False, False])
     fake = _FakeRerun()
 
@@ -475,13 +485,7 @@ def test_all_invalid_candidates_do_not_log_top_oracle_frustum() -> None:
 def test_compact_modalities_log_to_stable_entity_paths() -> None:
     """Compact OBBs, trajectory, and candidate depths should have fixed Rerun paths."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     cfg.primitives.log_candidate_depths = True
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(obbs=_obb_tensor(0.0))
@@ -505,7 +509,7 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
     assert ENTITY_TRAJECTORY in fake.logged  # noqa: S101
     invalid_raw_top_path = f"{ENTITY_CANDIDATE_ROOT}/invalid/candidate_001/camera"
     camera_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/camera"
-    depth_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/depth"
+    depth_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_002/camera/depth"
     first_path = f"{ENTITY_CANDIDATE_ROOT}/valid/candidate_000/camera"
     assert first_path not in fake.logged  # noqa: S101
     assert depth_path in fake.logged  # noqa: S101
@@ -522,14 +526,8 @@ def test_compact_modalities_log_to_stable_entity_paths() -> None:
 def test_mesh_logging_uses_mesh3d_with_configured_alpha() -> None:
     """GT mesh should use Rerun Mesh3D with configured albedo alpha."""
 
-    cfg = RerunOfflineInspectorConfig()
+    cfg = _minimal_candidate_cfg()
     cfg.geometry.mesh_alpha = 48
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
     sample = _sample()
     sample.efm_snippet_view = SimpleNamespace(
         mesh_verts=torch.tensor([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32),
@@ -557,13 +555,7 @@ def test_mesh_logging_uses_mesh3d_with_configured_alpha() -> None:
 def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
     """Snippet-frame OBB payloads should be drawn under world after applying T_world_snippet."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(obbs=_obb_tensor(0.0))
     sample.efm_snippet_view = SimpleNamespace(efm={ARIA_SNIPPET_T_WORLD_SNIPPET: _poses([[10.0, 0.0, 0.0]])})
@@ -582,11 +574,7 @@ def test_obbs_are_transformed_from_snippet_to_world_before_logging() -> None:
 def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
     """GT and detected OBB labels should expose class names when maps exist."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(
         obbs=_obb_tensor(0.0, sem_id=28, inst_id=8, prob=0.7),
@@ -616,11 +604,7 @@ def test_obb_labels_include_class_names_and_unknown_fallback() -> None:
 def test_target_obb_hint_accepts_rollout_target_id_tokens() -> None:
     """Rollout target ids use compact ``sem=...`` and ``inst=...`` tokens."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     sample = _sample()
     sample.gt_obbs = SimpleNamespace(
         obbs=_obb_tensor(0.0, sem_id=28, inst_id=34, prob=1.0),
@@ -644,11 +628,7 @@ def test_target_obb_hint_accepts_rollout_target_id_tokens() -> None:
 def test_efm_voxel_fields_log_thresholded_points() -> None:
     """Curated EFM voxel fields should map tensor axes as D->z, H->y, W->x."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     cfg.efm_voxels.log_occ_pr = True
     cfg.efm_voxels.occ_threshold = 0.5
     cfg.efm_voxels.cent_threshold = 0.5
@@ -686,11 +666,7 @@ def test_efm_voxel_fields_log_thresholded_points() -> None:
 def test_efm_voxel_extent_logs_posed_native_box() -> None:
     """The EFM voxel extent should be logged as a world-space oriented box."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_candidate_centers = False
+    cfg = _minimal_candidate_cfg()
     cfg.efm_voxels.log_occ_pr = False
     cfg.efm_voxels.log_cent_pr = False
     cfg.efm_voxels.log_cent_pr_nms = False
@@ -716,16 +692,10 @@ def test_efm_voxel_extent_logs_posed_native_box() -> None:
     )
 
 
-def test_ase_keyframes_are_rotated_and_logged_outside_world_tree() -> None:
-    """ASE image/depth keyframes should use display CW90 media paths."""
+def test_ase_keyframes_are_rotated_and_logged_under_camera_entities() -> None:
+    """ASE image/depth keyframes should use display CW90 camera media paths."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_candidate_centers = False
-    cfg.primitives.log_rgb_keyframes = True
-    cfg.primitives.log_depth_keyframes = True
+    cfg = _minimal_keyframe_cfg()
     image = torch.tensor(
         [
             [
@@ -756,13 +726,12 @@ def test_ase_keyframes_are_rotated_and_logged_outside_world_tree() -> None:
     )
 
     camera_path = f"{ENTITY_RGB_KEYFRAMES}/frame_000/camera"
-    image_path = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_000/image"
-    depth_path = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_000/depth"
+    image_path = f"{camera_path}/image"
+    depth_path = f"{camera_path}/depth"
     assert camera_path in fake.logged  # noqa: S101
     assert image_path in fake.logged  # noqa: S101
     assert depth_path in fake.logged  # noqa: S101
-    assert f"{camera_path}/image" not in fake.logged  # noqa: S101
-    assert f"{camera_path}/depth" not in fake.logged  # noqa: S101
+    assert not any(path.startswith("media/ase") for path in fake.logged)  # noqa: S101
     assert np.asarray(fake.logged[image_path].args[0]).shape == (3, 2, 3)  # noqa: S101
     np.testing.assert_array_equal(
         np.asarray(fake.logged[depth_path].args[0]),
@@ -773,15 +742,7 @@ def test_ase_keyframes_are_rotated_and_logged_outside_world_tree() -> None:
 def test_missing_keyframe_context_is_reported_in_metadata() -> None:
     """Requested live keyframes should not become orphan images without camera context."""
 
-    cfg = RerunOfflineInspectorConfig()
-    cfg.primitives.log_semidense = False
-    cfg.primitives.log_reference_pose = False
-    cfg.primitives.log_candidate_frusta = False
-    cfg.primitives.log_top_oracle_frustum = False
-    cfg.primitives.log_invalid_frusta = False
-    cfg.primitives.log_candidate_centers = False
-    cfg.primitives.log_rgb_keyframes = True
-    cfg.primitives.log_depth_keyframes = True
+    cfg = _minimal_keyframe_cfg()
     sample = _sample()
     fake = _FakeRerun()
     logger = RerunOfflineLogger(cfg, rr_module=fake)

@@ -29,6 +29,7 @@ from ..utils import BaseConfig, TargetConfig
 from .candidate_generation import CandidateViewGenerator, CandidateViewGeneratorConfig
 from .types import (
     CandidateGenerationRuntimeContext,
+    CandidatePositionMode,
     CandidateSamplingResult,
     SamplingStrategy,
     ViewDirectionMode,
@@ -40,12 +41,26 @@ _STRATEGY_IDS = {
     ViewDirectionMode.RADIAL_TOWARDS: 2,
     ViewDirectionMode.TARGET_POINT: 3,
 }
+_POSITION_IDS = {
+    CandidatePositionMode.UPPER_BOUND_FREE_SHELL: 0,
+    CandidatePositionMode.FORWARD_LOCAL: 1,
+    CandidatePositionMode.TARGET_BEARING_LOCAL: 2,
+    CandidatePositionMode.LATERAL_TARGET_BYPASS: 3,
+    CandidatePositionMode.LOCAL_REFINEMENT: 4,
+    CandidatePositionMode.REVISIT_BACKTRACK: 5,
+}
 
 
 def candidate_strategy_id(strategy: ViewDirectionMode | str) -> int:
     """Return the stable integer provenance id for a view-direction family."""
 
     return _STRATEGY_IDS[ViewDirectionMode(strategy)]
+
+
+def candidate_position_id(position_mode: CandidatePositionMode | str) -> int:
+    """Return the stable integer provenance id for a position family."""
+
+    return _POSITION_IDS[CandidatePositionMode(position_mode)]
 
 
 class CandidateMixtureComponentConfig(BaseConfig):
@@ -57,8 +72,14 @@ class CandidateMixtureComponentConfig(BaseConfig):
     count: int = Field(ge=1)
     """Number of full-shell candidates sampled by this component."""
 
-    strategy: ViewDirectionMode
-    """View-direction family used as the stable candidate-strategy provenance."""
+    strategy: ViewDirectionMode | None = None
+    """Backward-compatible alias for ``view_mode``."""
+
+    view_mode: ViewDirectionMode | None = None
+    """View-direction family used as stable candidate-strategy provenance."""
+
+    position_mode: CandidatePositionMode | None = None
+    """Position-family prior used to sample candidate centers."""
 
     sampling_strategy: SamplingStrategy | None = None
     """Optional positional sampling override."""
@@ -78,6 +99,17 @@ class CandidateMixtureComponentConfig(BaseConfig):
     view_max_elevation_deg: float | None = None
     view_roll_jitter_deg: float | None = None
 
+    @model_validator(mode="after")
+    def _resolve_modes(self) -> "CandidateMixtureComponentConfig":
+        view_mode = self.view_mode if self.view_mode is not None else self.strategy
+        if view_mode is None:
+            raise ValueError("Candidate mixture components require view_mode or strategy.")
+        object.__setattr__(self, "view_mode", view_mode)
+        object.__setattr__(self, "strategy", view_mode)
+        if self.position_mode is None:
+            object.__setattr__(self, "position_mode", CandidatePositionMode.UPPER_BOUND_FREE_SHELL)
+        return self
+
 
 class CandidateMixtureViewGeneratorConfig(TargetConfig["CandidateMixtureViewGenerator"]):
     """Config-as-factory for fixed-count mixed candidate tables."""
@@ -86,36 +118,68 @@ class CandidateMixtureViewGeneratorConfig(TargetConfig["CandidateMixtureViewGene
     def target_type(self) -> type["CandidateMixtureViewGenerator"]:
         return CandidateMixtureViewGenerator
 
-    base: CandidateViewGeneratorConfig = Field(default_factory=CandidateViewGeneratorConfig)
+    base: CandidateViewGeneratorConfig = Field(
+        default_factory=lambda: CandidateViewGeneratorConfig(
+            sampling_strategy=SamplingStrategy.FORWARD_POWERSPHERICAL,
+            min_radius=0.25,
+            max_radius=1.25,
+            min_elev_deg=-12.0,
+            max_elev_deg=18.0,
+            delta_azimuth_deg=120.0,
+            kappa=8.0,
+            enforce_motion_realism=True,
+            max_step_distance_m=1.25,
+            max_height_delta_m=0.6,
+            max_backward_step_m=0.35,
+            max_yaw_delta_deg=85.0,
+            collect_debug_stats=True,
+        )
+    )
     """Base generator settings shared by all mixture components."""
 
     components: list[CandidateMixtureComponentConfig] = Field(
         default_factory=lambda: [
             CandidateMixtureComponentConfig(
-                name="target_point",
-                count=24,
-                strategy=ViewDirectionMode.TARGET_POINT,
+                name="target_bearing_local",
+                count=18,
+                view_mode=ViewDirectionMode.TARGET_POINT,
+                position_mode=CandidatePositionMode.TARGET_BEARING_LOCAL,
                 view_max_azimuth_deg=0.0,
                 view_max_elevation_deg=0.0,
             ),
             CandidateMixtureComponentConfig(
-                name="radial_towards",
-                count=12,
-                strategy=ViewDirectionMode.RADIAL_TOWARDS,
+                name="forward_local",
+                count=18,
+                view_mode=ViewDirectionMode.FORWARD_RIG,
+                position_mode=CandidatePositionMode.FORWARD_LOCAL,
                 view_max_azimuth_deg=0.0,
                 view_max_elevation_deg=0.0,
             ),
             CandidateMixtureComponentConfig(
-                name="radial_away",
+                name="lateral_target_bypass",
                 count=12,
-                strategy=ViewDirectionMode.RADIAL_AWAY,
+                view_mode=ViewDirectionMode.TARGET_POINT,
+                position_mode=CandidatePositionMode.LATERAL_TARGET_BYPASS,
                 view_max_azimuth_deg=0.0,
                 view_max_elevation_deg=0.0,
             ),
             CandidateMixtureComponentConfig(
-                name="forward_rig",
-                count=12,
-                strategy=ViewDirectionMode.FORWARD_RIG,
+                name="local_refinement",
+                count=6,
+                view_mode=ViewDirectionMode.RADIAL_TOWARDS,
+                position_mode=CandidatePositionMode.LOCAL_REFINEMENT,
+                min_radius=0.2,
+                max_radius=0.7,
+                view_max_azimuth_deg=0.0,
+                view_max_elevation_deg=0.0,
+            ),
+            CandidateMixtureComponentConfig(
+                name="revisit_backtrack",
+                count=6,
+                view_mode=ViewDirectionMode.FORWARD_RIG,
+                position_mode=CandidatePositionMode.REVISIT_BACKTRACK,
+                min_radius=0.25,
+                max_radius=0.9,
                 view_max_azimuth_deg=0.0,
                 view_max_elevation_deg=0.0,
             ),
@@ -134,6 +198,22 @@ class CandidateMixtureViewGeneratorConfig(TargetConfig["CandidateMixtureViewGene
         """Total full-shell candidate budget across mixture components."""
 
         return sum(component.count for component in self.components)
+
+    @classmethod
+    def upper_bound_free_shell(cls, *, count: int = 60) -> "CandidateMixtureViewGeneratorConfig":
+        """Build the explicit legacy free-shell upper-bound ablation config."""
+
+        return cls(
+            base=CandidateViewGeneratorConfig(),
+            components=[
+                CandidateMixtureComponentConfig(
+                    name="upper_bound_free_shell",
+                    count=count,
+                    view_mode=ViewDirectionMode.RADIAL_AWAY,
+                    position_mode=CandidatePositionMode.UPPER_BOUND_FREE_SHELL,
+                )
+            ],
+        )
 
     @property
     def device(self) -> torch.device:
@@ -227,7 +307,13 @@ class CandidateMixtureViewGenerator:
             device = result.mask_valid.device
             result.strategy_id = torch.full(
                 (shell_count,),
-                candidate_strategy_id(component.strategy),
+                candidate_strategy_id(component.view_mode),
+                dtype=torch.int64,
+                device=device,
+            )
+            result.position_id = torch.full(
+                (shell_count,),
+                candidate_position_id(component.position_mode),
                 dtype=torch.int64,
                 device=device,
             )
@@ -252,16 +338,28 @@ class CandidateMixtureViewGenerator:
         runtime_context: CandidateGenerationRuntimeContext | None,
     ) -> CandidateViewGeneratorConfig:
         target_point = self.config.base.view_target_point_world
-        if component.strategy == ViewDirectionMode.TARGET_POINT:
+        position_target = self.config.base.position_target_point_world
+        if component.view_mode == ViewDirectionMode.TARGET_POINT:
             if runtime_context is None or runtime_context.target_center_world is None:
                 raise ValueError("TARGET_POINT candidate components require runtime_context.target_center_world.")
             target_point = torch.as_tensor(runtime_context.target_center_world, dtype=torch.float32).reshape(3)
+        if component.position_mode in (
+            CandidatePositionMode.TARGET_BEARING_LOCAL,
+            CandidatePositionMode.LATERAL_TARGET_BYPASS,
+        ):
+            if runtime_context is None or runtime_context.target_center_world is None:
+                raise ValueError(
+                    f"{component.position_mode.value} components require runtime_context.target_center_world."
+                )
+            position_target = torch.as_tensor(runtime_context.target_center_world, dtype=torch.float32).reshape(3)
 
         updates: dict[str, Any] = {
             "num_samples": component.count,
             "oversample_factor": 1.0,
-            "view_direction_mode": component.strategy,
+            "view_direction_mode": component.view_mode,
+            "position_mode": component.position_mode,
             "view_target_point_world": target_point,
+            "position_target_point_world": position_target,
         }
         if self.config.base.seed is not None:
             updates["seed"] = int(self.config.base.seed) + component_index
@@ -301,6 +399,7 @@ def _concat_results(
     mask_valid = torch.cat([result.mask_valid.reshape(-1) for result in results], dim=0)
     shell_offsets = _cat_optional([result.shell_offsets_ref for result in results])
     strategy_id = _cat_required([result.strategy_id for result in results], "strategy_id")
+    position_id = _cat_required([result.position_id for result in results], "position_id")
     mixture_id = _cat_required([result.mixture_id for result in results], "mixture_id")
     sampler_probability = _cat_required([result.sampler_probability for result in results], "sampler_probability")
     masks = _concat_masks(results, mask_valid)
@@ -315,6 +414,7 @@ def _concat_results(
         shell_offsets_ref=shell_offsets,
         sampling_pose=first.sampling_pose,
         strategy_id=strategy_id,
+        position_id=position_id,
         mixture_id=mixture_id,
         sampler_probability=sampler_probability,
         component_name=component_name,
@@ -346,17 +446,35 @@ def _concat_masks(results: list[CandidateSamplingResult], mask_valid: torch.Tens
 
 
 def _concat_extras(results: list[CandidateSamplingResult]) -> dict[str, Any]:
+    names = sorted({name for result in results for name, value in result.extras.items() if torch.is_tensor(value)})
     extras: dict[str, Any] = {}
-    for result in results:
-        for name, value in result.extras.items():
+    for name in names:
+        template = next(result.extras[name] for result in results if torch.is_tensor(result.extras.get(name)))
+        chunks = []
+        for result in results:
+            value = result.extras.get(name)
             if torch.is_tensor(value):
-                extras.setdefault(name, []).append(value)
-    return {name: torch.cat(values, dim=0) for name, values in extras.items() if len(values) == len(results)}
+                chunks.append(value)
+                continue
+            shell_count = int(result.mask_valid.reshape(-1).shape[0])
+            chunks.append(_missing_extra_tensor(template, shell_count=shell_count, device=result.mask_valid.device))
+        extras[name] = torch.cat(chunks, dim=0)
+    return extras
+
+
+def _missing_extra_tensor(template: torch.Tensor, *, shell_count: int, device: torch.device) -> torch.Tensor:
+    shape = (shell_count, *template.shape[1:])
+    if template.dtype == torch.bool:
+        return torch.zeros(shape, dtype=template.dtype, device=device)
+    if template.dtype.is_floating_point:
+        return torch.full(shape, float("nan"), dtype=template.dtype, device=device)
+    return torch.full(shape, -1, dtype=template.dtype, device=device)
 
 
 __all__ = [
     "CandidateMixtureComponentConfig",
     "CandidateMixtureViewGenerator",
     "CandidateMixtureViewGeneratorConfig",
+    "candidate_position_id",
     "candidate_strategy_id",
 ]

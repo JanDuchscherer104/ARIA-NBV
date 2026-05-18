@@ -61,6 +61,17 @@ class ViewDirectionMode(StrEnum):
     TARGET_POINT = "target_point"
 
 
+class CandidatePositionMode(StrEnum):
+    """How to sample candidate camera centers before orientation is assigned."""
+
+    UPPER_BOUND_FREE_SHELL = "upper_bound_free_shell"
+    FORWARD_LOCAL = "forward_local"
+    TARGET_BEARING_LOCAL = "target_bearing_local"
+    LATERAL_TARGET_BYPASS = "lateral_target_bypass"
+    LOCAL_REFINEMENT = "local_refinement"
+    REVISIT_BACKTRACK = "revisit_backtrack"
+
+
 class CollisionBackend(StrEnum):
     """Backend for collision tests."""
 
@@ -151,8 +162,9 @@ class CandidateSamplingResult:
     * `shell_poses`: full-shell world<-camera `PoseTW` payload, shape
       `(N, 12)`;
     * `mask_valid`: full-shell actor-action mask, shape `(N,)`;
-    * `strategy_id`, `mixture_id`, `sampler_probability`, and `component_name`:
-      optional full-shell provenance arrays/tuples aligned with `mask_valid`.
+    * `strategy_id`, `position_id`, `mixture_id`, `sampler_probability`, and
+      `component_name`: optional full-shell provenance arrays/tuples aligned
+      with `mask_valid`.
 
     Invalid candidates remain in the full shell and must receive false training
     masks and NaN oracle labels rather than low RRI.
@@ -172,6 +184,8 @@ class CandidateSamplingResult:
     """World <- sampling pose (gravity-aligned when enabled) used to generate candidate centers. FIXME: Previously we only provided reference_pose, which was *not* gravity-aligned."""
     strategy_id: torch.Tensor | None = None
     """Full-shell candidate strategy ids aligned with ``mask_valid``."""
+    position_id: torch.Tensor | None = None
+    """Full-shell position-family ids aligned with ``mask_valid``."""
     mixture_id: torch.Tensor | None = None
     """Full-shell mixture component ids aligned with ``mask_valid``."""
     sampler_probability: torch.Tensor | None = None
@@ -286,6 +300,7 @@ class CandidateSamplingResult:
 
 __all__ = [
     "SamplingStrategy",
+    "CandidatePositionMode",
     "CandidateGenerationRuntimeContext",
     "CollisionBackend",
     "ViewDirectionMode",

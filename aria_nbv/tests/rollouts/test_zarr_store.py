@@ -9,6 +9,7 @@ import json
 import numpy as np
 import pytest
 import torch
+import zarr
 
 pytest.importorskip("efm3d")
 
@@ -61,7 +62,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     reader = RolloutZarrStoreReader(result.store_dir)
     assert reader.root.attrs["schema_id"] == "aria_nbv.rollout_zarr_q_invalidity"
     assert reader.root.attrs["schema_version"] == ROLLOUT_ZARR_SCHEMA_VERSION
-    assert reader.root.attrs["return_semantics"] == "cumulative_target_rri"
+    assert reader.root.attrs["return_semantics"] == "cumulative_target_root_gain"
     assert reader.root.attrs["manifest_path"] == ROLLOUT_MANIFEST_FILENAME
     assert result.manifest_path.exists()
     assert result.manifest_sha256 == reader.root.attrs["manifest_sha256"]
@@ -73,6 +74,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert manifest["counts"]["rollouts"] == result.num_rollouts
     assert manifest["counts"]["steps"] == result.num_steps
     assert manifest["counts"]["candidates"] == result.num_candidates
+    assert manifest["counts"]["target_eval_crops"] >= result.num_steps
     assert manifest["counts"]["q_h_states"] == result.num_steps
     assert manifest["generation"]["invocation"]["mode"] == "programmatic"
     assert manifest["source_coverage"]["scene_counts"] == {"fixture_box": 3}
@@ -90,8 +92,21 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     root_pose = reader.array("rollouts/root_pose_world")
     assert root_pose.shape == (result.num_rollouts, 12)
     assert np.isfinite(root_pose).all()
+    assert reader.array("rollouts/root_time_ns").shape == (result.num_rollouts,)
+    assert reader.array("rollouts/root_trajectory_index").shape == (result.num_rollouts,)
+    assert reader.array("rollouts/root_frame_index").shape == (result.num_rollouts,)
 
-    candidate_valid = reader.array("candidates/candidate_valid_mask")
+    deleted_candidate_arrays = {
+        "candidate_valid_mask",
+        "padded_mask",
+        "heavy_diag_available_mask",
+        "selection_entropy",
+    }
+    assert deleted_candidate_arrays.isdisjoint(set(reader.root["candidates"].array_keys()))
+    assert "transition_id" not in set(reader.root["steps"].array_keys())
+    assert "transition" not in set(reader.root["dictionaries"].array_keys())
+
+    candidate_valid = reader.array("candidates/actor_action_mask")
     selection_probabilities = reader.array("candidates/selection_probabilities")
     assert np.all(selection_probabilities[~candidate_valid] == 0.0)
     assert np.all(reader.array("candidates/selected_mask") <= candidate_valid)
@@ -113,12 +128,35 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
         reader.array("selected_depth/candidate_row_id"),
         reader.array("steps/selected_candidate_row_id"),
     )
+    target_eval_crops = reader.root["target_eval_crops"]
+    assert target_eval_crops.attrs["role"] == "oracle_eval_only"
+    assert target_eval_crops.attrs["coordinate_frame"] == "world"
+    assert target_eval_crops.attrs["max_points"] == 50_000
+    crop_rows = int(target_eval_crops["crop_row_id"].shape[0])
+    assert crop_rows == manifest["counts"]["target_eval_crops"]
+    assert target_eval_crops["points_world"].shape == (crop_rows, 50_000, 3)
+    assert target_eval_crops["mask"].shape == (crop_rows, 50_000)
+    assert np.array_equal(
+        np.asarray(target_eval_crops["mask"]).sum(axis=1).astype(np.int32),
+        np.asarray(target_eval_crops["lengths"]),
+    )
+    assert set(np.asarray(target_eval_crops["source_role_id"]).tolist()) == {0, 1}
+    assert np.any(np.asarray(target_eval_crops["candidate_row_id"]) == -1)
 
     q_h = reader.q_h_view()
     q_h_group = reader.root["q_h"]
     assert q_h_group.attrs["view_role"] == "training_core_derived_cache"
+    assert q_h_group.attrs["td_semantics"] == "selected_transition_only"
+    assert q_h_group.attrs["reward_metric"] == "target_root_gain"
+    assert q_h_group.attrs["return_semantics"] == "cumulative_target_root_gain"
     assert q_h_group.attrs["chunk_states"] == 64
     assert q_h_group.attrs["state_count"] == result.num_steps
+    assert {
+        "one_step_scene_rri",
+        "bootstrap_next_step_row_id",
+        "terminal_mask",
+        "discount",
+    }.isdisjoint(set(q_h_group.array_keys()))
     q_candidate_row_id = q_h["candidate_row_id"]
     valid_action_mask = q_h["valid_action_mask"]
     q_train_mask = q_h["q_train_mask"]
@@ -128,15 +166,33 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert q_candidate_row_id.shape == valid_action_mask.shape
     assert np.all(q_train_mask <= valid_action_mask)
     assert "q_target_target_rri" not in q_h
+    assert "one_step_target_root_gain" in q_h
+    assert "td_reward" in q_h
+    assert np.isfinite(q_h["one_step_target_root_gain"][q_train_mask]).all()
+    assert np.isfinite(q_h["td_reward"]).all()
     assert np.all(~valid_action_mask[q_candidate_row_id < 0])
-    assert np.allclose(q_h["discount"][:2], np.asarray([1.0, 0.95], dtype=np.float32))
-    derived_q_h = reader.q_h_view(discount_gamma=0.95)
+    derived_q_h = reader.q_h_view(discount_gamma=0.5)
+    assert np.any(derived_q_h["td_discount"] != q_h["td_discount"])
     for name, actual in q_h.items():
         expected = derived_q_h[name]
+        if name == "td_discount":
+            continue
         if np.issubdtype(actual.dtype, np.floating):
             assert np.allclose(actual, expected, equal_nan=True)
         else:
             assert np.array_equal(actual, expected)
+
+
+def test_rollout_zarr_rejects_stale_schema_version(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=11)[:1]
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+
+    root = zarr.open_group(result.store_dir, mode="a")
+    root.attrs["schema_version"] = "0.5-selected-depth"
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("0.5-selected-depth" in error and ROLLOUT_ZARR_SCHEMA_VERSION in error for error in validation.errors)
 
 
 def test_rollout_zarr_validation_requires_selected_depth_when_enabled(tmp_path) -> None:
@@ -172,7 +228,7 @@ def test_rollout_zarr_selected_action_td_fields_align_with_step_rows(tmp_path) -
     assert np.all(td_discount[~td_terminal] > 0.0)
 
 
-def test_rollout_zarr_requires_explicit_target_rri_for_q_training(tmp_path) -> None:
+def test_rollout_zarr_requires_explicit_target_root_gain_for_q_training(tmp_path) -> None:
     records = build_rollout_records(horizon=1, num_samples=6, seed=11)[:1]
     for step in _steps(records[0]):
         step.metric_vectors = {}
@@ -184,8 +240,10 @@ def test_rollout_zarr_requires_explicit_target_rri_for_q_training(tmp_path) -> N
 
     assert np.isfinite(reader.array("candidates/selection_logits")).any()
     assert np.isnan(reader.array("candidates/target_rri")).all()
+    assert np.isnan(reader.array("candidates/target_root_gain")).all()
     assert not reader.array("candidates/q_train_mask").any()
     assert np.isnan(q_h["one_step_target_rri"]).all()
+    assert np.isnan(q_h["one_step_target_root_gain"]).all()
     assert not q_h["q_train_mask"].any()
 
 
@@ -193,16 +251,37 @@ def test_rollout_zarr_never_backfills_scene_rri_from_generic_rri(tmp_path) -> No
     records = build_rollout_records(horizon=1, num_samples=6, seed=10)[:1]
     for step in _steps(records[0]):
         generic = torch.arange(step.candidates.mask_valid.shape[0], dtype=torch.float32)
-        step.metric_vectors = {"rri": generic, "target_rri": generic}
-        step.selected_metrics = {"rri": 1.0, "target_rri": 1.0}
+        step.metric_vectors = {"rri": generic, "target_rri": generic, "target_root_gain": generic + 10.0}
+        step.selected_metrics = {"rri": 1.0, "target_rri": 1.0, "target_root_gain": 11.0}
 
     result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
     reader = RolloutZarrStoreReader(result.store_dir)
     q_h = reader.q_h_view()
 
     assert np.isfinite(reader.array("candidates/target_rri")).any()
+    assert np.isfinite(reader.array("candidates/target_root_gain")).any()
     assert np.isnan(reader.array("candidates/scene_rri")).all()
-    assert np.isnan(q_h["one_step_scene_rri"]).all()
+    assert "one_step_scene_rri" not in q_h
+
+
+def test_rollout_zarr_qh_reward_uses_target_root_gain_not_target_rri(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=14)[:1]
+    for step in _steps(records[0]):
+        full = torch.arange(step.candidates.mask_valid.shape[0], dtype=torch.float32)
+        step.metric_vectors["target_rri"] = full + 1.0
+        step.metric_vectors["target_root_gain"] = full + 101.0
+        selected = int(step.selected_shell_index)
+        step.selected_metrics["target_rri"] = float(full[selected].item() + 1.0)
+        step.selected_metrics["target_root_gain"] = float(full[selected].item() + 101.0)
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    reader = RolloutZarrStoreReader(result.store_dir)
+    q_h = reader.q_h_view()
+    selected_index = int(q_h["selected_candidate_index"][0])
+
+    assert q_h["td_reward"][0] == pytest.approx(q_h["one_step_target_root_gain"][0, selected_index])
+    assert q_h["td_reward_target_rri"][0] == pytest.approx(q_h["one_step_target_rri"][0, selected_index])
+    assert q_h["td_reward"][0] != pytest.approx(q_h["td_reward_target_rri"][0])
 
 
 def test_rollout_zarr_masks_invalid_candidate_oracle_labels(tmp_path) -> None:
@@ -211,16 +290,24 @@ def test_rollout_zarr_masks_invalid_candidate_oracle_labels(tmp_path) -> None:
     invalid_shell_index = 0 if int(step.selected_shell_index) != 0 else 1
     step.candidates.mask_valid[invalid_shell_index] = False
     step.metric_vectors["target_rri"] = torch.arange(step.candidates.mask_valid.shape[0], dtype=torch.float32)
+    step.metric_vectors["target_root_gain"] = (
+        torch.arange(step.candidates.mask_valid.shape[0], dtype=torch.float32) + 10.0
+    )
+    valid_count = int(step.candidates.mask_valid.sum().item())
+    step.target_eval_candidate_points_world = step.target_eval_candidate_points_world[:valid_count]
+    step.target_eval_candidate_point_lengths = step.target_eval_candidate_point_lengths[:valid_count]
 
     result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
     reader = RolloutZarrStoreReader(result.store_dir)
     q_h = reader.q_h_view()
 
-    candidate_valid = reader.array("candidates/candidate_valid_mask")
+    candidate_valid = reader.array("candidates/actor_action_mask")
     assert not candidate_valid[invalid_shell_index]
     assert np.isnan(reader.array("candidates/target_rri")[invalid_shell_index])
+    assert np.isnan(reader.array("candidates/target_root_gain")[invalid_shell_index])
     assert not reader.array("candidates/q_train_mask")[invalid_shell_index]
     assert np.isnan(q_h["one_step_target_rri"][0, invalid_shell_index])
+    assert np.isnan(q_h["one_step_target_root_gain"][0, invalid_shell_index])
     assert not q_h["q_train_mask"][0, invalid_shell_index]
 
 

@@ -266,16 +266,21 @@ def validate(*, quiet: bool = False) -> int:
     errors: list[str] = []
     try:
         active = _load_active()
-        _load_resolved()
+        resolved = _load_resolved()
     except ValueError as exc:
         errors.append(str(exc))
         active = {"issue": [], "todo": [], "refactor": []}
+        resolved = {"issue": [], "todo": [], "refactor": []}
 
     active_issue_ids = {str(record.get("id")) for record in active["issue"]}
     seen_ids: set[str] = set()
     for kind in ("issue", "todo", "refactor"):
         for record in active[kind]:
             errors.extend(_validate_record(kind, record, active_issue_ids, seen_ids))
+    active_ids = {str(record.get("id")) for records in active.values() for record in records}
+    resolved_ids = {str(record.get("id")) for records in resolved.values() for record in records}
+    for record_id in sorted(active_ids & resolved_ids):
+        errors.append(f"{record_id}: active id reuses a resolved record id")
 
     if errors:
         print("agents DB validation failed", file=sys.stderr)

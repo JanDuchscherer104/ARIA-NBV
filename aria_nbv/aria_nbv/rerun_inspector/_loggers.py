@@ -3,102 +3,75 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import torch
 from efm3d.aria.aria_constants import ARIA_SNIPPET_T_WORLD_SNIPPET
 from efm3d.aria.obb import ObbTW, transform_obbs
 from efm3d.aria.pose import PoseTW
-from efm3d.aria.tensor_wrapper import TensorWrapper
 from pytorch3d.transforms import matrix_to_quaternion
 from torch import Tensor
 
 from ..utils.semantic_names import semantic_class_name
+from ._blueprint import log_default_inspector_blueprint
 from ._colors import obb_semantic_rgba
+from ._entities import (
+    ENTITY_CANDIDATE_ROOT,
+    ENTITY_DEPTH_KEYFRAMES,
+    ENTITY_DETECTED_OBBS,
+    ENTITY_EFM_VOXEL_EXTENT,
+    ENTITY_EFM_VOXELS,
+    ENTITY_GT_OBBS,
+    ENTITY_MESH,
+    ENTITY_METADATA_SAMPLE,
+    ENTITY_REFERENCE_POSE,
+    ENTITY_RGB_KEYFRAMES,
+    ENTITY_SEMIDENSE,
+    ENTITY_TRAJECTORY,
+    ENTITY_WORLD,
+)
+from ._geometry import (
+    camera_tw_pinhole_kwargs as _camera_tw_pinhole_kwargs,
+)
+from ._geometry import (
+    candidate_centers_world as _candidate_centers_world,
+)
+from ._geometry import (
+    depth_hw as _depth_hw,
+)
+from ._geometry import (
+    deterministic_downsample,
+)
+from ._geometry import (
+    display_rot90_cw as _display_rot90_cw,
+)
+from ._geometry import (
+    image_hwc as _image_hwc,
+)
+from ._geometry import (
+    p3d_pinhole_kwargs as _p3d_pinhole_kwargs,
+)
+from ._geometry import (
+    pose_rt as _pose_rt,
+)
+from ._geometry import (
+    subset_poses as _subset_poses,
+)
+from ._geometry import (
+    to_numpy as _to_numpy,
+)
 from ._metadata import OfflineVisualInventory, build_sample_metadata_document
+from ._session import RerunModule, log_world_coordinates, start_rerun_recording
 
 if TYPE_CHECKING:
     from efm3d.aria.camera import CameraTW
-    from numpy.typing import DTypeLike, NDArray
-    from pytorch3d.renderer.cameras import PerspectiveCameras
+    from numpy.typing import NDArray
 
     from aria_nbv.data_handling import VinOfflineSample
 
     from ._config import RerunOfflineInspectorConfig
-
-RerunEntityFactory: TypeAlias = Callable[..., object]
-LineStripPayload: TypeAlias = list[Any]
-
-
-class RerunModule(Protocol):
-    """Subset of the Rerun module used by the offline inspector."""
-
-    Points3D: RerunEntityFactory
-    LineStrips3D: RerunEntityFactory
-    Boxes3D: RerunEntityFactory
-    AnyValues: RerunEntityFactory
-    TextDocument: RerunEntityFactory
-    Scalar: RerunEntityFactory
-    Scalars: RerunEntityFactory
-    SeriesLines: RerunEntityFactory
-    SeriesPoints: RerunEntityFactory
-    Transform3D: RerunEntityFactory
-    Mesh3D: RerunEntityFactory
-    Image: RerunEntityFactory
-    DepthImage: RerunEntityFactory
-    Pinhole: RerunEntityFactory
-    ViewCoordinates: Any
-    TransformRelation: Any
-
-    def init(self, *args: object, **kwargs: object) -> None:
-        """Initialize a recording."""
-
-    def save(self, *args: object, **kwargs: object) -> None:
-        """Open a save sink."""
-
-    def spawn(self, *args: object, **kwargs: object) -> None:
-        """Open a viewer sink."""
-
-    def connect_grpc(self, *args: object, **kwargs: object) -> None:
-        """Connect to a Rerun server."""
-
-    def log(self, entity_path: str, entity: object, *args: object, **kwargs: object) -> None:
-        """Log one entity."""
-
-    def set_time(self, timeline: str, *, sequence: int | None = None, **kwargs: object) -> None:
-        """Set a timeline for subsequent logs."""
-
-    def set_time_sequence(self, timeline: str, sequence: int, **kwargs: object) -> None:
-        """Set an integer timeline for subsequent logs."""
-
-
-ENTITY_WORLD = "world"
-ENTITY_SEMIDENSE = "world/ase/semidense"
-ENTITY_REFERENCE_POSE = "world/ase/reference/rig"
-ENTITY_METADATA_SAMPLE = "metadata/sample"
-ENTITY_MESH = "world/gt/mesh"
-ENTITY_CANDIDATE_ROOT = "world/candidates"
-ENTITY_GT_OBBS = "world/gt/obbs"
-ENTITY_DETECTED_OBBS = "world/efm/obbs/detected"
-ENTITY_TRAJECTORY = "world/ase/trajectory/rig"
-ENTITY_RGB_KEYFRAMES = "world/ase/cameras/rgb"
-ENTITY_DEPTH_KEYFRAMES = "world/ase/cameras/rgb"
-ENTITY_ASE_KEYFRAME_MEDIA = "media/ase/cameras/rgb"
-ENTITY_EFM_VOXELS = "world/efm/voxels"
-ENTITY_EFM_VOXEL_EXTENT = "world/efm/voxels/extent"
-
-_FRUSTUM_EDGES = (
-    (0, 1),
-    (0, 2),
-    (0, 3),
-    (0, 4),
-    (1, 2),
-    (2, 3),
-    (3, 4),
-    (4, 1),
-)
 
 _OBB_EDGES = (
     (0, 1),
@@ -116,272 +89,12 @@ _OBB_EDGES = (
 )
 
 
-def _to_numpy(value: object, *, dtype: DTypeLike = np.float32) -> NDArray[Any]:
-    """Convert tensors and tensor-wrapper payloads to NumPy arrays."""
-
-    if isinstance(value, TensorWrapper):
-        value = value._data
-    if isinstance(value, torch.Tensor):
-        value = value.detach().cpu().numpy()
-    return np.asarray(value, dtype=dtype)
-
-
-def deterministic_downsample(points: object, *, max_points: int, seed: int | None) -> NDArray[Any]:
-    """Return a deterministic subset of ``points`` with shape ``(N, 3)``."""
-
-    arr = _to_numpy(points).reshape(-1, 3)
-    if max_points <= 0:
-        return arr[:0]
-    if arr.shape[0] <= max_points:
-        return arr
-    rng = np.random.default_rng(seed)
-    indices = np.sort(rng.choice(arr.shape[0], size=max_points, replace=False))
-    return arr[indices]
-
-
-def _world_view_contents() -> list[str]:
-    """Return the default world-view query rules for Rerun blueprints."""
-
-    return ["+ /world/**"]
-
-
-def _hidden_world_view_paths(*, hidden_world_paths: Sequence[str] = ()) -> tuple[str, ...]:
-    """Return rooted world-view entity paths hidden by default but still included."""
-
-    return (
-        _normalize_blueprint_entity_path(ENTITY_EFM_VOXELS),
-        _normalize_blueprint_entity_path(ENTITY_GT_OBBS),
-        *(_normalize_blueprint_entity_path(path) for path in hidden_world_paths),
-    )
-
-
-def _normalize_blueprint_entity_path(path: str) -> str:
-    """Return a rooted entity path suitable for Rerun blueprint query rules."""
-
-    return f"/{path.lstrip('/')}"
-
-
-def log_default_inspector_blueprint(
-    rr_module: RerunModule,
-    *,
-    hidden_world_paths: Sequence[str] = (),
-) -> None:
-    """Send the default inspector layout when the installed Rerun SDK supports blueprints."""
-
-    send_blueprint = getattr(rr_module, "send_blueprint", None)
-    if send_blueprint is None:
-        return
-    try:
-        import rerun.blueprint as rrb
-
-        blueprint = rrb.Blueprint(
-            rrb.Horizontal(
-                rrb.Spatial3DView(
-                    name="World",
-                    origin="/world",
-                    contents=_world_view_contents(),
-                    overrides={
-                        path: rrb.EntityBehavior(visible=False)
-                        for path in _hidden_world_view_paths(hidden_world_paths=hidden_world_paths)
-                    },
-                ),
-                rrb.Vertical(
-                    rrb.TimeSeriesView(name="Rollout RRI", origin="/plots/rollout/rri"),
-                    rrb.TimeSeriesView(name="Rollout Diagnostics", origin="/plots/rollout/diagnostics"),
-                    rrb.TextDocumentView(
-                        name="Metadata",
-                        origin="/metadata",
-                        contents=["/metadata/**"],
-                    ),
-                    row_shares=[2, 1, 1],
-                ),
-                column_shares=[3, 1],
-            ),
-            collapse_panels=False,
-        )
-        send_blueprint(blueprint, make_active=True, make_default=True)
-    except Exception:
-        return
-
-
 def _candidate_count(sample: VinOfflineSample) -> int:
     """Return the valid candidate width for one sample."""
 
     count = int(sample.oracle.candidate_count)
     pose_count = int(_to_numpy(sample.oracle.candidate_poses_world_cam._data).reshape(-1, 12).shape[0])
     return min(max(count, 0), pose_count)
-
-
-def _pose_rt(poses: PoseTW, indices: Sequence[int] | None = None) -> tuple[NDArray[Any], NDArray[Any]]:
-    """Extract ``R`` and ``t`` from a PoseTW-like batch."""
-
-    r = _to_numpy(poses.R).reshape(-1, 3, 3)
-    t = _to_numpy(poses.t).reshape(-1, 3)
-    if indices is not None:
-        idx = np.asarray(indices, dtype=np.int64)
-        r = r[idx]
-        t = t[idx]
-    return r, t
-
-
-def _p3d_param_at(values: Tensor, index: int) -> NDArray[Any]:
-    """Return one PyTorch3D camera parameter row as ``float32``."""
-
-    arr = _to_numpy(values).reshape(-1, values.shape[-1])
-    if arr.shape[0] == 0:
-        raise ValueError("PyTorch3D camera parameter batch is empty.")
-    row = arr[0] if arr.shape[0] == 1 else arr[min(max(index, 0), arr.shape[0] - 1)]
-    return np.asarray(row, dtype=np.float32)
-
-
-def _p3d_pinhole_kwargs(cameras: PerspectiveCameras, index: int) -> dict[str, list[float]]:
-    """Return Rerun ``Pinhole`` kwargs from a PyTorch3D camera entry.
-
-    PyTorch3D stores ``image_size`` as ``(height, width)``; Rerun expects
-    ``resolution`` as ``[width, height]``.
-    """
-
-    image_size = _p3d_param_at(cameras.image_size, index)
-    focal = _p3d_param_at(cameras.focal_length, index)
-    principal = _p3d_param_at(cameras.principal_point, index)
-    height, width = float(image_size[0]), float(image_size[1])
-    return {
-        "resolution": [width, height],
-        "focal_length": [float(focal[0]), float(focal[1])],
-        "principal_point": [float(principal[0]), float(principal[1])],
-    }
-
-
-def _camera_tw_pinhole_kwargs(camera: CameraTW) -> dict[str, list[float]]:
-    """Return Rerun ``Pinhole`` kwargs from one EFM ``CameraTW`` entry."""
-
-    size = _to_numpy(camera.size).reshape(-1, 2)[0]
-    focal = _to_numpy(camera.f).reshape(-1, 2)[0]
-    principal = _to_numpy(camera.c).reshape(-1, 2)[0]
-    return {
-        "resolution": [float(size[0]), float(size[1])],
-        "focal_length": [float(focal[0]), float(focal[1])],
-        "principal_point": [float(principal[0]), float(principal[1])],
-    }
-
-
-def _fallback_candidate_centers_world(poses_world_cam: PoseTW, indices: Sequence[int]) -> NDArray[Any]:
-    """Return candidate camera centers from PoseTW translations."""
-
-    _, centers = _pose_rt(poses_world_cam, indices)
-    return centers
-
-
-def _fallback_frusta_line_strips(
-    poses_world_cam: PoseTW,
-    *,
-    indices: Sequence[int],
-    scale: float,
-) -> tuple[list[list[list[float]]], list[str] | None]:
-    """Build simple batched camera-frustum line strips in world frame.
-
-    The helper treats candidate poses as ``T_world_cam`` and uses the positive
-    camera-Z direction for display-only frustum geometry.
-    """
-
-    r, t = _pose_rt(poses_world_cam, indices)
-    z = float(scale)
-    xy = float(scale) * 0.55
-    corners_cam = np.asarray(
-        [
-            [0.0, 0.0, 0.0],
-            [-xy, -xy, z],
-            [xy, -xy, z],
-            [xy, xy, z],
-            [-xy, xy, z],
-        ],
-        dtype=np.float32,
-    )
-    strips: list[list[list[float]]] = []
-    for rot, trans in zip(r, t, strict=False):
-        corners_world = (rot @ corners_cam.T).T + trans.reshape(1, 3)
-        for start, end in _FRUSTUM_EDGES:
-            strips.append([corners_world[start].tolist(), corners_world[end].tolist()])
-    return strips, None
-
-
-def _subset_poses(poses_world_cam: PoseTW, indices: Sequence[int]) -> PoseTW:
-    """Return a PoseTW-like subset without importing data-handling internals."""
-
-    data = poses_world_cam._data
-    if data is None:
-        raise ValueError("PoseTW payload is empty; cannot subset candidate poses.")
-    data = data.reshape(-1, 12)
-    index = torch.as_tensor(list(indices), device=data.device, dtype=torch.long)
-    return cast("PoseTW", PoseTW(data.index_select(0, index)))
-
-
-def _subset_cameras(cameras: PerspectiveCameras, indices: Sequence[int]) -> PerspectiveCameras:
-    """Return a camera batch subset when the camera object supports indexing."""
-
-    try:
-        return cameras[list(indices)]
-    except Exception:
-        return cameras
-
-
-def _subset_optional_1d(values: object | None, indices: Sequence[int]) -> NDArray[Any] | None:
-    """Return a selected one-dimensional NumPy view for optional labels/colors."""
-
-    if values is None:
-        return None
-    arr = _to_numpy(values).reshape(-1)
-    return arr[np.asarray(indices, dtype=np.int64)]
-
-
-def _worker_c_frusta_line_strips(
-    poses_world_cam: PoseTW,
-    *,
-    indices: Sequence[int],
-    scale: float,
-    cameras: PerspectiveCameras | None = None,
-    oracle_rri: Tensor | None = None,
-    validity: NDArray[Any] | None = None,
-) -> tuple[LineStripPayload, list[str] | None]:
-    """Use Worker-C frusta helpers when available, otherwise local fallback."""
-
-    try:
-        from . import _frusta
-    except ImportError:
-        return _fallback_frusta_line_strips(poses_world_cam, indices=indices, scale=scale)
-
-    p3d_helper = getattr(_frusta, "frusta_from_p3d_cameras", None)
-    if callable(p3d_helper) and cameras is not None:
-        result = p3d_helper(
-            _subset_poses(poses_world_cam, indices),
-            _subset_cameras(cameras, indices),
-            depth_m=scale,
-            candidate_ids=list(indices),
-            oracle_rri=_subset_optional_1d(oracle_rri, indices),
-            validity=_subset_optional_1d(validity, indices),
-        )
-        return list(result.line_strips), list(result.labels)
-
-    for name in ("build_rerun_frusta_line_strips", "build_frusta_line_strips"):
-        helper = getattr(_frusta, name, None)
-        if callable(helper):
-            return helper(poses_world_cam, indices=indices, scale=scale), None
-    return _fallback_frusta_line_strips(poses_world_cam, indices=indices, scale=scale)
-
-
-def _worker_c_candidate_centers(poses_world_cam: PoseTW, indices: Sequence[int]) -> NDArray[Any]:
-    """Use Worker-C center helpers when available, otherwise local fallback."""
-
-    try:
-        from . import _frusta
-    except ImportError:
-        return _fallback_candidate_centers_world(poses_world_cam, indices)
-
-    for name in ("candidate_centers_world", "pose_centers_world"):
-        helper = getattr(_frusta, name, None)
-        if callable(helper):
-            return np.asarray(helper(poses_world_cam, indices=indices), dtype=np.float32)
-    return _fallback_candidate_centers_world(poses_world_cam, indices)
 
 
 def _rgba(name: str, count: int) -> list[list[int]]:
@@ -859,42 +572,6 @@ def _trajectory_points(sample: VinOfflineSample) -> NDArray[Any]:
     return centers
 
 
-def _image_hwc(tensor: object, index: int) -> NDArray[Any]:
-    """Convert a CHW image tensor in [0,1] or [0,255] to HWC uint8."""
-
-    arr = _to_numpy(tensor)
-    if arr.ndim == 4:
-        arr = arr[index]
-    if arr.ndim == 3 and arr.shape[0] in (1, 3):
-        arr = np.moveaxis(arr, 0, -1)
-    arr = np.asarray(arr)
-    if arr.dtype != np.uint8:
-        arr = np.clip(arr, 0.0, 1.0 if float(np.nanmax(arr)) <= 1.0 else 255.0)
-        if float(np.nanmax(arr)) <= 1.0:
-            arr = arr * 255.0
-        arr = arr.astype(np.uint8)
-    return arr
-
-
-def _depth_hw(tensor: object, index: int) -> NDArray[Any]:
-    """Return one depth frame as ``float32`` with shape ``(H, W)``."""
-
-    arr = _to_numpy(tensor)
-    if arr.ndim == 4:
-        arr = arr[index, 0]
-    elif arr.ndim == 3:
-        arr = arr[index]
-        if arr.ndim == 3 and arr.shape[0] == 1:
-            arr = arr[0]
-    return np.asarray(arr, dtype=np.float32)
-
-
-def _display_rot90_cw(array: NDArray[Any]) -> NDArray[Any]:
-    """Apply ARIA's display-only 90 degree clockwise image convention."""
-
-    return np.ascontiguousarray(np.rot90(array, k=-1))
-
-
 def _keyframe_indices(num_frames: int) -> list[int]:
     """Return the first/last keyframe indices used for compact inspection."""
 
@@ -1000,7 +677,7 @@ class RerunOfflineLogger:
     def _log_world_coordinates(self) -> None:
         """Declare the Rerun scene root as ARIA's right-handed Z-up world."""
 
-        self.rr.log(ENTITY_WORLD, self.rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
+        log_world_coordinates(self.rr)
 
     def _log_pose_transform(
         self,
@@ -1048,22 +725,7 @@ class RerunOfflineLogger:
     def start(self) -> None:
         """Initialize the Rerun recording and open the configured sink before logging."""
 
-        output = self.config.output
-        self.rr.init(output.application_id, recording_id=output.recording_id)
-        if output.mode == "save":
-            output.save_path.parent.mkdir(parents=True, exist_ok=True)
-            self.rr.save(output.save_path)
-        elif output.mode == "spawn":
-            self.rr.spawn(
-                port=output.spawn_port,
-                connect=True,
-                memory_limit=output.spawn_memory_limit,
-                hide_welcome_screen=output.hide_welcome_screen,
-            )
-        elif output.mode == "connect":
-            self.rr.connect_grpc(output.connect_addr)
-        else:  # pragma: no cover - pydantic constrains this.
-            raise ValueError(f"Unsupported Rerun output mode: {output.mode}")
+        start_rerun_recording(self.rr, self.config.output)
         log_default_inspector_blueprint(self.rr)
         self._log_world_coordinates()
 
@@ -1087,7 +749,7 @@ class RerunOfflineLogger:
             self._log_candidate_points(sample)
         if self.config.primitives.log_candidate_depths and inventory.has_candidate_depths:
             self._log_candidate_depths(sample)
-        if (self.config.primitives.log_mesh or self.config.primitives.log_gt_mesh) and inventory.has_mesh:
+        if self.config.primitives.log_gt_mesh and inventory.has_mesh:
             self._log_mesh(sample)
         if self.config.primitives.log_gt_obbs and inventory.has_gt_obbs:
             self._log_obbs(
@@ -1178,7 +840,7 @@ class RerunOfflineLogger:
                 )
 
         if self.config.primitives.log_candidate_centers and selected_idx is not None:
-            center = _worker_c_candidate_centers(poses, [selected_idx])
+            center = _candidate_centers_world(poses, [selected_idx])
             self.rr.log(
                 f"{_candidate_entity(selected_idx, validity)}/center",
                 self.rr.Points3D(
@@ -1343,7 +1005,7 @@ class RerunOfflineLogger:
             _keyframe_indices(int(camera.images.shape[0])),
         ):
             camera_entity = f"{ENTITY_RGB_KEYFRAMES}/frame_{idx:03d}/camera"
-            image_entity = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_{idx:03d}/image"
+            image_entity = f"{camera_entity}/image"
             self._log_camera_pose_and_pinhole(camera_entity, pose_world_cam, _camera_tw_pinhole_kwargs(camera_tw))
             self.rr.log(
                 image_entity,
@@ -1365,7 +1027,7 @@ class RerunOfflineLogger:
             _keyframe_indices(int(depth.shape[0])),
         ):
             camera_entity = f"{ENTITY_DEPTH_KEYFRAMES}/frame_{idx:03d}/camera"
-            depth_entity = f"{ENTITY_ASE_KEYFRAME_MEDIA}/frame_{idx:03d}/depth"
+            depth_entity = f"{camera_entity}/depth"
             self._log_camera_pose_and_pinhole(camera_entity, pose_world_cam, _camera_tw_pinhole_kwargs(camera_tw))
             self.rr.log(
                 depth_entity,
@@ -1395,7 +1057,7 @@ class RerunOfflineLogger:
         if image.ndim == 3 and image.shape[0] == 1:
             image = image[0]
         camera_entity = _candidate_camera_entity(selected_idx, validity)
-        depth_entity = f"{_candidate_entity(selected_idx, validity)}/depth"
+        depth_entity = f"{camera_entity}/depth"
         self._log_camera_pose_and_pinhole(
             camera_entity,
             _subset_poses(sample.oracle.candidate_poses_world_cam, [selected_idx]),
@@ -1473,7 +1135,6 @@ class RerunOfflineLogger:
 
 
 __all__ = [
-    "ENTITY_ASE_KEYFRAME_MEDIA",
     "ENTITY_CANDIDATE_ROOT",
     "ENTITY_DETECTED_OBBS",
     "ENTITY_DEPTH_KEYFRAMES",
@@ -1489,5 +1150,4 @@ __all__ = [
     "ENTITY_WORLD",
     "RerunOfflineLogger",
     "deterministic_downsample",
-    "log_default_inspector_blueprint",
 ]

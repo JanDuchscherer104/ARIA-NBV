@@ -10,10 +10,12 @@ import numpy as np
 
 from aria_nbv.rollouts import RolloutZarrStoreReader, validate_rollout_zarr_store
 
+from ._blueprint import log_default_inspector_blueprint
 from ._colors import INVALID_RGBA, step_to_rgba
-from ._loggers import ENTITY_WORLD, RerunModule, RerunOfflineLogger, log_default_inspector_blueprint
+from ._loggers import RerunOfflineLogger
 from ._metadata import collect_visual_inventory, validate_required_inventory
 from ._sample import select_rerun_sample
+from ._session import RerunModule, log_world_coordinates, start_rerun_recording
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -74,24 +76,8 @@ class RerunRolloutZarrLogger:
     def start(self) -> None:
         """Initialize the Rerun recording and configured output sink."""
 
-        output = self.config.output
-        self.rr.init(output.application_id, recording_id=output.recording_id)
-        if output.mode == "save":
-            output.save_path.parent.mkdir(parents=True, exist_ok=True)
-            self.rr.save(output.save_path)
-        elif output.mode == "spawn":
-            self.rr.spawn(
-                port=output.spawn_port,
-                connect=True,
-                memory_limit=output.spawn_memory_limit,
-                hide_welcome_screen=output.hide_welcome_screen,
-            )
-        elif output.mode == "connect":
-            self.rr.connect_grpc(output.connect_addr)
-        else:  # pragma: no cover - pydantic constrains this.
-            raise ValueError(f"Unsupported Rerun output mode: {output.mode}")
-        log_default_inspector_blueprint(self.rr)
-        self.rr.log(ENTITY_WORLD, self.rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
+        start_rerun_recording(self.rr, self.config.output)
+        log_world_coordinates(self.rr)
 
     def log_store(
         self,
@@ -199,7 +185,7 @@ class RerunRolloutZarrLogger:
     def _log_step(self, step: "_RolloutStepPayload") -> None:
         for candidate in step.candidates:
             self._log_candidate_camera(candidate)
-            self._log_selected_depth(candidate)
+            self._log_selected_depth_representation(candidate)
             self._log_candidate_center(candidate)
         self.rr.log(ENTITY_ROLLOUT_VALID_COUNT, self.rr.Scalars(float(step.valid_candidate_count)))
         self.rr.log(ENTITY_ROLLOUT_SELECTED_PROBABILITY, self.rr.Scalars(_finite_or_zero(step.selected_probability)))
@@ -318,9 +304,7 @@ class RerunRolloutZarrLogger:
                 shell_index=candidate.shell_index,
                 compact_valid_index=candidate.compact_valid_index,
                 candidate_status=candidate.status,
-                valid_mask=candidate.display_valid,
-                stored_valid_mask=candidate.stored_valid,
-                display_validity_trusted=candidate.display_validity_trusted,
+                valid_mask=candidate.valid,
                 selected_mask=candidate.selected,
                 target_rri=candidate.target_rri,
                 selection_probability=candidate.probability,
@@ -332,18 +316,35 @@ class RerunRolloutZarrLogger:
             ),
         )
 
-    def _log_selected_depth(self, candidate: "_RolloutCandidatePayload") -> None:
+    def _log_selected_depth_representation(self, candidate: "_RolloutCandidatePayload") -> None:
         if candidate.selected_depth is None:
             return
-        self.rr.log(
-            f"{candidate.camera_entity}/depth",
-            self.rr.DepthImage(
-                candidate.selected_depth.depth_m,
-                meter=1.0,
-                colormap=self.config.rollout_depths.colormap,
-                point_fill_ratio=self.config.rollout_depths.point_fill_ratio,
-            ),
-        )
+        representation = self.config.rollout_depths.representation
+        if representation in ("depth_image", "both"):
+            self.rr.log(
+                f"{candidate.camera_entity}/depth",
+                self.rr.DepthImage(
+                    candidate.selected_depth.depth_m,
+                    meter=1.0,
+                    colormap=self.config.rollout_depths.colormap,
+                    point_fill_ratio=self.config.rollout_depths.point_fill_ratio,
+                ),
+            )
+        if representation in ("point_cloud", "both"):
+            points = _selected_depth_points_camera(
+                candidate.selected_depth,
+                max_points=self.config.rollout_depths.max_points,
+            )
+            if points.shape[0] == 0:
+                return
+            self.rr.log(
+                f"{candidate.camera_entity}/points",
+                self.rr.Points3D(
+                    points,
+                    radii=self.config.rollout_depths.point_radius,
+                    colors=[candidate.color],
+                ),
+            )
 
     def _log_candidate_center(self, candidate: "_RolloutCandidatePayload") -> None:
         self.rr.log(
@@ -378,9 +379,7 @@ class _RolloutCandidatePayload:
     shell_index: int
     compact_valid_index: int
     status: str
-    stored_valid: bool
-    display_valid: bool
-    display_validity_trusted: bool
+    valid: bool
     selected: bool
     pose: NDArray[np.float32]
     center: NDArray[np.float32]
@@ -563,16 +562,17 @@ def _step_payload(
     order = np.argsort(shell_indices, kind="stable")
     row_positions = row_positions[order]
 
-    stored_valid = reader.array("candidates/candidate_valid_mask")[row_positions].astype(bool)
-    display_validity_trusted = True
-    display_valid = stored_valid
+    valid = reader.array("candidates/actor_action_mask")[row_positions].astype(bool)
     selected = reader.array("candidates/selected_mask")[row_positions].astype(bool)
     poses = reader.array("candidates/pose_world_cam")[row_positions].astype(np.float32).reshape(-1, 12)
     centers = _pose_centers(poses)
     target_rri = reader.array("candidates/target_rri")[row_positions].astype(np.float32).reshape(-1)
     probabilities = reader.array("candidates/selection_probabilities")[row_positions].astype(np.float32).reshape(-1)
+    log_probabilities = (
+        reader.array("candidates/selection_log_probabilities")[row_positions].astype(np.float32).reshape(-1)
+    )
     logits = reader.array("candidates/selection_logits")[row_positions].astype(np.float32).reshape(-1)
-    entropy = reader.array("candidates/selection_entropy")[row_positions].astype(np.float32).reshape(-1)
+    entropy = _selection_entropy(probabilities=probabilities, log_probabilities=log_probabilities, valid_mask=valid)
     reason_bitsets = reader.array("candidates/invalid_reason_bitset")[row_positions].astype(np.uint32).reshape(-1)
     primary_reasons = reader.array("candidates/primary_invalid_reason")[row_positions].astype(np.uint16).reshape(-1)
     compact_valid = reader.array("candidates/compact_valid_index")[row_positions].astype(np.int64).reshape(-1)
@@ -592,10 +592,8 @@ def _step_payload(
         step_row_id=step_row_id,
         shell_indices=shell_indices,
         compact_valid=compact_valid,
-        stored_valid=stored_valid,
-        display_valid=display_valid,
+        valid=valid,
         selected=selected,
-        display_validity_trusted=display_validity_trusted,
         step_index=step_index,
         poses=poses,
         centers=centers,
@@ -614,24 +612,35 @@ def _step_payload(
         "step_index": step_index,
         "selected_candidate_row_id": selected_candidate_row_id,
         "num_candidates": int(row_positions.shape[0]),
-        "num_valid_candidates": int(display_valid.sum()),
-        "stored_num_valid_candidates": int(stored_valid.sum()),
-        "display_validity_trusted": display_validity_trusted,
+        "num_valid_candidates": int(valid.sum()),
         "selected_local_index": selected_local,
         "selected_shell_index": int(shell_indices[selected_local]) if selected_local >= 0 else None,
         "selected_probability": float(probabilities[selected_local]) if selected_local >= 0 else None,
         "selected_target_rri": float(target_rri[selected_local]) if selected_local >= 0 else None,
-        "selection_entropy": float(entropy[selected_local]) if selected_local >= 0 else None,
-        "invalid_candidate_count": int((~display_valid).sum()),
-        "stored_invalid_candidate_count": int((~stored_valid).sum()),
+        "selection_entropy": float(entropy) if selected_local >= 0 else None,
+        "invalid_candidate_count": int((~valid).sum()),
         "pose_frame": "stored_pose_world_cam",
         "selected_depth": {
             "enabled": bool(rollout_depths.enabled),
             "available": selected_depth is not None,
             "warnings": selected_depth_warnings,
+            "representation": rollout_depths.representation,
             "depth_entity": (
                 f"{candidate_payloads[selected_local].camera_entity}/depth"
-                if selected_depth is not None and selected_local >= 0
+                if (
+                    selected_depth is not None
+                    and selected_local >= 0
+                    and rollout_depths.representation in ("depth_image", "both")
+                )
+                else None
+            ),
+            "points_entity": (
+                f"{candidate_payloads[selected_local].camera_entity}/points"
+                if (
+                    selected_depth is not None
+                    and selected_local >= 0
+                    and rollout_depths.representation in ("point_cloud", "both")
+                )
                 else None
             ),
             "image_size_hw": list(selected_depth.image_size_hw) if selected_depth is not None else None,
@@ -650,7 +659,7 @@ def _step_payload(
         ),
         candidates=candidate_payloads,
         selected_center=centers[selected_local] if selected_local >= 0 else None,
-        valid_candidate_count=int(display_valid.sum()),
+        valid_candidate_count=int(valid.sum()),
         selected_probability=float(probabilities[selected_local]) if selected_local >= 0 else float("nan"),
         selected_target_rri=float(target_rri[selected_local]) if selected_local >= 0 else float("nan"),
         metadata=metadata,
@@ -665,12 +674,19 @@ def _plot_step_payload(
 ) -> _RolloutPlotStep:
     step_row_id = int(reader.array("steps/step_row_id")[step_row_position])
     row_positions = _candidate_rows_for_step(reader, step_row_id=step_row_id)
-    candidate_valid = reader.array("candidates/candidate_valid_mask")[row_positions].astype(bool)
+    candidate_valid = reader.array("candidates/actor_action_mask")[row_positions].astype(bool)
     selected = reader.array("candidates/selected_mask")[row_positions].astype(bool)
     target_rri = reader.array("candidates/target_rri")[row_positions].astype(np.float32).reshape(-1)
     scene_rri = reader.array("candidates/scene_rri")[row_positions].astype(np.float32).reshape(-1)
     probabilities = reader.array("candidates/selection_probabilities")[row_positions].astype(np.float32).reshape(-1)
-    entropy = reader.array("candidates/selection_entropy")[row_positions].astype(np.float32).reshape(-1)
+    log_probabilities = (
+        reader.array("candidates/selection_log_probabilities")[row_positions].astype(np.float32).reshape(-1)
+    )
+    entropy = _selection_entropy(
+        probabilities=probabilities,
+        log_probabilities=log_probabilities,
+        valid_mask=candidate_valid,
+    )
     summary = _candidate_rri_summary(
         target_rri=target_rri,
         scene_rri=scene_rri,
@@ -786,7 +802,7 @@ def _candidate_rri_summary(
     target_rri: NDArray[Any],
     scene_rri: NDArray[Any],
     probabilities: NDArray[Any],
-    entropy: NDArray[Any],
+    entropy: float,
     valid_mask: NDArray[Any],
     selected_mask: NDArray[Any],
     top_k: int,
@@ -814,11 +830,7 @@ def _candidate_rri_summary(
         if selected_index >= 0
         else float("nan")
     )
-    selected_entropy = (
-        float(np.asarray(entropy, dtype=np.float32).reshape(-1)[selected_index])
-        if selected_index >= 0
-        else float("nan")
-    )
+    selected_entropy = float(entropy) if selected_index >= 0 else float("nan")
     return _CandidateRriSummary(
         selected_target_rri=selected_target,
         selected_scene_rri=selected_scene,
@@ -830,6 +842,23 @@ def _candidate_rri_summary(
         candidate_max_target_rri=maximum,
         top_candidate_target_rri=top_values,
     )
+
+
+def _selection_entropy(
+    *,
+    probabilities: NDArray[Any],
+    log_probabilities: NDArray[Any],
+    valid_mask: NDArray[Any],
+) -> float:
+    """Return the finite-candidate policy entropy for one rollout step."""
+
+    prob = np.asarray(probabilities, dtype=np.float32).reshape(-1)
+    log_prob = np.asarray(log_probabilities, dtype=np.float32).reshape(-1)
+    valid = np.asarray(valid_mask, dtype=bool).reshape(-1)
+    usable = valid & np.isfinite(prob) & np.isfinite(log_prob) & (prob > 0.0)
+    if not bool(usable.any()):
+        return float("nan")
+    return float(-(prob[usable] * log_prob[usable]).sum())
 
 
 def _q_h_metadata(reader: RolloutZarrStoreReader, *, step_row_id: int) -> dict[str, Any]:
@@ -850,8 +879,8 @@ def _q_h_metadata(reader: RolloutZarrStoreReader, *, step_row_id: int) -> dict[s
     candidate_rows = np.nonzero(candidate_step_ids == int(step_row_id))[0].astype(np.int64)
     try:
         valid_mask = reader.array("candidates/actor_action_mask")[candidate_rows].astype(bool)
-    except KeyError:
-        valid_mask = reader.array("candidates/candidate_valid_mask")[candidate_rows].astype(bool)
+    except KeyError as exc:
+        return {"state_row_found": False, "warning": f"Q_H metadata unavailable: missing array {exc}."}
     try:
         train_mask = reader.array("candidates/q_train_mask")[candidate_rows].astype(bool) & valid_mask
     except KeyError:
@@ -888,6 +917,34 @@ def _pose_centers(pose_rows: NDArray[np.float32]) -> NDArray[np.float32]:
     if pose_rows.size == 0:
         return np.empty((0, 3), dtype=np.float32)
     return pose_rows.reshape(-1, 12)[:, 9:12].astype(np.float32, copy=True)
+
+
+def _selected_depth_points_camera(
+    selected_depth: _SelectedDepthPayload,
+    *,
+    max_points: int,
+) -> NDArray[np.float32]:
+    """Unproject selected-depth pixels to camera-local LUF points for display."""
+
+    if max_points <= 0:
+        return np.empty((0, 3), dtype=np.float32)
+    depth = np.asarray(selected_depth.depth_m, dtype=np.float32)
+    valid = np.asarray(selected_depth.valid_mask, dtype=bool) & np.isfinite(depth) & (depth > 0.0)
+    rows, cols = np.nonzero(valid)
+    if rows.size == 0:
+        return np.empty((0, 3), dtype=np.float32)
+
+    if rows.size > max_points:
+        indices = np.linspace(0, rows.size - 1, num=int(max_points), dtype=np.int64)
+        rows = rows[indices]
+        cols = cols[indices]
+
+    z = depth[rows, cols]
+    fx, fy = selected_depth.focal_px.astype(np.float32)
+    cx, cy = selected_depth.principal_point_px.astype(np.float32)
+    x_left = (cx - cols.astype(np.float32)) * z / fx
+    y_up = (cy - rows.astype(np.float32)) * z / fy
+    return np.stack([x_left, y_up, z], axis=1).astype(np.float32, copy=False)
 
 
 def _rollout_root_path(
@@ -961,17 +1018,15 @@ def _candidate_payloads(
     step_row_id: int,
     shell_indices: NDArray[Any],
     compact_valid: NDArray[Any],
-    stored_valid: NDArray[Any],
-    display_valid: NDArray[Any],
+    valid: NDArray[Any],
     selected: NDArray[Any],
-    display_validity_trusted: bool,
     step_index: int,
     poses: NDArray[np.float32],
     centers: NDArray[np.float32],
     target_rri: NDArray[Any],
     probabilities: NDArray[Any],
     logits: NDArray[Any],
-    entropy: NDArray[Any],
+    entropy: float,
     reason_bitsets: NDArray[Any],
     primary_reasons: NDArray[Any],
     selected_depth: _SelectedDepthPayload | None,
@@ -981,15 +1036,13 @@ def _candidate_payloads(
         candidate_row_ids,
         shell_indices,
         compact_valid,
-        stored_valid,
-        display_valid,
+        valid,
         selected,
         poses,
         centers,
         target_rri,
         probabilities,
         logits,
-        entropy,
         reason_bitsets,
         primary_reasons,
         strict=False,
@@ -998,22 +1051,20 @@ def _candidate_payloads(
             row_id,
             shell,
             compact,
-            is_stored_valid,
-            is_display_valid,
+            is_valid,
             is_selected,
             pose,
             center,
             rri,
             prob,
             logit,
-            ent,
             reason,
             primary,
         ) = values
         shell_index = int(shell)
-        status = _candidate_status(display_valid=bool(is_display_valid), selected=bool(is_selected))
+        status = _candidate_status(valid=bool(is_valid), selected=bool(is_selected))
         color = _candidate_color(
-            display_valid=bool(is_display_valid),
+            valid=bool(is_valid),
             selected=bool(is_selected),
             step_index=step_index,
         )
@@ -1034,16 +1085,14 @@ def _candidate_payloads(
                 shell_index=shell_index,
                 compact_valid_index=int(compact),
                 status=status,
-                stored_valid=bool(is_stored_valid),
-                display_valid=bool(is_display_valid),
-                display_validity_trusted=display_validity_trusted,
+                valid=bool(is_valid),
                 selected=bool(is_selected),
                 pose=np.asarray(pose, dtype=np.float32).reshape(12),
                 center=np.asarray(center, dtype=np.float32).reshape(3),
                 target_rri=float(rri),
                 probability=float(prob),
                 logit=float(logit),
-                entropy=float(ent),
+                entropy=float(entropy),
                 reason_bitset=int(reason),
                 primary_reason=int(primary),
                 color=color,
@@ -1055,17 +1104,17 @@ def _candidate_payloads(
     return payloads
 
 
-def _candidate_status(*, display_valid: bool, selected: bool) -> str:
+def _candidate_status(*, valid: bool, selected: bool) -> str:
     if selected:
         return "selected"
-    return "valid" if display_valid else "invalid"
+    return "valid" if valid else "invalid"
 
 
-def _candidate_color(*, display_valid: bool, selected: bool, step_index: int) -> list[int]:
+def _candidate_color(*, valid: bool, selected: bool, step_index: int) -> list[int]:
     step_color = step_to_rgba([step_index], alpha=255 if selected else 220).reshape(1, 4)[0].astype(int).tolist()
     if selected:
         return step_color
-    if display_valid:
+    if valid:
         return step_color
     invalid_color = step_color.copy()
     invalid_color[3] = int(INVALID_RGBA[3])

@@ -51,12 +51,14 @@ selected_strategy = "top_valid_oracle"
 enabled          = true
 branch_scope     = "same_source_target"
 candidate_top_k  = 5
-log_all_candidates = false
 
 [rollout_depths]
 enabled                = true
+representation         = "depth_image"
 colormap               = "turbo"
 point_fill_ratio       = 0.2
+max_points             = 20000
+point_radius           = 0.006
 require_selected_depth = false
 
 [efm_voxels]
@@ -81,7 +83,6 @@ log_top_oracle_frustum = true
 log_invalid_frusta     = true
 log_candidate_centers  = true
 log_metadata           = true
-log_mesh               = true
 log_candidate_points   = false
 log_gt_mesh            = true
 log_gt_obbs            = true

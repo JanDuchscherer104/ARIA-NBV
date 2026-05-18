@@ -45,7 +45,7 @@ Root attributes:
 | `split_manifest_hash` | yes | Scene-level split contract. |
 | `reason_code_version` | yes | Invalidity dictionary version. |
 | `target_protocol_version` | yes | V0/V1 target contract version. |
-| `return_semantics` | yes | Example: `cumulative_target_rri`. |
+| `return_semantics` | yes | Default: `cumulative_target_root_gain`. |
 | `field_retention_policy` | yes | Example: `compact`, `selected_heavy`, or `audit`. |
 | `selected_depth_enabled` | yes | True when one selected-action depth row is required for every step. |
 | `selected_depth_width_px`, `selected_depth_height_px` | when enabled | Persisted selected-action raster size; default `240 x 240`. |
@@ -110,6 +110,14 @@ rollouts.zarr/
     focal_px
     principal_point_px
     image_size_hw
+  target_eval_crops/
+    crop_row_id
+    step_row_id
+    candidate_row_id
+    source_role_id
+    points_world
+    lengths
+    mask
   q_h/
     state_step_row_id
     source_row_id
@@ -119,12 +127,10 @@ rollouts.zarr/
     target_row_id
     invalid_reason_bitset
     one_step_target_rri
-    one_step_scene_rri
+    one_step_target_root_gain
     selected_candidate_index
-    bootstrap_next_step_row_id
-    terminal_mask
-    discount
     td_selected_candidate_row_id
+    td_reward
     td_reward_target_rri
     td_next_step_row_id
     td_terminal_mask
@@ -221,7 +227,8 @@ target.
 - `candidate_config_hash`, `oracle_config_hash`, `rollout_config_hash`;
 - `model_checkpoint_hash` when learned scores are used;
 - `termination_reason`;
-- `final_cumulative_target_rri`, `final_cumulative_scene_rri`;
+- `final_cumulative_target_root_gain`, `final_cumulative_scene_root_gain`;
+- `final_cumulative_target_rri`, `final_cumulative_scene_rri` diagnostics;
 - `path_length_m`, `view_count`, `invalid_action_rate`, `runtime_ms`.
 
 `steps/step_index` columns:
@@ -231,7 +238,8 @@ target.
 - `selected_candidate_row_id`, `selected_shell_index`,
   `selected_compact_valid_index`;
 - `num_candidates`, `num_valid_candidates`;
-- `cumulative_target_rri`, `cumulative_scene_rri`, `path_length_m`;
+- `cumulative_target_root_gain`, `cumulative_scene_root_gain`;
+- `cumulative_target_rri`, `cumulative_scene_rri`, `path_length_m` diagnostics;
 - `step_runtime_ms`;
 - `reason_histogram_offset` for compact per-step invalidity summaries.
 
@@ -280,16 +288,16 @@ into target-RRI labels or invalidity reasons.
 | `strategy_id` | `[N] enum/int` | Candidate source strategy. |
 | `mixture_id` | `[N] enum/int` | Sampler mixture component. |
 | `sampler_probability` | `[N] float32` | Optional proposal probability. |
-| `candidate_valid_mask` | `[N] bool` | Required. |
-| `actor_action_mask` | `[N] bool` | Actor-selectable. |
+| `actor_action_mask` | `[N] bool` | Canonical persisted action-feasibility mask; actor-selectable. |
 | `oracle_label_mask` | `[N] bool` | Oracle label exists and is valid. |
 | `q_train_mask` | `[N] bool` | Usable for configured Q_H target. |
-| `padded_mask` | `[N] bool` | False data for dense tensors only. |
 | `selected_mask` | `[N] bool` | Selected at this step. |
-| `heavy_diag_available_mask` | `[N] bool` | Heavy diagnostics available. |
 | `invalid_reason_bitset` | `[N] uint32` | Versioned reason bitset. |
 | `primary_invalid_reason` | `[N] uint16` | Reporting reason. |
-| `scene_rri`, `target_rri` | `[N] float32` | NaN when masked. |
+| `target_root_gain`, `scene_root_gain` | `[N] float32` | Root-normalized reward fields; NaN when masked. |
+| `scene_rri`, `target_rri` | `[N] float32` | State-relative diagnostics; NaN when masked. |
+| `target_log_error_gain`, `scene_log_error_gain` | `[N] float32` | Optional diagnostics. |
+| `target_pm_dist_before`, `target_pm_dist_after` | `[N] float32` | Point-mesh audit fields. |
 | `accuracy_delta`, `completeness_delta` | `[N] float32` | Optional oracle components. |
 | `target_visible_fraction` | `[N] float32` | Protocol-defined visibility. |
 | `oracle_rank`, `model_rank` | `[N] int16/int32` | `-1` when unavailable. |
@@ -338,18 +346,17 @@ version family.
 
 Use these masks consistently:
 
-- `candidate_valid_mask`: required geometry, evidence, target, and oracle
-  checks pass for this protocol.
-- `actor_action_mask`: the actor or one-step scorer may select the action using
-  actor-visible state only.
-- `oracle_label_mask`: oracle scene/target RRI exists and is valid.
+- `actor_action_mask`: the canonical persisted action-feasibility mask. The
+  actor or one-step scorer may select the action using actor-visible state
+  only when this mask is true.
+- `oracle_label_mask`: oracle target-root-gain reward exists and is valid.
 - `q_train_mask`: the row is usable for the configured Q_H target tensor.
 - `target_valid_mask`: target record is usable under the protocol.
-- `padded_mask`: dense tensor filler, never a real candidate.
-- `heavy_diag_available_mask`: optional diagnostic arrays are present.
 
 For the first Q_H dataset, `q_train_mask` should require actor-selectability,
-valid oracle target RRI, valid target record, and non-padded candidate row.
+valid oracle target-root gain, finite diagnostic target RRI, and valid target
+record. Dense `q_h/` padding is derived from `candidate_row_id == -1` plus
+false masks, not persisted in the candidate table.
 
 ## Q_H Tensor View
 
@@ -371,29 +378,30 @@ Recommended tensor shapes:
 | `target_row_id` | `[S]` | `int64` | none |
 | `selected_candidate_index` | `[S]` | `int16/int32` | `-1` |
 | `one_step_target_rri` | `[S, C_max]` | `float32` | `NaN` |
-| `one_step_scene_rri` | `[S, C_max]` | `float32` | `NaN` |
-| `bootstrap_next_step_row_id` | `[S, C_max]` | `int64` | `-1` |
-| `terminal_mask` | `[S, C_max]` | `bool` | `true` for terminal or unavailable branch |
-| `discount` | `[H_max]` | `float32` | none |
+| `one_step_target_root_gain` | `[S, C_max]` | `float32` | `NaN` |
 | `td_selected_candidate_row_id` | `[S]` | `int64` | `-1` |
+| `td_reward` | `[S]` | `float32` | `NaN` |
 | `td_reward_target_rri` | `[S]` | `float32` | `NaN` |
 | `td_next_step_row_id` | `[S]` | `int64` | `-1` |
 | `td_terminal_mask` | `[S]` | `bool` | `true` |
 | `td_discount` | `[S]` | `float32` | configured gamma |
 
 Multi-step target tensors such as `q_target_target_rri[S,H,C]` are future
-derived views, not part of the current schema `0.5-selected-depth` writer.
+derived views, not part of the current schema
+`0.7-root-gain-target-crops` writer.
 
 Array attributes must record:
 
-- horizon convention, for example horizons `1..H_max`;
-- return semantics, initially cumulative target RRI;
-- whether returns are oracle-computed, model-estimated, or bootstrapped;
+- `td_semantics="selected_transition_only"`;
+- `reward_metric="target_root_gain"`;
+- `return_semantics="cumulative_target_root_gain"`;
+- `discount_gamma`;
+- target RRI semantics as state-relative diagnostics;
 - target protocol version;
 - split protocol and scene-level split hash;
 - whether scalar motion/rule penalties are absent or included.
 
-Initial Q_H targets should be pure bounded cumulative target RRI. Scalar
+Initial Q_H targets should be pure bounded cumulative target-root gain. Scalar
 motion, rule, and invalidity penalties are separate ablations and require a
 different `return_semantics` attribute.
 

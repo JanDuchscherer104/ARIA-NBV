@@ -101,7 +101,7 @@ tags: [codex, workflow, architecture]
 - `Q_H` is a candidate-query Transformer: encode scene, target, history, and
   candidate tokens, then output one masked finite-horizon Q value per
   candidate.
-- `Q_H` predicts bounded cumulative target RRI from ASE oracle rollout traces;
+- `Q_H` predicts bounded cumulative root-normalized target gain from ASE oracle rollout traces;
   learned selected actions must be oracle-evaluated.
 - Main actor-visible target protocol is V1 **OBS-SEL / PRED-Q / GT-EVAL**.
 - Target input starts with observed/predicted OBB geometry plus class,
@@ -238,31 +238,31 @@ tags: [codex, workflow, architecture]
 - The one-step target-conditioned scorer is no longer a standalone research
   question. It is the required learned myopic baseline/control for the revised
   Q_H planning RQ, where `Q_H` must beat the learned one-step target scorer and
-  one-step greedy/model scoring on cumulative target RRI under equal acquisition
-  budget.
+  one-step greedy/model scoring on cumulative root-normalized target gain under
+  equal acquisition budget.
 - Invalidity is a hard mask plus explicit reason-code contract, not a low RRI class. Validity heads or scalar penalty rewards are ablations after masks/reasons are reliable.
 - The first thesis-grade non-myopic comparison is bounded oracle-RRI lookahead versus one-step greedy under equal acquisition and candidate budget; bounded oracle lookahead is an upper-bound baseline for learned Q_H.
 - Rollout data before the first `Q_H` training must include random-valid,
   oracle-greedy/lookahead, and oracle-scored temperature-softmax traces with
   deterministic replay. Gumbel-Top-k traces remain preferred later evidence
   for diversity, but they are not a blocker for the first `Q_H` attempt.
-- Multi-step reward and Q targets start with bounded cumulative target RRI. Gamma remains symbolic in formulas, but the thesis-core comparison reports cumulative target RRI under equal acquisition budget. Log-improvement, episode normalization, and scalar motion/rule/validity/diversity penalties are extensions; the current one-step RRI label remains unchanged for VIN compatibility.
+- Multi-step reward and Q targets start with bounded cumulative root-normalized target gain. Gamma remains symbolic in formulas, but the thesis-core comparison reports cumulative target-root gain and endpoint gain under equal acquisition budget. State-relative target RRI remains a diagnostic and VIN-compatible one-step label; log-improvement and scalar motion/rule/validity/diversity penalties are extensions.
 - A target-conditioned candidate-query Transformer `Q_H` model over finite
   candidate sets is a mandatory M5 thesis deliverable, trained from ASE oracle
   rollout data. It predicts one masked bounded-horizon Q value per candidate
-  and must beat one-step greedy/model scoring on cumulative target RRI under
+  and must beat one-step greedy/model scoring on cumulative target-root gain under
   equal acquisition budget, while oracle lookahead is reported as the upper
   bound.
 - Fitted Double-Q-style targets are the first value-learning target family for
   `Q_H`. IQL is a second offline-RL ablation only after `Q_H` is stable; SB3
   DQN/PPO/SAC are deferred until an online Gymnasium simulator exists.
 - Zarr is the first-choice rollout replay store. It should contain factual
-  source, target, rollout, step, candidate, lineage, dictionary, and metadata
-  tables without duplicating raw ASE/ATEK; full meshes are external
-  path/hash/version references, and `Q_H` tensors are derived reader/training
-  views unless profiling later proves persisted arrays necessary.
-- The first implemented rollout replay path uses standalone `rollouts.zarr`
-  schema `0.3-source-facts-derived-qh`, not VIN offline-store embedded
+  source, target, rollout, step, candidate, lineage, dictionary, target-eval
+  crop, and metadata tables without duplicating raw ASE/ATEK; full meshes are
+  external path/hash/version references, and `Q_H` tensors are validated
+  derived training views.
+- The current implemented rollout replay path uses standalone `rollouts.zarr`
+  schema `0.7-root-gain-target-crops`, not VIN offline-store embedded
   counterfactual blocks. The production root contract is `VinOfflineSample`;
   `VinOracleBatch` remains a one-step VIN training DTO.
 - Masked oracle temperature-softmax is the first stochastic rollout

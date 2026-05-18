@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig, _crop_mesh_to_aabb
+from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig, _canonical_fused_unions, _crop_mesh_to_aabb
 
 
 def _unit_square_mesh(device: torch.device, *, dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor]:
@@ -131,3 +131,23 @@ def test_crop_mesh_to_aabb_rejects_empty_crop() -> None:
 
     with pytest.raises(ValueError, match="no mesh faces"):
         _crop_mesh_to_aabb(verts, faces, aabb)
+
+
+def test_capped_union_preserves_candidate_points_when_root_saturates() -> None:
+    root = torch.stack(
+        [torch.tensor([float(index), 0.0, 0.0], dtype=torch.float32) for index in range(100)],
+        dim=0,
+    )
+    query = torch.tensor([[[1000.0, 0.0, 0.0]]], dtype=torch.float32)
+    lengths = torch.tensor([1], dtype=torch.long)
+
+    fused, fused_lengths = _canonical_fused_unions(
+        points_t=root,
+        points_q=query,
+        lengths_q=lengths,
+        voxel_size_m=0.0,
+        max_points=10,
+    )
+
+    assert int(fused_lengths[0].item()) == 10
+    assert torch.isclose(fused[0, :10, 0], torch.tensor(1000.0)).any()

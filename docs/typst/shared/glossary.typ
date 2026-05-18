@@ -264,7 +264,7 @@
     key: "acquisition-cost",
     short: "cost",
     long: "Acquisition Cost",
-    description: "Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination. The thesis should first report cumulative target RRI and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.",
+    description: "Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination. The thesis should first report cumulative root-normalized target gain, diagnostic target RRI, and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.",
     group: "Planning",
     custom: (
       anchor: "term-acquisition-cost",
@@ -276,7 +276,7 @@
       category: "planning.objective",
       parent: "trajectory-objective",
       definition_short: "Budget consumed to acquire observations, measured by view count, path length, elapsed time, invalid-action rate, or a weighted combination.",
-      definition_long: "The thesis should first report cumulative target RRI and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.",
+      definition_long: "The thesis should first report cumulative root-normalized target gain, diagnostic target RRI, and acquisition cost separately, then use scalarized objectives only when the tradeoff is explicit.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq1-objective",
         "docs/contents/thesis/roadmap.qmd#roadmap-m5",
@@ -992,7 +992,7 @@
     key: "target-rri-reward",
     short: "reward",
     long: "Target-RRI Reward",
-    description: "Quality-only immediate reward for thesis-core target-aware rollouts. It is the target-specific RRI obtained by selecting a candidate from the current reconstruction state; scalar motion, rule, diversity, and validity penalties are later ablations.",
+    description: "Quality-only immediate reward for thesis-core target-aware rollouts. It is the target-specific point-mesh error reduction normalized by the rollout-root target error; scalar motion, rule, diversity, and validity penalties are later ablations.",
     group: "Metrics",
     custom: (
       anchor: "term-target-rri-reward",
@@ -1003,8 +1003,8 @@
       ),
       category: "metrics.reconstruction_quality",
       parent: "target-specific-rri",
-      definition_short: "Quality-only immediate reward equal to target-specific RRI for the selected candidate.",
-      definition_long: "The main thesis reward is cumulative target RRI under equal acquisition budget. Log-improvement and episode-normalized variants remain visible follow-up reward ablations, not the default target for the first Q_H result.",
+      definition_short: "Quality-only immediate reward equal to root-normalized target gain for the selected candidate.",
+      definition_long: "The main thesis reward is cumulative root-normalized target gain under equal acquisition budget. State-relative target RRI remains a one-step diagnostic and VIN-compatible label; log-improvement variants remain visible follow-up reward ablations, not the default target for the first Q_H result.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq1-objective",
         "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
@@ -1054,19 +1054,19 @@
     key: "finite-horizon-return",
     short: "return",
     long: "Finite-Horizon Return",
-    description: "Symbolic H-step return used by ARIA-NBV rollout evaluation and Q_H targets. The formula keeps gamma explicit while the thesis-core comparison reports cumulative target RRI under equal acquisition budget.",
+    description: "Symbolic H-step return used by ARIA-NBV rollout evaluation and Q_H targets. The formula keeps gamma explicit while the thesis-core comparison reports cumulative root-normalized target gain under equal acquisition budget.",
     group: "Planning",
     custom: (
       anchor: "term-finite-horizon-return",
       aliases: (
         "H-step return",
         "bounded return",
-        "cumulative target RRI",
+        "cumulative target root gain",
       ),
       category: "planning.objective",
       parent: "target-conditioned-nbv-mdp",
-      definition_short: "H-step discounted return over target-RRI rewards.",
-      definition_long: "The return definition keeps gamma symbolic so discounted ablations remain possible. The first thesis result should report cumulative target RRI under an equal acquisition budget and treat log-improvement or normalized rewards as follow-up analysis.",
+      definition_short: "H-step discounted return over root-normalized target-gain rewards.",
+      definition_long: "The return definition keeps gamma symbolic so discounted ablations remain possible. The first thesis result should report cumulative root-normalized target gain under an equal acquisition budget and treat log-improvement or scalarized rewards as follow-up analysis.",
       internal_links: (
         "docs/contents/theory/rl_planning.qmd#rl-planning-theory",
         "docs/contents/thesis/questions.qmd#rq4-planning",
@@ -1121,7 +1121,7 @@
       category: "model.value",
       parent: "target-conditioned-nbv-mdp",
       definition_short: "Finite-horizon candidate-value function for target-conditioned ARIA-NBV.",
-      definition_long: "The mandatory M5 learned policy-like result is Q_H over finite candidate sets. The first-path architecture is a candidate-query Transformer: encode s_t^{cf0}, actor-visible target descriptor z_e, selected-view history, budget state, and candidate tokens, then emit one value per candidate. DQN contributes replayed transition learning and Bellman-style finite-action value targets; Double DQN contributes the masked online-selector / target-evaluator backup to reduce max-over-candidate overestimation; IQL contributes the offline support rule that value learning must not query invalid, ungenerated, or unavailable actions. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative target RRI under equal acquisition budget, with bounded oracle lookahead as an upper bound.",
+      definition_long: "The mandatory M5 learned policy-like result is Q_H over finite candidate sets. The first-path architecture is a candidate-query Transformer: encode s_t^{cf0}, actor-visible target descriptor z_e, selected-view history, budget state, and candidate tokens, then emit one value per candidate. DQN contributes replayed transition learning and Bellman-style finite-action value targets; Double DQN contributes the masked online-selector / target-evaluator backup to reduce max-over-candidate overestimation; IQL contributes the offline support rule that value learning must not query invalid, ungenerated, or unavailable actions. Q_H must respect validity masks and beat one-step greedy or model scoring on cumulative root-normalized target gain under equal acquisition budget, with bounded oracle lookahead as an upper bound.",
       internal_links: (
         "docs/contents/thesis/questions.qmd#rq4-planning",
         "docs/contents/thesis/roadmap.qmd#roadmap-m5",

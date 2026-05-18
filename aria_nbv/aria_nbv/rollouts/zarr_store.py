@@ -10,11 +10,12 @@ not mutate or migrate the strict VIN offline store; rollout replay is a
 separate artifact with source manifest, split, target, candidate-mixture, policy,
 and oracle config hashes.
 
-`q_train_mask` is true only when a row is non-padded, actor-selectable,
-target-valid, GT-label-valid, and has a finite target-RRI label. Invalid
-candidates keep their full-shell row but carry false masks and NaN labels.
-Target RRI and scene RRI are distinct diagnostics; target labels must not be
-silently filled from scene scores or low-quality invalid rows.
+`q_train_mask` is true only when a candidate row is actor-selectable,
+target-valid, GT-label-valid, and has a finite target-root-gain reward. Invalid
+candidates keep their full-shell row but carry false masks and NaN labels. Q_H
+padding exists only in the derived dense `q_h/` view. Target RRI and scene RRI
+are state-relative diagnostics; target labels must not be silently filled from
+scene scores or low-quality invalid rows.
 """
 
 from __future__ import annotations
@@ -63,17 +64,26 @@ if TYPE_CHECKING:
 ROLLOUT_ZARR_SCHEMA_ID = "aria_nbv.rollout_zarr_q_invalidity"
 """Schema id stored as a root attribute on rollout replay stores."""
 
-ROLLOUT_ZARR_SCHEMA_VERSION = "0.5-selected-depth"
-"""Manifest-backed rollout replay schema version with selected-action depth retention."""
+ROLLOUT_ZARR_SCHEMA_VERSION = "0.7-root-gain-target-crops"
+"""Manifest-backed rollout replay schema version with root-gain Q_H semantics."""
 
-DEFAULT_RETURN_SEMANTICS = "cumulative_target_rri"
-"""Default return target family for initial ``Q_H`` replay views."""
+DEFAULT_RETURN_SEMANTICS = "cumulative_target_root_gain"
+"""Default return target family for root-normalized ``Q_H`` replay views."""
+
+Q_H_REWARD_METRIC = "target_root_gain"
+"""Candidate field used as the default Q_H training reward."""
+
+DEFAULT_TARGET_EVAL_CROP_MAX_POINTS = 50_000
+"""Default fixed row width for oracle/eval target crop point payloads."""
 
 SELECTED_DEPTH_INVALID_FILL_VALUE = 0.0
 """Fill value written for invalid selected-depth pixels before float16 storage."""
 
 SELECTED_DEPTH_CODEC = "blosc:zstd:clevel=5:bitshuffle"
 """Human-readable selected-depth compressor contract stored in metadata."""
+
+Q_H_TD_SEMANTICS = "selected_transition_only"
+"""Q_H TD contract persisted on the ``q_h/`` group."""
 
 Q_H_ARRAY_NAMES = (
     "state_step_row_id",
@@ -84,12 +94,10 @@ Q_H_ARRAY_NAMES = (
     "target_row_id",
     "selected_candidate_index",
     "one_step_target_rri",
-    "one_step_scene_rri",
-    "bootstrap_next_step_row_id",
-    "terminal_mask",
+    "one_step_target_root_gain",
     "invalid_reason_bitset",
-    "discount",
     "td_selected_candidate_row_id",
+    "td_reward",
     "td_reward_target_rri",
     "td_next_step_row_id",
     "td_terminal_mask",
@@ -152,6 +160,9 @@ ROLLOUT_TABLE = _TableSchema(
         _TableField("chain_id", np.int32),
         _TableField("source_row_id", np.int64),
         _TableField("root_pose_world", np.float32),
+        _TableField("root_time_ns", np.int64),
+        _TableField("root_trajectory_index", np.int32),
+        _TableField("root_frame_index", np.int32),
         _TableField("scene_id", np.int32),
         _TableField("snippet_id", np.int32),
         _TableField("target_row_id", np.int64),
@@ -164,6 +175,8 @@ ROLLOUT_TABLE = _TableSchema(
         _TableField("termination_reason", np.int32),
         _TableField("final_cumulative_target_rri", np.float32),
         _TableField("final_cumulative_scene_rri", np.float32),
+        _TableField("final_cumulative_target_root_gain", np.float32),
+        _TableField("final_cumulative_scene_root_gain", np.float32),
         _TableField("split_id", np.int32),
     ),
 )
@@ -200,7 +213,8 @@ STEP_TABLE = _TableSchema(
         _TableField("num_valid_candidates", np.int32),
         _TableField("cumulative_target_rri", np.float32),
         _TableField("cumulative_scene_rri", np.float32),
-        _TableField("transition_id", np.int32),
+        _TableField("cumulative_target_root_gain", np.float32),
+        _TableField("cumulative_scene_root_gain", np.float32),
     ),
 )
 """Canonical `steps/` table fields and dtypes."""
@@ -216,13 +230,10 @@ CANDIDATE_TABLE = _TableSchema(
         _TableField("compact_valid_index", np.int32),
         _TableField("pose_world_cam", np.float32),
         _TableField("pose_relative_root", np.float32),
-        _TableField("candidate_valid_mask", np.bool_),
         _TableField("actor_action_mask", np.bool_),
         _TableField("oracle_label_mask", np.bool_),
         _TableField("q_train_mask", np.bool_),
-        _TableField("padded_mask", np.bool_),
         _TableField("selected_mask", np.bool_),
-        _TableField("heavy_diag_available_mask", np.bool_),
         _TableField("strategy_id", np.int32),
         _TableField("mixture_id", np.int32),
         _TableField("sampler_probability", np.float32),
@@ -231,10 +242,19 @@ CANDIDATE_TABLE = _TableSchema(
         _TableField("primary_invalid_reason", np.uint16),
         _TableField("scene_rri", np.float32),
         _TableField("target_rri", np.float32),
+        _TableField("scene_root_gain", np.float32),
+        _TableField("target_root_gain", np.float32),
+        _TableField("scene_log_error_gain", np.float32),
+        _TableField("target_log_error_gain", np.float32),
+        _TableField("scene_pm_dist_before", np.float32),
+        _TableField("scene_pm_dist_after", np.float32),
+        _TableField("target_pm_dist_before", np.float32),
+        _TableField("target_pm_dist_after", np.float32),
+        _TableField("target_current_support", np.float32),
+        _TableField("target_candidate_support", np.float32),
         _TableField("selection_logits", np.float32),
         _TableField("selection_probabilities", np.float32),
         _TableField("selection_log_probabilities", np.float32),
-        _TableField("selection_entropy", np.float32),
     ),
 )
 """Canonical `candidates/` table fields and dtypes."""
@@ -250,6 +270,21 @@ SELECTED_DEPTH_TABLE = _TableSchema(
     ),
 )
 """Metadata rows aligned with selected-action depth rasters."""
+
+TARGET_EVAL_CROP_TABLE = _TableSchema(
+    "target_eval_crops",
+    (
+        _TableField("crop_row_id", np.int64),
+        _TableField("step_row_id", np.int64),
+        _TableField("candidate_row_id", np.int64),
+        _TableField("source_role_id", np.int32),
+        _TableField("crop_policy_id", np.int32),
+        _TableField("voxel_size_m", np.float32),
+        _TableField("max_points", np.int32),
+        _TableField("lengths", np.int32),
+    ),
+)
+"""Oracle/eval-only target crop metadata aligned with fixed point payloads."""
 
 
 @dataclass(slots=True)
@@ -275,7 +310,7 @@ class RolloutZarrValidationResult:
 
     `errors` contains schema, linkage, mask, and lineage violations. Validation
     fails if candidate strategy ids, mixture ids, target protocol metadata,
-    source hashes, or explicit target-RRI labels are missing.
+    source hashes, or explicit target-root-gain rewards are missing.
     """
 
     store_dir: Path
@@ -301,6 +336,7 @@ class _RolloutTables:
     steps: dict[str, np.ndarray]
     candidates: dict[str, np.ndarray]
     selected_depth: dict[str, np.ndarray]
+    target_eval_crops: dict[str, np.ndarray]
 
 
 class RolloutZarrStoreConfig(BaseConfig):
@@ -317,6 +353,9 @@ class RolloutZarrStoreConfig(BaseConfig):
     split_manifest_hash: str = "unknown-split-manifest"
     q_h_chunk_states: int = Field(default=64, ge=1)
     """Number of state rows per chunk in the persisted derived ``q_h/`` view."""
+
+    target_eval_crop_max_points: int = Field(default=DEFAULT_TARGET_EVAL_CROP_MAX_POINTS, ge=1)
+    """Fixed row width for oracle/eval target crop point payloads."""
 
     _resolve_store_dir = field_validator("store_dir", mode="before")(resolve_cache_artifact_dir)
 
@@ -346,21 +385,18 @@ class RolloutZarrStoreReader:
             "manifest": read_rollout_store_manifest(self.store_dir),
         }
 
-    def q_h_view(self, *, discount_gamma: float | None = None, horizon: int | None = None) -> dict[str, np.ndarray]:
+    def q_h_view(self, *, discount_gamma: float | None = None) -> dict[str, np.ndarray]:
         """Return the padded finite-candidate ``Q_H`` training view.
 
         With default arguments this reads the persisted derived ``q_h/`` group.
-        Passing ``discount_gamma`` or ``horizon`` recomputes the view from the
-        canonical factual tables for audits and ablations.
+        Passing ``discount_gamma`` recomputes the view from the canonical
+        factual tables for audits and ablations.
         """
 
-        if discount_gamma is None and horizon is None and "q_h" in self.root:
+        if discount_gamma is None and "q_h" in self.root:
             return _read_q_h_arrays(self.root)
         gamma = float(self.root.attrs.get("discount_gamma", 1.0) if discount_gamma is None else discount_gamma)
-        if horizon is None:
-            horizon_values = np.asarray(self.root["rollouts/horizon"])
-            horizon = int(horizon_values.max()) if horizon_values.size else 1
-        return _build_q_h_arrays(_read_tables_from_root(self.root), horizon=int(horizon), gamma=gamma)
+        return _build_q_h_arrays(_read_tables_from_root(self.root), gamma=gamma)
 
 
 def write_rollout_zarr_store(
@@ -384,6 +420,7 @@ def write_rollout_zarr_store(
     selected_depth_zfar_m: float | None = 20.0,
     selected_depth_source_resolution: str = "exact_output_size",
     q_h_chunk_states: int = 64,
+    target_eval_crop_max_points: int = DEFAULT_TARGET_EVAL_CROP_MAX_POINTS,
 ) -> RolloutZarrWriteResult:
     """Write rollout records into a standalone ``rollouts.zarr`` store."""
 
@@ -407,6 +444,7 @@ def write_rollout_zarr_store(
         selected_depth_zfar_m=selected_depth_zfar_m,
         selected_depth_source_resolution=selected_depth_source_resolution,
         q_h_chunk_states=q_h_chunk_states,
+        target_eval_crop_max_points=target_eval_crop_max_points,
     ).write()
 
 
@@ -435,6 +473,7 @@ class _RolloutZarrWriteSession:
         selected_depth_zfar_m: float | None,
         selected_depth_source_resolution: str,
         q_h_chunk_states: int,
+        target_eval_crop_max_points: int,
     ) -> None:
         self.output_dir = Path(store_dir).expanduser().resolve()
         self.records = records
@@ -455,12 +494,15 @@ class _RolloutZarrWriteSession:
         self.selected_depth_zfar_m = selected_depth_zfar_m
         self.selected_depth_source_resolution = str(selected_depth_source_resolution)
         self.q_h_chunk_states = int(q_h_chunk_states)
+        self.target_eval_crop_max_points = int(target_eval_crop_max_points)
         if self.selected_depth_width_px < 1 or self.selected_depth_height_px < 1:
             raise ValueError("selected_depth_width_px and selected_depth_height_px must be positive.")
         if self.selected_depth_chunk_steps < 1:
             raise ValueError("selected_depth_chunk_steps must be positive.")
         if self.q_h_chunk_states < 1:
             raise ValueError("q_h_chunk_states must be positive.")
+        if self.target_eval_crop_max_points < 1:
+            raise ValueError("target_eval_crop_max_points must be positive.")
 
     def write(self) -> RolloutZarrWriteResult:
         """Materialize the configured rollout traces to disk."""
@@ -472,9 +514,10 @@ class _RolloutZarrWriteSession:
             dictionaries,
             selected_depth_width_px=self.selected_depth_width_px,
             selected_depth_height_px=self.selected_depth_height_px,
+            target_eval_crop_max_points=self.target_eval_crop_max_points,
         )
         q_h_horizon = _table_horizon(table)
-        q_h_arrays = _build_q_h_arrays(table, horizon=q_h_horizon, gamma=self.discount_gamma)
+        q_h_arrays = _build_q_h_arrays(table, gamma=self.discount_gamma)
         root_metadata = _root_metadata_payload(
             records=self.records,
             tables=table,
@@ -496,6 +539,7 @@ class _RolloutZarrWriteSession:
             selected_depth_znear_m=self.selected_depth_znear_m,
             selected_depth_zfar_m=self.selected_depth_zfar_m,
             selected_depth_source_resolution=self.selected_depth_source_resolution,
+            target_eval_crop_max_points=self.target_eval_crop_max_points,
             created_at_utc=created_at_utc,
             manifest_sha256="",
         )
@@ -537,12 +581,19 @@ class _RolloutZarrWriteSession:
             zfar_m=self.selected_depth_zfar_m,
             source_resolution=self.selected_depth_source_resolution,
         )
+        _write_target_eval_crops_group(
+            groups["target_eval_crops"],
+            table.target_eval_crops,
+            dictionaries=dictionaries,
+            max_points=self.target_eval_crop_max_points,
+        )
         _write_q_h_group(
             groups["q_h"],
             q_h_arrays,
             chunk_states=self.q_h_chunk_states,
             horizon=q_h_horizon,
             gamma=self.discount_gamma,
+            return_semantics=self.return_semantics,
         )
         written_manifest_digest = write_rollout_store_manifest(self.output_dir, manifest_payload)
         if written_manifest_digest != manifest_digest:
@@ -586,6 +637,7 @@ class _RolloutZarrValidator:
         self._validate_q_h(candidate_row_id)
         self._validate_candidates(candidate_row_id)
         self._validate_selected_depth()
+        self._validate_target_eval_crops()
         self._validate_sources()
         self._validate_targets()
         self._validate_required_lineage()
@@ -642,7 +694,6 @@ class _RolloutZarrValidator:
     def _validate_q_h(self, candidate_row_id: np.ndarray) -> None:
         derived = _build_q_h_arrays(
             _read_tables_from_root(self.root),
-            horizon=_stored_horizon(self.root),
             gamma=float(self.root.attrs.get("discount_gamma", 1.0)),
         )
         persisted = _read_q_h_arrays_if_present(self.root)
@@ -657,6 +708,7 @@ class _RolloutZarrValidator:
         q_train_mask = q_h["q_train_mask"]
         valid_action_mask = q_h["valid_action_mask"]
         one_step_target_rri = q_h["one_step_target_rri"]
+        one_step_target_root_gain = q_h["one_step_target_root_gain"]
         td_terminal_mask = q_h["td_terminal_mask"]
         td_discount = q_h["td_discount"]
 
@@ -664,9 +716,11 @@ class _RolloutZarrValidator:
         if not np.isin(real_q_ids, candidate_row_id).all():
             self.errors.append("Q_H candidate_row_id contains ids not present in candidates/candidate_row_id.")
         if np.any(q_train_mask & (~valid_action_mask)):
-            self.errors.append("Q_H q_train_mask is true for invalid or padded candidates.")
+            self.errors.append("Q_H q_train_mask is true for invalid candidates.")
+        if np.any(q_train_mask & (~np.isfinite(one_step_target_root_gain))):
+            self.errors.append("Q_H q_train_mask is true without a finite explicit target-root-gain reward.")
         if np.any(q_train_mask & (~np.isfinite(one_step_target_rri))):
-            self.errors.append("Q_H q_train_mask is true without a finite explicit target-RRI label.")
+            self.errors.append("Q_H q_train_mask is true without a finite diagnostic target-RRI label.")
         if np.any(td_terminal_mask & (td_discount != 0.0)):
             self.errors.append("Q_H td_discount must be zero for terminal selected transitions.")
 
@@ -684,6 +738,12 @@ class _RolloutZarrValidator:
             self.errors.append("q_h/horizon attr does not match rollouts/horizon.")
         if float(group.attrs.get("discount_gamma", float("nan"))) != float(self.root.attrs.get("discount_gamma", 1.0)):
             self.errors.append("q_h/discount_gamma attr does not match root discount_gamma.")
+        if group.attrs.get("td_semantics") != Q_H_TD_SEMANTICS:
+            self.errors.append(f"q_h/td_semantics must be {Q_H_TD_SEMANTICS!r}.")
+        if group.attrs.get("reward_metric") != Q_H_REWARD_METRIC:
+            self.errors.append(f"q_h/reward_metric must be {Q_H_REWARD_METRIC!r}.")
+        if group.attrs.get("return_semantics") != self.root.attrs.get("return_semantics"):
+            self.errors.append("q_h/return_semantics attr does not match root return_semantics.")
 
         for name in Q_H_ARRAY_NAMES:
             actual = persisted[name]
@@ -752,6 +812,60 @@ class _RolloutZarrValidator:
             if tuple(group[name].shape) != (int(step_row_id.shape[0]), 2):
                 self.errors.append(f"selected_depth/{name} must have shape (num_steps, 2).")
 
+    def _validate_target_eval_crops(self) -> None:
+        if "target_eval_crops" not in self.root:
+            self.errors.append("Missing required group 'target_eval_crops'.")
+            return
+        group = self.root["target_eval_crops"]
+        required = set(TARGET_EVAL_CROP_TABLE.names) | {"points_world", "mask", "source_role_names"}
+        missing = sorted(name for name in required if name not in group)
+        if missing:
+            self.errors.append(f"Missing target_eval_crops arrays: {missing}.")
+            return
+        if group.attrs.get("role") != "oracle_eval_only":
+            self.errors.append("target_eval_crops/role attr must be 'oracle_eval_only'.")
+        if group.attrs.get("coordinate_frame") != "world":
+            self.errors.append("target_eval_crops/coordinate_frame attr must be 'world'.")
+        points = np.asarray(group["points_world"])
+        mask = np.asarray(group["mask"])
+        lengths = np.asarray(group["lengths"], dtype=np.int32)
+        crop_row_id = np.asarray(group["crop_row_id"], dtype=np.int64)
+        if points.ndim != 3 or points.shape[-1] != 3:
+            self.errors.append("target_eval_crops/points_world must have shape (rows,max_points,3).")
+            return
+        if mask.shape != points.shape[:2]:
+            self.errors.append("target_eval_crops/mask must align with points_world rows and point width.")
+            return
+        if lengths.shape != (points.shape[0],):
+            self.errors.append("target_eval_crops/lengths must have one value per crop row.")
+            return
+        if crop_row_id.shape != (points.shape[0],):
+            self.errors.append("target_eval_crops/crop_row_id must have one value per crop row.")
+            return
+        if not np.array_equal(crop_row_id, np.arange(points.shape[0], dtype=np.int64)):
+            self.errors.append("target_eval_crops/crop_row_id must be contiguous from zero.")
+        if np.any(lengths < 0) or np.any(lengths > points.shape[1]):
+            self.errors.append("target_eval_crops/lengths must be within the fixed point width.")
+        if not np.array_equal(mask.sum(axis=1).astype(np.int32), lengths):
+            self.errors.append("target_eval_crops/mask true counts must equal lengths.")
+        if points.shape[1] != int(self.root.attrs.get("target_eval_crops_max_points", points.shape[1])):
+            self.errors.append("target_eval_crops point width must match root target_eval_crops_max_points.")
+        step_row_id = np.asarray(self.root["steps/step_row_id"], dtype=np.int64)
+        crop_step_row_id = np.asarray(group["step_row_id"], dtype=np.int64)
+        if crop_step_row_id.size and not np.isin(crop_step_row_id, step_row_id).all():
+            self.errors.append("target_eval_crops/step_row_id contains ids not present in steps/step_row_id.")
+        source_role_id = np.asarray(group["source_role_id"], dtype=np.int32)
+        if source_role_id.size and not np.isin(source_role_id, np.asarray([0, 1], dtype=np.int32)).all():
+            self.errors.append("target_eval_crops/source_role_id must be current_eval=0 or candidate_eval=1.")
+        candidate_row_id = np.asarray(group["candidate_row_id"], dtype=np.int64)
+        candidate_rows = np.asarray(self.root["candidates/candidate_row_id"], dtype=np.int64)
+        candidate_refs = candidate_row_id[source_role_id == 1]
+        current_refs = candidate_row_id[source_role_id == 0]
+        if current_refs.size and np.any(current_refs != -1):
+            self.errors.append("target_eval_crops current_eval rows must use candidate_row_id=-1.")
+        if candidate_refs.size and not np.isin(candidate_refs, candidate_rows).all():
+            self.errors.append("target_eval_crops candidate_eval rows reference missing candidates.")
+
     def _validate_sources(self) -> None:
         source_row_id = np.asarray(self.root["sources/source_row_id"])
         rollout_source_row_id = np.asarray(self.root["rollouts/source_row_id"])
@@ -787,6 +901,12 @@ class _RolloutZarrValidator:
                 self.errors.append("rollouts/root_pose_world must have shape (num_rollouts, 12).")
             elif not np.isfinite(root_pose_world).all():
                 self.errors.append("rollouts/root_pose_world contains non-finite values.")
+        rollout_count = int(np.asarray(self.root["rollouts/rollout_row_id"]).shape[0])
+        for name in ("root_time_ns", "root_trajectory_index", "root_frame_index"):
+            if name not in self.root["rollouts"]:
+                self.errors.append(f"Missing required rollout {name} field.")
+            elif np.asarray(self.root[f"rollouts/{name}"]).shape != (rollout_count,):
+                self.errors.append(f"rollouts/{name} must have shape (num_rollouts,).")
 
         q_state_target_row_id = _q_h_arrays_for_validation(self.root)["target_row_id"]
         step_rollout_row_id = np.asarray(self.root["steps/rollout_row_id"])
@@ -883,6 +1003,7 @@ def _required_groups() -> tuple[str, ...]:
         "steps",
         "candidates",
         "selected_depth",
+        "target_eval_crops",
         "q_h",
     )
 
@@ -909,6 +1030,7 @@ def _root_metadata_payload(
     selected_depth_znear_m: float | None,
     selected_depth_zfar_m: float | None,
     selected_depth_source_resolution: str,
+    target_eval_crop_max_points: int,
     created_at_utc: str,
     manifest_sha256: str,
 ) -> dict[str, Any]:
@@ -952,6 +1074,8 @@ def _root_metadata_payload(
         "q_h_view_persisted": True,
         "q_h_view_role": "training_core_derived_cache",
         "q_h_source_tables": "steps,candidates,rollouts,targets",
+        "q_h_reward_metric": Q_H_REWARD_METRIC,
+        "q_h_return_semantics": return_semantics,
         "q_h_horizon": int(q_h_horizon),
         "q_h_chunk_states": int(q_h_chunk_states),
         "q_h_state_count": int(q_h_arrays["state_step_row_id"].shape[0]),
@@ -964,6 +1088,11 @@ def _root_metadata_payload(
         "num_steps": int(tables.steps["step_row_id"].shape[0]),
         "num_candidates": int(tables.candidates["candidate_row_id"].shape[0]),
         "num_selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
+        "target_eval_crops_enabled": True,
+        "target_eval_crops_role": "oracle_eval_only",
+        "target_eval_crops_coordinate_frame": "world",
+        "target_eval_crops_max_points": int(target_eval_crop_max_points),
+        "target_eval_crops_num_rows": int(tables.target_eval_crops["crop_row_id"].shape[0]),
         "num_q_h_states": int(q_h_arrays["state_step_row_id"].shape[0]),
     }
 
@@ -994,6 +1123,7 @@ def _build_manifest_payload(
             "steps": int(tables.steps["step_row_id"].shape[0]),
             "candidates": int(tables.candidates["candidate_row_id"].shape[0]),
             "selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
+            "target_eval_crops": int(tables.target_eval_crops["crop_row_id"].shape[0]),
             "q_h_states": int(q_h_arrays["state_step_row_id"].shape[0]),
             "q_h_max_candidates": int(q_h_arrays["candidate_row_id"].shape[1])
             if q_h_arrays["candidate_row_id"].ndim == 2
@@ -1144,6 +1274,12 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
                     lineage.branch_schedule_id,
                     lineage.target_protocol_version,
                     lineage.target_crop_policy,
+                    *(
+                        step.target_eval_crop_policy
+                        for trajectory in _record.result.trajectories
+                        for step in trajectory.steps
+                        if step.target_eval_crop_policy
+                    ),
                     lineage.target_reason_code_version,
                     lineage.reason_code_version,
                     lineage.selection_rng_state_hash,
@@ -1159,14 +1295,6 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
                 for record in records
                 for trajectory in record.result.trajectories
             }
-        ),
-        "transition": sorted(
-            {
-                f"{lineage.rollout_id}:step={step.step_index}:shell={step.selected_shell_index}"
-                for _record, trajectory, lineage in items
-                for step in trajectory.steps
-            }
-            | {""}
         ),
     }
 
@@ -1530,6 +1658,7 @@ def _flatten_records(
     *,
     selected_depth_width_px: int,
     selected_depth_height_px: int,
+    target_eval_crop_max_points: int,
 ) -> _RolloutTables:
     source_rows: dict[str, list[Any]] = _empty_rows(SOURCE_TABLE)
     rollout_rows: dict[str, list[Any]] = _empty_rows(ROLLOUT_TABLE)
@@ -1537,9 +1666,11 @@ def _flatten_records(
     step_rows: dict[str, list[Any]] = _empty_rows(STEP_TABLE)
     candidate_rows: dict[str, list[Any]] = _empty_candidate_rows()
     selected_depth_rows: dict[str, list[Any]] = _empty_selected_depth_rows()
+    target_eval_crop_rows: dict[str, list[Any]] = _empty_target_eval_crop_rows()
 
     candidate_row_id = 0
     step_row_id = 0
+    crop_row_id = 0
     seen_source_rows: dict[int, tuple[object, ...]] = {}
     rollout_row_id = 0
     for record, trajectory, lineage in _record_items(records):
@@ -1547,6 +1678,8 @@ def _flatten_records(
         if final_target_rri is None:
             final_target_rri = trajectory.cumulative_rri
         final_scene_rri = _trajectory_cumulative_metric(trajectory, ("scene_rri",))
+        final_target_root_gain = _trajectory_cumulative_metric(trajectory, ("target_root_gain", "root_gain"))
+        final_scene_root_gain = _trajectory_cumulative_metric(trajectory, ("scene_root_gain",))
         source_row_id = _lineage_source_row_id(lineage)
         source_identity = _source_identity(lineage=lineage, source_row_id=source_row_id)
         existing_source_identity = seen_source_rows.get(source_row_id)
@@ -1565,6 +1698,9 @@ def _flatten_records(
         rollout_rows["root_pose_world"].append(
             record.result.root_pose_world.tensor().detach().cpu().to(dtype=torch.float32).reshape(-1).numpy()
         )
+        rollout_rows["root_time_ns"].append(_int_or_default(record.result.root_time_ns, default=-1))
+        rollout_rows["root_trajectory_index"].append(_int_or_default(record.result.root_trajectory_index, default=-1))
+        rollout_rows["root_frame_index"].append(_int_or_default(record.result.root_frame_index, default=-1))
         rollout_rows["scene_id"].append(_dict_id(dictionaries["scene"], lineage.scene_id or ""))
         rollout_rows["snippet_id"].append(_dict_id(dictionaries["snippet"], lineage.snippet_id or ""))
         rollout_rows["target_row_id"].append(lineage.target_row_id if lineage.target_row_id is not None else 0)
@@ -1579,6 +1715,8 @@ def _flatten_records(
         )
         rollout_rows["final_cumulative_target_rri"].append(_nan_if_none(final_target_rri))
         rollout_rows["final_cumulative_scene_rri"].append(_nan_if_none(final_scene_rri))
+        rollout_rows["final_cumulative_target_root_gain"].append(_nan_if_none(final_target_root_gain))
+        rollout_rows["final_cumulative_scene_root_gain"].append(_nan_if_none(final_scene_root_gain))
         rollout_rows["split_id"].append(_dict_id(dictionaries["split"], lineage.split or "unknown"))
 
         lineage_rows["rollout_row_id"].append(rollout_row_id)
@@ -1605,11 +1743,23 @@ def _flatten_records(
 
         running_target_rri: float | None = None
         running_scene_rri: float | None = None
+        running_target_root_gain: float | None = None
+        running_scene_root_gain: float | None = None
         root_pose = record.result.root_pose_world.tensor().detach().cpu().reshape(-1)
         for step in trajectory.steps:
             candidate_valid = _candidate_valid(step)
             running_target_rri = _accumulate_selected_metric(running_target_rri, step, ("target_rri", "rri"))
             running_scene_rri = _accumulate_selected_metric(running_scene_rri, step, ("scene_rri",))
+            running_target_root_gain = _accumulate_selected_metric(
+                running_target_root_gain,
+                step,
+                ("target_root_gain", "root_gain"),
+            )
+            running_scene_root_gain = _accumulate_selected_metric(
+                running_scene_root_gain,
+                step,
+                ("scene_root_gain",),
+            )
             this_step_row_id = step_row_id
             step_row_id += 1
             selected_candidate_row_id = candidate_row_id + int(step.selected_shell_index)
@@ -1623,13 +1773,23 @@ def _flatten_records(
             step_rows["num_valid_candidates"].append(int(candidate_valid.sum().item()))
             step_rows["cumulative_target_rri"].append(_nan_if_none(running_target_rri))
             step_rows["cumulative_scene_rri"].append(_nan_if_none(running_scene_rri))
-            transition_id = f"{lineage.rollout_id}:step={step.step_index}:shell={step.selected_shell_index}"
-            step_rows["transition_id"].append(_dict_id(dictionaries["transition"], transition_id))
+            step_rows["cumulative_target_root_gain"].append(_nan_if_none(running_target_root_gain))
+            step_rows["cumulative_scene_root_gain"].append(_nan_if_none(running_scene_root_gain))
             _append_selected_depth_row(
                 selected_depth_rows,
                 step=step,
                 step_row_id=this_step_row_id,
                 selected_candidate_row_id=selected_candidate_row_id,
+            )
+            crop_row_id = _append_target_eval_crop_rows(
+                target_eval_crop_rows,
+                step=step,
+                candidate_valid=candidate_valid,
+                step_row_id=this_step_row_id,
+                candidate_row_id_start=candidate_row_id,
+                crop_row_id_start=crop_row_id,
+                dictionaries=dictionaries,
+                fixed_max_points=target_eval_crop_max_points,
             )
 
             for shell_index in range(int(candidate_valid.shape[0])):
@@ -1658,6 +1818,10 @@ def _flatten_records(
             selected_depth_rows,
             width_px=selected_depth_width_px,
             height_px=selected_depth_height_px,
+        ),
+        target_eval_crops=_rows_to_numpy_target_eval_crop_table(
+            target_eval_crop_rows,
+            max_points=target_eval_crop_max_points,
         ),
     )
 
@@ -1727,6 +1891,121 @@ def _empty_selected_depth_rows() -> dict[str, list[Any]]:
     return rows
 
 
+def _empty_target_eval_crop_rows() -> dict[str, list[Any]]:
+    rows = _empty_rows(TARGET_EVAL_CROP_TABLE)
+    rows["points_world"] = []
+    rows["mask"] = []
+    return rows
+
+
+def _append_target_eval_crop_rows(
+    rows: dict[str, list[Any]],
+    *,
+    step: CounterfactualStepResult,
+    candidate_valid: torch.Tensor,
+    step_row_id: int,
+    candidate_row_id_start: int,
+    crop_row_id_start: int,
+    dictionaries: dict[str, list[str]],
+    fixed_max_points: int,
+) -> int:
+    """Append oracle/eval-only target crop rows for current and candidate geometry."""
+
+    crop_row_id = int(crop_row_id_start)
+    crop_policy_id = _dict_id(dictionaries["config"], step.target_eval_crop_policy or "")
+    voxel_size_m = _float_or_nan(step.target_eval_voxel_size_m)
+    max_points = _int_or_default(step.target_eval_max_points, default=fixed_max_points)
+
+    if step.target_eval_current_points_world is not None:
+        points, mask, length = _fixed_crop_payload(step.target_eval_current_points_world, fixed_max_points)
+        _append_target_eval_crop_row(
+            rows,
+            crop_row_id=crop_row_id,
+            step_row_id=step_row_id,
+            candidate_row_id=-1,
+            source_role_id=0,
+            crop_policy_id=crop_policy_id,
+            voxel_size_m=voxel_size_m,
+            max_points=max_points,
+            points_world=points,
+            mask=mask,
+            length=length,
+        )
+        crop_row_id += 1
+
+    if step.target_eval_candidate_points_world is None:
+        return crop_row_id
+    lengths = step.target_eval_candidate_point_lengths
+    if lengths is None:
+        raise ValueError("target_eval_candidate_point_lengths requires target_eval_candidate_points_world.")
+    points_q = torch.as_tensor(step.target_eval_candidate_points_world).detach().cpu()
+    lengths_q = torch.as_tensor(lengths).detach().cpu().to(dtype=torch.long).reshape(-1)
+    valid_indices = torch.nonzero(candidate_valid, as_tuple=False).reshape(-1)
+    if points_q.ndim != 3 or points_q.shape[0] != valid_indices.numel():
+        raise ValueError("target_eval_candidate_points_world must align with valid candidate rows.")
+    if lengths_q.shape[0] != valid_indices.numel():
+        raise ValueError("target_eval_candidate_point_lengths must align with valid candidate rows.")
+    for compact_index, shell_index_t in enumerate(valid_indices):
+        shell_index = int(shell_index_t.detach().cpu().item())
+        length = int(lengths_q[compact_index].item())
+        row_points = points_q[compact_index, :length, :3]
+        points, mask, fixed_length = _fixed_crop_payload(row_points, fixed_max_points)
+        _append_target_eval_crop_row(
+            rows,
+            crop_row_id=crop_row_id,
+            step_row_id=step_row_id,
+            candidate_row_id=candidate_row_id_start + shell_index,
+            source_role_id=1,
+            crop_policy_id=crop_policy_id,
+            voxel_size_m=voxel_size_m,
+            max_points=max_points,
+            points_world=points,
+            mask=mask,
+            length=fixed_length,
+        )
+        crop_row_id += 1
+    return crop_row_id
+
+
+def _append_target_eval_crop_row(
+    rows: dict[str, list[Any]],
+    *,
+    crop_row_id: int,
+    step_row_id: int,
+    candidate_row_id: int,
+    source_role_id: int,
+    crop_policy_id: int,
+    voxel_size_m: float,
+    max_points: int,
+    points_world: np.ndarray,
+    mask: np.ndarray,
+    length: int,
+) -> None:
+    rows["crop_row_id"].append(int(crop_row_id))
+    rows["step_row_id"].append(int(step_row_id))
+    rows["candidate_row_id"].append(int(candidate_row_id))
+    rows["source_role_id"].append(int(source_role_id))
+    rows["crop_policy_id"].append(int(crop_policy_id))
+    rows["voxel_size_m"].append(float(voxel_size_m))
+    rows["max_points"].append(int(max_points))
+    rows["lengths"].append(int(length))
+    rows["points_world"].append(points_world)
+    rows["mask"].append(mask)
+
+
+def _fixed_crop_payload(points: torch.Tensor, max_points: int) -> tuple[np.ndarray, np.ndarray, int]:
+    pts = torch.as_tensor(points).detach().cpu().to(dtype=torch.float32).reshape(-1, 3)
+    finite = torch.isfinite(pts).all(dim=-1)
+    pts = pts[finite]
+    length = min(int(pts.shape[0]), int(max_points))
+    output = np.zeros((int(max_points), 3), dtype=np.float32)
+    mask = np.zeros((int(max_points),), dtype=np.bool_)
+    if length > 0:
+        output[:length, :] = pts[:length].numpy().astype(np.float32, copy=False)
+        mask[:length] = True
+    return output, mask, length
+
+
 def _append_candidate_row(
     rows: dict[str, list[Any]],
     *,
@@ -1744,10 +2023,30 @@ def _append_candidate_row(
     is_selected = int(step.selected_shell_index) == int(shell_index)
     target_rri = _metric_value(step, ("target_rri", "oracle_target_rri"), shell_index)
     scene_rri = _metric_value(step, ("scene_rri", "oracle_scene_rri"), shell_index)
+    target_root_gain = _metric_value(step, ("target_root_gain", "root_gain"), shell_index)
+    scene_root_gain = _metric_value(step, ("scene_root_gain",), shell_index)
+    target_log_error_gain = _metric_value(step, ("target_log_error_gain", "log_error_gain"), shell_index)
+    scene_log_error_gain = _metric_value(step, ("scene_log_error_gain",), shell_index)
+    target_pm_dist_before = _metric_value(step, ("target_pm_dist_before",), shell_index)
+    target_pm_dist_after = _metric_value(step, ("target_pm_dist_after",), shell_index)
+    scene_pm_dist_before = _metric_value(step, ("scene_pm_dist_before",), shell_index)
+    scene_pm_dist_after = _metric_value(step, ("scene_pm_dist_after",), shell_index)
+    target_current_support = _metric_value(step, ("target_current_support",), shell_index)
+    target_candidate_support = _metric_value(step, ("target_candidate_support",), shell_index)
     if not is_valid:
         target_rri = float("nan")
         scene_rri = float("nan")
-    oracle_label = bool(is_valid and np.isfinite(target_rri))
+        target_root_gain = float("nan")
+        scene_root_gain = float("nan")
+        target_log_error_gain = float("nan")
+        scene_log_error_gain = float("nan")
+        target_pm_dist_before = float("nan")
+        target_pm_dist_after = float("nan")
+        scene_pm_dist_before = float("nan")
+        scene_pm_dist_after = float("nan")
+        target_current_support = float("nan")
+        target_candidate_support = float("nan")
+    oracle_label = bool(is_valid and np.isfinite(target_root_gain))
     q_train = bool(is_valid and oracle_label and target_label_valid)
     pose = step.candidates.shell_poses.tensor()[shell_index].detach().cpu().numpy().astype(np.float32)
     rows["candidate_row_id"].append(candidate_row_id)
@@ -1758,15 +2057,10 @@ def _append_candidate_row(
     rows["compact_valid_index"].append(_compact_valid_index(candidate_valid, shell_index))
     rows["pose_world_cam"].append(pose)
     rows["pose_relative_root"].append(_relative_pose_to_root(pose_world_cam=pose, root_pose_world=root_pose))
-    rows["candidate_valid_mask"].append(is_valid)
     rows["actor_action_mask"].append(is_valid)
     rows["oracle_label_mask"].append(oracle_label)
     rows["q_train_mask"].append(q_train)
-    rows["padded_mask"].append(False)
     rows["selected_mask"].append(is_selected)
-    rows["heavy_diag_available_mask"].append(
-        bool(is_selected and (step.selected_point_cloud_world is not None or step.selected_depth_m is not None))
-    )
     rows["strategy_id"].append(_full_shell_value(step.candidates.strategy_id, shell_index, candidate_valid, default=-1))
     rows["mixture_id"].append(_full_shell_value(step.candidates.mixture_id, shell_index, candidate_valid, default=-1))
     rows["sampler_probability"].append(
@@ -1778,6 +2072,16 @@ def _append_candidate_row(
     rows["primary_invalid_reason"].append(int(primary_reason[shell_index].item()))
     rows["scene_rri"].append(scene_rri)
     rows["target_rri"].append(target_rri)
+    rows["scene_root_gain"].append(scene_root_gain)
+    rows["target_root_gain"].append(target_root_gain)
+    rows["scene_log_error_gain"].append(scene_log_error_gain)
+    rows["target_log_error_gain"].append(target_log_error_gain)
+    rows["scene_pm_dist_before"].append(scene_pm_dist_before)
+    rows["scene_pm_dist_after"].append(scene_pm_dist_after)
+    rows["target_pm_dist_before"].append(target_pm_dist_before)
+    rows["target_pm_dist_after"].append(target_pm_dist_after)
+    rows["target_current_support"].append(target_current_support)
+    rows["target_candidate_support"].append(target_candidate_support)
     rows["selection_logits"].append(
         _valid_vector_value(step.selection_logits, shell_index, candidate_valid, default=np.nan)
     )
@@ -1787,7 +2091,6 @@ def _append_candidate_row(
     rows["selection_log_probabilities"].append(
         _valid_vector_value(step.selection_log_probabilities, shell_index, candidate_valid, default=-np.inf)
     )
-    rows["selection_entropy"].append(_nan_if_none(step.selection_entropy))
 
 
 def _append_selected_depth_row(
@@ -1881,6 +2184,34 @@ def _write_selected_depth_group(
     _write_selected_depth_array(group, "valid_mask", values["valid_mask"], chunk_steps=chunk_steps)
 
 
+def _write_target_eval_crops_group(
+    group: zarr.Group,
+    values: dict[str, np.ndarray],
+    *,
+    dictionaries: dict[str, list[str]],
+    max_points: int,
+) -> None:
+    """Write oracle/eval-only target crop point payloads and row metadata."""
+
+    group.attrs.update(
+        {
+            "enabled": True,
+            "role": "oracle_eval_only",
+            "coordinate_frame": "world",
+            "points_dtype": "float32",
+            "mask_dtype": "bool",
+            "max_points": int(max_points),
+            "source_roles": "current_eval,candidate_eval",
+        }
+    )
+    for name in TARGET_EVAL_CROP_TABLE.names:
+        _write_array(group, name, values[name])
+    _write_array(group, "points_world", values["points_world"])
+    _write_array(group, "mask", values["mask"])
+    _write_string_array(group, "source_role_names", ["current_eval", "candidate_eval"])
+    _write_string_array(group, "crop_policy_dictionary", dictionaries.get("config", []))
+
+
 def _write_q_h_group(
     group: zarr.Group,
     values: dict[str, np.ndarray],
@@ -1888,6 +2219,7 @@ def _write_q_h_group(
     chunk_states: int,
     horizon: int,
     gamma: float,
+    return_semantics: str,
 ) -> None:
     """Write the derived dense finite-candidate training view."""
 
@@ -1897,6 +2229,10 @@ def _write_q_h_group(
         {
             "view_role": "training_core_derived_cache",
             "source_tables": "steps,candidates,rollouts,targets",
+            "td_semantics": Q_H_TD_SEMANTICS,
+            "reward_metric": Q_H_REWARD_METRIC,
+            "return_semantics": return_semantics,
+            "td_reward_target_rri_role": "diagnostic_state_relative_rri",
             "state_count": state_count,
             "max_candidates": max_candidates,
             "horizon": int(horizon),
@@ -1908,7 +2244,7 @@ def _write_q_h_group(
         _write_q_h_array(group, name, values[name], chunk_states=chunk_states)
 
 
-def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> dict[str, np.ndarray]:
+def _build_q_h_arrays(tables: _RolloutTables, *, gamma: float) -> dict[str, np.ndarray]:
     steps = tables.steps
     candidates = tables.candidates
     rollouts = tables.rollouts
@@ -1916,7 +2252,6 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
     candidate_step_ids = candidates["step_row_id"].astype(np.int64)
     max_candidates = _max_candidates_per_step(steps, candidates)
     state_count = int(step_ids.shape[0])
-    h_max = max(int(horizon), 1)
 
     q = {
         "state_step_row_id": step_ids,
@@ -1927,12 +2262,10 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
         "target_row_id": np.zeros((state_count,), dtype=np.int64),
         "selected_candidate_index": np.full((state_count,), -1, dtype=np.int32),
         "one_step_target_rri": np.full((state_count, max_candidates), np.nan, dtype=np.float32),
-        "one_step_scene_rri": np.full((state_count, max_candidates), np.nan, dtype=np.float32),
-        "bootstrap_next_step_row_id": np.full((state_count, max_candidates), -1, dtype=np.int64),
-        "terminal_mask": np.ones((state_count, max_candidates), dtype=np.bool_),
+        "one_step_target_root_gain": np.full((state_count, max_candidates), np.nan, dtype=np.float32),
         "invalid_reason_bitset": np.zeros((state_count, max_candidates), dtype=np.uint32),
-        "discount": np.asarray([float(gamma) ** power for power in range(h_max)], dtype=np.float32),
         "td_selected_candidate_row_id": np.full((state_count,), -1, dtype=np.int64),
+        "td_reward": np.full((state_count,), np.nan, dtype=np.float32),
         "td_reward_target_rri": np.full((state_count,), np.nan, dtype=np.float32),
         "td_next_step_row_id": np.full((state_count,), -1, dtype=np.int64),
         "td_terminal_mask": np.ones((state_count,), dtype=np.bool_),
@@ -1959,7 +2292,7 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
             q["valid_action_mask"][row, local_index] = bool(candidates["actor_action_mask"][candidate_index])
             q["q_train_mask"][row, local_index] = bool(candidates["q_train_mask"][candidate_index])
             q["one_step_target_rri"][row, local_index] = float(candidates["target_rri"][candidate_index])
-            q["one_step_scene_rri"][row, local_index] = float(candidates["scene_rri"][candidate_index])
+            q["one_step_target_root_gain"][row, local_index] = float(candidates["target_root_gain"][candidate_index])
             q["invalid_reason_bitset"][row, local_index] = int(candidates["invalid_reason_bitset"][candidate_index])
             if int(candidates["candidate_row_id"][candidate_index]) == selected_candidate_row_id:
                 selected_local_index = local_index
@@ -1967,18 +2300,17 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
         q["selected_candidate_index"][row] = selected_local_index
         q["td_selected_candidate_row_id"][row] = selected_candidate_row_id
         if selected_local_index >= 0:
+            q["td_reward"][row] = q["one_step_target_root_gain"][row, selected_local_index]
             q["td_reward_target_rri"][row] = q["one_step_target_rri"][row, selected_local_index]
             next_step = next_step_by_rollout.get((rollout_id, int(steps["step_index"][row]) + 1), -1)
             q["td_next_step_row_id"][row] = next_step
             q["td_terminal_mask"][row] = next_step < 0
             if next_step >= 0:
                 q["td_discount"][row] = float(gamma)
-                q["terminal_mask"][row, selected_local_index] = False
-                q["bootstrap_next_step_row_id"][row, selected_local_index] = next_step
 
     q["q_train_mask"] &= q["valid_action_mask"]
     q["one_step_target_rri"][~q["valid_action_mask"]] = np.nan
-    q["one_step_scene_rri"][~q["valid_action_mask"]] = np.nan
+    q["one_step_target_root_gain"][~q["valid_action_mask"]] = np.nan
     return q
 
 
@@ -2020,6 +2352,26 @@ def _rows_to_numpy_selected_depth_table(
     return table
 
 
+def _rows_to_numpy_target_eval_crop_table(
+    rows: dict[str, list[Any]],
+    *,
+    max_points: int,
+) -> dict[str, np.ndarray]:
+    expected = set(TARGET_EVAL_CROP_TABLE.names) | {"points_world", "mask"}
+    if set(rows) != expected:
+        missing = sorted(expected - set(rows))
+        extra = sorted(set(rows) - expected)
+        raise ValueError(f"Target eval crop fields do not match schema; missing={missing}, extra={extra}.")
+    table = {name: np.asarray(rows[name], dtype=dtype) for name, dtype in TARGET_EVAL_CROP_TABLE.dtypes.items()}
+    if rows["points_world"]:
+        table["points_world"] = np.stack(rows["points_world"], axis=0).astype(np.float32, copy=False)
+        table["mask"] = np.stack(rows["mask"], axis=0).astype(np.bool_, copy=False)
+    else:
+        table["points_world"] = np.empty((0, int(max_points), 3), dtype=np.float32)
+        table["mask"] = np.empty((0, int(max_points)), dtype=np.bool_)
+    return table
+
+
 def _read_tables_from_root(root: Any) -> _RolloutTables:
     return _RolloutTables(
         sources=_read_group_table(root, SOURCE_TABLE),
@@ -2028,6 +2380,7 @@ def _read_tables_from_root(root: Any) -> _RolloutTables:
         steps=_read_group_table(root, STEP_TABLE),
         candidates=_read_group_table(root, CANDIDATE_TABLE),
         selected_depth=_read_selected_depth_table(root),
+        target_eval_crops=_read_target_eval_crop_table(root),
     )
 
 
@@ -2040,6 +2393,19 @@ def _read_selected_depth_table(root: Any) -> dict[str, np.ndarray]:
     values = {field.name: np.asarray(group[field.name]) for field in SELECTED_DEPTH_TABLE.fields}
     values["depth_m"] = np.empty((0, 0, 0), dtype=np.float16)
     values["valid_mask"] = np.empty((0, 0, 0), dtype=bool)
+    return values
+
+
+def _read_target_eval_crop_table(root: Any) -> dict[str, np.ndarray]:
+    if "target_eval_crops" not in root:
+        values = {field.name: np.empty((0,), dtype=field.dtype) for field in TARGET_EVAL_CROP_TABLE.fields}
+        values["points_world"] = np.empty((0, 0, 3), dtype=np.float32)
+        values["mask"] = np.empty((0, 0), dtype=np.bool_)
+        return values
+    group = root["target_eval_crops"]
+    values = {field.name: np.asarray(group[field.name]) for field in TARGET_EVAL_CROP_TABLE.fields}
+    values["points_world"] = np.asarray(group["points_world"])
+    values["mask"] = np.asarray(group["mask"])
     return values
 
 
@@ -2061,7 +2427,6 @@ def _q_h_arrays_for_validation(root: Any) -> dict[str, np.ndarray]:
         return values
     return _build_q_h_arrays(
         _read_tables_from_root(root),
-        horizon=_stored_horizon(root),
         gamma=float(root.attrs.get("discount_gamma", 1.0)),
     )
 

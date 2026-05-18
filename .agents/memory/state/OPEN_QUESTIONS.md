@@ -20,10 +20,10 @@ tags: [research, nbv, vin, training]
 - What exact compact actor-visible crop descriptor should be used for the first target-input ablation: pooled EVL/voxel features, semidense point statistics, projected feature pooling, or a smaller diagnostic descriptor?
 
 ## Q_H and Offline RL Details
-- What exact horizon values, discount/default gamma, return target definition, and target-RRI clipping convention should define $Q_H$ after RQ1 separates endpoint target-quality gain from finite-horizon cumulative target-RRI return?
+- What exact horizon values, discount/default gamma, and root-normalized reward clipping convention should define $Q_H$ after RQ1 separates endpoint target-quality gain from the finite-horizon target-root-gain return?
 - What epsilon, clipping, and near-solved-target eligibility policy should be used when $D_e(P_0)$ is close to zero in endpoint gain or log target-error gain?
 - Should log target-error gain be a reported primary companion metric, a diagnostic-only ablation, or deferred until stage-dependence evidence requires it?
-- Should Q_H use only cumulative target RRI in the main run, or should path length, motion rules, validity, and diversity penalties receive a small first ablation?
+- Should Q_H use only cumulative root-normalized target gain in the main run, or should path length, motion rules, validity, and diversity penalties receive a small first ablation?
 - Should invalidity remain hard-mask-only for all finite-candidate Q_H experiments, or should a validity head, scalar invalidity penalty, or learned feasibility signal be tried before the continuous-action bridge?
 - What is the exact IQL scope if Q_H is stable: report-only ablation, full comparison, or defer to future work?
 - What exact scope should online discrete Q_H have after offline fitted Q_H: bridge design only, smoke experiment in the ASE mesh/oracle loop, or quantitative comparator before continuous actor-critic work?

@@ -477,6 +477,7 @@ class RolloutDatasetWriter:
             selected_depth_zfar_m=selected_depth_renderer_config.renderer.zfar,
             selected_depth_source_resolution="exact_output_size",
             q_h_chunk_states=self.config.store.q_h_chunk_states,
+            target_eval_crop_max_points=self.config.store.target_eval_crop_max_points,
         )
         self.stats.rollouts_written = int(result.num_rollouts)
         validation = validate_rollout_zarr_store(result.store_dir)

@@ -138,6 +138,21 @@ def _attach_fixture_candidate_provenance(result: CounterfactualRolloutResult) ->
             step.selected_depth_focal_px = (120.0, 120.0)
             step.selected_depth_principal_point_px = (120.0, 120.0)
             step.selected_depth_image_size_hw = (240, 240)
+            valid_count = int(mask.sum().item())
+            step.target_eval_current_points_world = torch.tensor(
+                [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.0, 0.1, 0.0]],
+                dtype=torch.float32,
+            )
+            step.target_eval_candidate_points_world = torch.zeros((valid_count, 2, 3), dtype=torch.float32)
+            step.target_eval_candidate_point_lengths = torch.full((valid_count,), 2, dtype=torch.long)
+            for valid_index in range(valid_count):
+                step.target_eval_candidate_points_world[valid_index, :, :] = torch.tensor(
+                    [[float(valid_index), 0.0, 0.0], [float(valid_index), 0.1, 0.0]],
+                    dtype=torch.float32,
+                )
+            step.target_eval_crop_policy = TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
+            step.target_eval_voxel_size_m = 0.02
+            step.target_eval_max_points = 50_000
 
 
 def _config_hash(config: BaseConfig) -> str:
@@ -174,10 +189,25 @@ def _fixture_scores(
     del trajectory
     valid_poses = result.poses_world_cam()
     centers = valid_poses.t.reshape(-1, 3)
-    scores = torch.linspace(0.1, 0.1 * centers.shape[0], centers.shape[0], device=centers.device)
-    scores = scores + float(step_index)
+    target_rri = torch.linspace(0.1, 0.1 * centers.shape[0], centers.shape[0], device=centers.device)
+    target_rri = target_rri + float(step_index)
+    target_root_gain = target_rri + 10.0
     return CounterfactualCandidateEvaluation(
-        scores=scores,
-        score_label="oracle_rri",
-        metrics=CounterfactualMetricBundle(rri=scores, scene_rri=scores, target_rri=scores),
+        scores=target_root_gain,
+        score_label="target_root_gain",
+        metrics=CounterfactualMetricBundle(
+            rri=target_rri,
+            scene_rri=target_rri,
+            target_rri=target_rri,
+            scene_root_gain=target_root_gain / 2.0,
+            target_root_gain=target_root_gain,
+            scene_log_error_gain=target_rri / 3.0,
+            target_log_error_gain=target_rri / 2.0,
+            scene_pm_dist_before=target_rri + 1.0,
+            scene_pm_dist_after=target_rri + 0.5,
+            target_pm_dist_before=target_rri + 2.0,
+            target_pm_dist_after=target_rri + 1.0,
+            target_current_support=torch.full_like(target_rri, 3.0),
+            target_candidate_support=torch.full_like(target_rri, 2.0),
+        ),
     )

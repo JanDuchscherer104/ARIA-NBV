@@ -188,3 +188,5 @@ here we also need to consider how to generate the multi-step samples in a way su
 
 - First RRI computation compares the reconstruction improvement of the first counterfactual view's *dense* pointcloud against the sparse SLAM pointcloud, whilst the subsequent RRIs compare the dense single step pointclouds against the fused PC which now includes the union of the semi-dense and previous dense pointclouds. This leads to a bias in the RRI computation, favoring the first candidate views.
 - We need to investigate the current target selection policy so that we get a well balanced distribution of targets for the multi-step rollouts.
+- we actually shouldn't create a dedicated single step rollout dataset. just allow adding new steps to the same rollout roots!
+  - add simplified visualization of the rollout trees per snippet in streamlit app. there also plot important summary statistics as currently found in the online counterfactual rollout page to monitor the distributions of the generated multi-step samples (i.e. RRI values, multi step returns, relative candidate pose changes (translation and rotation), number of steps and branches per rollout, ...)

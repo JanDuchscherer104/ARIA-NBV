@@ -25,6 +25,7 @@ from aria_nbv.pose_generation import (
     CandidateGenerationRuntimeContext,
     CandidateMixtureComponentConfig,
     CandidateMixtureViewGeneratorConfig,
+    CandidatePositionMode,
     CandidateSamplingResult,
     CandidateViewGeneratorConfig,
     CounterfactualCandidateEvaluation,
@@ -44,11 +45,13 @@ from aria_nbv.pose_generation.plotting import (
 from aria_nbv.pose_generation.target_counterfactuals import (
     TargetRriInvalidError,
     _crop_mesh_to_obb,
+    _crop_padded_pointclouds_to_obb,
     _crop_points_to_obb,
 )
 from aria_nbv.rendering import CandidateDepthRendererConfig
 from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
 from aria_nbv.rollouts import RolloutLineage, RolloutZarrRecord
+from aria_nbv.rri_metrics import RriEvaluationPointCloudSource, RriRewardMode
 from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
 from aria_nbv.utils.data_plotting import get_frustum_segments
 
@@ -113,6 +116,7 @@ def _target_row(*, gt_target_row_id: int) -> TargetCandidateRow:
         projected_area_fraction=0.1,
         semidense_support_count=10,
         evl_support_count=10,
+        effective_support_count=10.0,
         visibility_score=1.0,
         support_score=1.0,
         deficit_score=0.0,
@@ -329,11 +333,14 @@ def test_target_scorer_computes_target_and_scene_rri_from_one_pointcloud_batch(m
             dtype=torch.float32,
         ),
         mesh_faces=torch.tensor([[0, 1, 2], [3, 4, 5]], dtype=torch.int64),
+        semidense=SimpleNamespace(collapse_points=lambda: torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32)),
     )
     candidates = _candidate_result_for_pose(_identity_pose(), count=2)
     cfg = CounterfactualTargetOracleRriScorerConfig(
         min_current_target_points=1,
         include_scene_rri=True,
+        eval_point_cloud_source=RriEvaluationPointCloudSource.LEGACY_SEMIDENSE_ROOT,
+        reward_mode=RriRewardMode.STATE_RELATIVE_RRI,
     )
 
     evaluation = cfg.setup_target(sample=sample, target_sample=target_sample, target_row=row)(
@@ -348,6 +355,97 @@ def test_target_scorer_computes_target_and_scene_rri_from_one_pointcloud_batch(m
     assert evaluation.score_label == "target_rri"
     assert evaluation.metric_vectors["target_rri"].tolist() == [3.0, 3.0]
     assert evaluation.metric_vectors["scene_rri"].tolist() == [6.0, 6.0]
+    assert evaluation.target_eval_current_points_world is not None
+    assert evaluation.target_eval_current_points_world.shape == (1, 3)
+    assert evaluation.target_eval_candidate_points_world is not None
+    assert evaluation.target_eval_candidate_points_world.shape[0] == 2
+
+
+def test_target_scorer_crops_current_eval_before_global_scene_cap(monkeypatch) -> None:
+    class _FakeDepthRenderer:
+        def render(self, sample, candidates):
+            del sample, candidates
+            return object()
+
+    class _FakeOracle:
+        def score(self, *, points_t, points_q, lengths_q, gt_verts, gt_faces, extend):
+            del points_q, lengths_q, gt_verts, gt_faces, extend
+            assert points_t.shape[0] == 1
+            values = torch.ones((1,), dtype=torch.float32)
+            return SimpleNamespace(
+                rri=values,
+                pm_dist_before=values,
+                pm_dist_after=values * 0.5,
+                pm_acc_before=values,
+                pm_comp_before=values,
+                pm_acc_after=values,
+                pm_comp_after=values,
+            )
+
+    import aria_nbv.pose_generation.target_counterfactuals as target_cf
+
+    monkeypatch.setattr(CandidateDepthRendererConfig, "setup_target", lambda self: _FakeDepthRenderer())
+    monkeypatch.setattr(OracleRRIConfig, "setup_target", lambda self: _FakeOracle())
+    monkeypatch.setattr(
+        target_cf,
+        "build_candidate_pointclouds",
+        lambda sample, depths, *, stride=1: CandidatePointClouds(
+            points=torch.tensor([[[0.0, 0.0, 0.0]]], dtype=torch.float32),
+            lengths=torch.tensor([1], dtype=torch.long),
+            semidense_points=torch.empty((0, 3), dtype=torch.float32),
+            semidense_length=torch.tensor([0], dtype=torch.long),
+            occupancy_bounds=torch.tensor([-1.0, 1.0, -1.0, 1.0, -1.0, 1.0], dtype=torch.float32),
+        ),
+    )
+    target_obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+    target_sample = _target_sample_with_gt_obb(target_obb)
+    sample = SimpleNamespace(
+        mesh_verts=torch.tensor(
+            [[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.0, 0.5, 0.0]],
+            dtype=torch.float32,
+        ),
+        mesh_faces=torch.tensor([[0, 1, 2]], dtype=torch.int64),
+        semidense=SimpleNamespace(
+            collapse_points=lambda: torch.tensor([[3.0, 3.0, 3.0], [0.0, 0.0, 0.0]], dtype=torch.float32)
+        ),
+    )
+    cfg = CounterfactualTargetOracleRriScorerConfig(
+        include_scene_rri=False,
+        eval_point_cloud_source=RriEvaluationPointCloudSource.LEGACY_SEMIDENSE_ROOT,
+        eval_fusion_max_points=1,
+        target_eval_max_points=5,
+    )
+
+    evaluation = cfg.setup_target(
+        sample=sample, target_sample=target_sample, target_row=_target_row(gt_target_row_id=0)
+    )(
+        _candidate_result_for_pose(_identity_pose(), count=1),
+        CounterfactualTrajectory(root_pose_world=_identity_pose()),
+        0,
+    )
+
+    assert evaluation.target_eval_current_points_world is not None
+    assert evaluation.target_eval_current_points_world.tolist() == [[0.0, 0.0, 0.0]]
+
+
+def test_target_candidate_crop_applies_target_local_budget_after_obb_crop() -> None:
+    obb = _obb((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+    points = torch.tensor(
+        [
+            [[5.0, 5.0, 5.0], [0.01, 0.0, 0.0], [0.02, 0.0, 0.0], [0.9, 0.0, 0.0]],
+        ],
+        dtype=torch.float32,
+    )
+    cropped, lengths = _crop_padded_pointclouds_to_obb(
+        points,
+        torch.tensor([4], dtype=torch.long),
+        obb,
+        voxel_size_m=0.1,
+        max_points=2,
+    )
+
+    assert lengths.tolist() == [1]
+    assert cropped.shape == (1, 1, 3)
 
 
 def _default_extent(device: torch.device | str = "cpu") -> torch.Tensor:
@@ -364,6 +462,9 @@ def _make_rollout_config(
     stochastic_branch_probabilities: list[float] | None = None,
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
     selection_temperature: float = 1.0,
+    robust_temperature_logits: bool = True,
+    min_sibling_yaw_deg: float = 0.0,
+    require_sibling_strategy_diversity: bool = False,
 ) -> CounterfactualPoseGeneratorConfig:
     candidate_cfg = CandidateViewGeneratorConfig(
         num_samples=16,
@@ -389,6 +490,9 @@ def _make_rollout_config(
         stochastic_branch_probabilities=stochastic_branch_probabilities,
         selection_policy=selection_policy,
         selection_temperature=selection_temperature,
+        robust_temperature_logits=robust_temperature_logits,
+        min_sibling_yaw_deg=min_sibling_yaw_deg,
+        require_sibling_strategy_diversity=require_sibling_strategy_diversity,
         verbosity=0,
     )
 
@@ -403,6 +507,7 @@ def _run_rollouts(
     stochastic_branch_probabilities: list[float] | None = None,
     selection_policy: CounterfactualSelectionPolicy = CounterfactualSelectionPolicy.FARTHEST_FROM_HISTORY,
     selection_temperature: float = 1.0,
+    robust_temperature_logits: bool = True,
     score_candidates=None,
 ):
     cfg = _make_rollout_config(
@@ -414,6 +519,7 @@ def _run_rollouts(
         stochastic_branch_probabilities=stochastic_branch_probabilities,
         selection_policy=selection_policy,
         selection_temperature=selection_temperature,
+        robust_temperature_logits=robust_temperature_logits,
     )
     generator = CounterfactualPoseGenerator(cfg)
     mesh, verts, faces = _mesh_triplet(cfg.candidate_config.device)
@@ -699,6 +805,114 @@ def test_temperature_softmax_branch_factor_samples_distinct_candidates() -> None
 
     assert len(selected) == 3
     assert len(set(selected)) == 3
+
+
+def test_temperature_softmax_uses_robust_logits_invariant_to_affine_score_scale() -> None:
+    def _affine_evaluator(scale: float, offset: float):
+        def _evaluate(result, trajectory, step_index):
+            del trajectory, step_index
+            valid_poses = result.poses_world_cam()
+            num_valid = int(valid_poses.t.reshape(-1, 3).shape[0])
+            base = torch.linspace(0.1, 1.0, num_valid, device=valid_poses.t.device)
+            scores = base * scale + offset
+            return CounterfactualCandidateEvaluation(
+                scores=scores,
+                score_label="affine_score",
+                metric_vectors={"rri": scores},
+            )
+
+        return _evaluate
+
+    small = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        selection_temperature=0.75,
+        score_candidates=_affine_evaluator(1.0, 0.0),
+    )
+    large = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        selection_temperature=0.75,
+        score_candidates=_affine_evaluator(1000.0, 100.0),
+    )
+
+    small_step = small.trajectories[0].steps[0]
+    large_step = large.trajectories[0].steps[0]
+
+    assert small_step.selected_shell_index == large_step.selected_shell_index
+    assert small_step.selection_logits is not None
+    assert large_step.selection_logits is not None
+    assert torch.allclose(small_step.selection_logits, large_step.selection_logits)
+    assert torch.allclose(small_step.selection_probabilities, large_step.selection_probabilities)
+
+
+def test_greedy_branch_selection_can_require_strategy_diversity() -> None:
+    base_cfg = CandidateViewGeneratorConfig(
+        num_samples=6,
+        oversample_factor=1.0,
+        min_radius=0.6,
+        max_radius=0.6,
+        ensure_collision_free=False,
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        view_max_azimuth_deg=0.0,
+        view_max_elevation_deg=0.0,
+        verbosity=0,
+        seed=0,
+        is_debug=True,
+    )
+    mixture_cfg = CandidateMixtureViewGeneratorConfig(
+        base=base_cfg,
+        components=[
+            CandidateMixtureComponentConfig(
+                name="forward",
+                count=3,
+                view_mode=ViewDirectionMode.FORWARD_RIG,
+                position_mode=CandidatePositionMode.FORWARD_LOCAL,
+            ),
+            CandidateMixtureComponentConfig(
+                name="towards",
+                count=3,
+                view_mode=ViewDirectionMode.RADIAL_TOWARDS,
+                position_mode=CandidatePositionMode.FORWARD_LOCAL,
+            ),
+            CandidateMixtureComponentConfig(
+                name="away",
+                count=3,
+                view_mode=ViewDirectionMode.RADIAL_AWAY,
+                position_mode=CandidatePositionMode.FORWARD_LOCAL,
+            ),
+        ],
+    )
+    cfg = CounterfactualPoseGeneratorConfig(
+        candidate_config=mixture_cfg,
+        horizon=1,
+        branch_factor=3,
+        selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+        require_sibling_strategy_diversity=True,
+        verbosity=0,
+    )
+    generator = CounterfactualPoseGenerator(cfg)
+    mesh, verts, faces = _mesh_triplet(cfg.candidate_config.device)
+
+    rollouts = generator.generate(
+        reference_pose=_identity_pose(device=cfg.candidate_config.device),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        camera_calib_template=_dummy_camera(cfg.candidate_config.device),
+        occupancy_extent=_default_extent(cfg.candidate_config.device),
+        score_candidates=_fake_rri_evaluator,
+    )
+
+    selected_strategy_ids = [
+        int(trajectory.steps[0].candidates.strategy_id[trajectory.steps[0].selected_shell_index].item())
+        for trajectory in rollouts.trajectories
+    ]
+    assert len(selected_strategy_ids) == 3
+    assert len(set(selected_strategy_ids)) == 3
 
 
 def test_counterfactual_selection_ignores_nonfinite_evaluator_scores() -> None:

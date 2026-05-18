@@ -4,8 +4,9 @@ The helpers in this module operate on selected-step metric mappings emitted by
 counterfactual rollout scorers. They keep rollout plotting and reporting code
 from redefining thesis metrics locally:
 
-* ``G_t^(H)`` is the discounted additive return over selected target-RRI
-  rewards.
+* ``G_t^(H)`` is the discounted additive return over selected root-normalized
+  target gains when available, falling back to state-relative target RRI for
+  legacy rows.
 * ``J_e^(H)`` is the endpoint target-error gain from the initial target
   point-mesh error to the final target point-mesh error.
 * log-gain is an optional endpoint companion diagnostic.
@@ -24,7 +25,7 @@ class TargetRolloutMetricSummary:
     """Selected-trajectory target-RRI and endpoint metric summary."""
 
     cumulative_return: float | None
-    """Discounted ``G_t^(H)`` over selected target-RRI rewards."""
+    """Discounted ``G_t^(H)`` over selected root-normalized rewards."""
     endpoint_gain: float | None
     """Endpoint target-error gain ``J_e^(H)`` when point-mesh errors exist."""
     log_gain: float | None
@@ -41,6 +42,12 @@ def selected_target_rri(metrics: Mapping[str, Any]) -> float | None:
     """Return the selected-step target RRI from one metric mapping."""
 
     return _finite_metric(metrics, "target_rri", "rri")
+
+
+def selected_target_reward(metrics: Mapping[str, Any]) -> float | None:
+    """Return the selected-step reward used for rollout/Q_H return."""
+
+    return _finite_metric(metrics, "target_root_gain", "root_gain", "target_rri", "rri")
 
 
 def target_point_mesh_error_before(metrics: Mapping[str, Any]) -> float | None:
@@ -62,8 +69,8 @@ def finite_horizon_target_return(
 ) -> float | None:
     """Compute additive selected target-RRI return ``G_t^(H)``.
 
-    Missing or non-finite target-RRI rows are skipped. ``None`` is returned only
-    when no finite selected target-RRI reward is present.
+    Missing or non-finite rows are skipped. ``None`` is returned only when no
+    finite selected target reward is present.
     """
 
     if gamma < 0.0:
@@ -73,7 +80,7 @@ def finite_horizon_target_return(
     weight = 1.0
     found = False
     for metrics in selected_metric_rows:
-        reward = selected_target_rri(metrics)
+        reward = selected_target_reward(metrics)
         if reward is not None:
             total += weight * reward
             found = True
@@ -165,6 +172,7 @@ __all__ = [
     "endpoint_log_gain",
     "endpoint_target_gain",
     "finite_horizon_target_return",
+    "selected_target_reward",
     "selected_target_rri",
     "summarize_target_rollout_metrics",
     "target_point_mesh_error_after",

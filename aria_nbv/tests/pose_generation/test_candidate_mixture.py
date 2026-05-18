@@ -17,8 +17,10 @@ from aria_nbv.pose_generation import (
     CandidateMixtureComponentConfig,
     CandidateMixtureViewGenerator,
     CandidateMixtureViewGeneratorConfig,
+    CandidatePositionMode,
     CandidateViewGeneratorConfig,
     ViewDirectionMode,
+    candidate_position_id,
     candidate_strategy_id,
 )
 
@@ -95,6 +97,7 @@ def test_mixed_sampler_fixed_counts_and_full_shell_provenance() -> None:
 
     assert result.mask_valid.shape[0] == 6
     assert result.strategy_id is not None
+    assert result.position_id is not None
     assert result.mixture_id is not None
     assert result.sampler_probability is not None
     assert (
@@ -102,6 +105,7 @@ def test_mixed_sampler_fixed_counts_and_full_shell_provenance() -> None:
         == [candidate_strategy_id(ViewDirectionMode.TARGET_POINT)] * 4
         + [candidate_strategy_id(ViewDirectionMode.RADIAL_AWAY)] * 2
     )
+    assert result.position_id.tolist() == [candidate_position_id(CandidatePositionMode.UPPER_BOUND_FREE_SHELL)] * 6
     assert result.mixture_id.tolist() == [0, 0, 0, 0, 1, 1]
     assert torch.allclose(
         result.sampler_probability,
@@ -141,3 +145,38 @@ def test_target_point_component_orients_towards_actor_visible_target_center() ->
     cosine = (forward * to_target).sum(dim=1)
 
     assert torch.all(cosine > 0.99)
+
+
+def test_default_mixture_uses_realistic_position_families_without_free_shell() -> None:
+    cfg = CandidateMixtureViewGeneratorConfig(
+        base=_base_cfg().model_copy(
+            update={
+                "position_mode": CandidatePositionMode.FORWARD_LOCAL,
+                "enforce_motion_realism": True,
+                "max_step_distance_m": 1.25,
+                "max_height_delta_m": 0.6,
+                "max_backward_step_m": 0.35,
+                "max_yaw_delta_deg": 100.0,
+                "collect_debug_stats": True,
+            }
+        )
+    )
+
+    result = _run_generate(cfg)
+
+    assert result.position_id is not None
+    assert CandidatePositionMode.UPPER_BOUND_FREE_SHELL.value not in set(result.component_name or ())
+    assert candidate_position_id(CandidatePositionMode.TARGET_BEARING_LOCAL) in result.position_id.tolist()
+    assert candidate_position_id(CandidatePositionMode.LATERAL_TARGET_BYPASS) in result.position_id.tolist()
+    assert "motion_step_length_m" in result.extras
+    assert "target_bearing_yaw_rad" in result.extras
+
+
+def test_upper_bound_free_shell_ablation_is_explicit() -> None:
+    cfg = CandidateMixtureViewGeneratorConfig.upper_bound_free_shell(count=5)
+
+    result = _run_generate(cfg)
+
+    assert result.component_name == ("upper_bound_free_shell",) * 5
+    assert result.position_id is not None
+    assert result.position_id.tolist() == [candidate_position_id(CandidatePositionMode.UPPER_BOUND_FREE_SHELL)] * 5

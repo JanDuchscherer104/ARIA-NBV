@@ -11,9 +11,10 @@ from aria_nbv.utils import Console
 from aria_nbv.utils.config_paths import resolve_config_toml_path
 
 from ._config import RerunOfflineInspectorConfig
-from ._loggers import RerunModule, RerunOfflineLogger
+from ._loggers import RerunOfflineLogger
 from ._metadata import collect_visual_inventory, validate_required_inventory
 from ._sample import select_rerun_sample
+from ._session import RerunModule
 
 
 def _build_parser() -> argparse.ArgumentParser:

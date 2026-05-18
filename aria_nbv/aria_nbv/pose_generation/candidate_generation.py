@@ -37,6 +37,7 @@ from ..utils.frames import rotate_yaw_cw90, world_up_tensor
 from .candidate_generation_rules import (
     FreeSpaceRule,
     MinDistanceToMeshRule,
+    MotionRealismRule,
     PathCollisionRule,
     Rule,
 )
@@ -45,6 +46,7 @@ from .positional_sampling import PositionSampler
 from .types import (
     CandidateContext,
     CandidateGenerationRuntimeContext,
+    CandidatePositionMode,
     CandidateSamplingResult,
     CollisionBackend,
     SamplingStrategy,
@@ -100,6 +102,12 @@ class CandidateViewGeneratorConfig(TargetConfig["CandidateViewGenerator"]):
     kappa: float = 4.0
     """Concentration parameter for the forward-biased PowerSpherical sampler."""
 
+    position_mode: CandidatePositionMode = CandidatePositionMode.UPPER_BOUND_FREE_SHELL
+    """Position-family prior used to sample candidate centers before orientation assignment."""
+
+    position_target_point_world: torch.Tensor | None = None
+    """Optional actor-visible world-space target center for target-bearing position modes."""
+
     min_distance_to_mesh: float = 0.2
     """Minimum clearance (metres) between candidate center and mesh surface."""
     ensure_collision_free: bool = True
@@ -112,6 +120,21 @@ class CandidateViewGeneratorConfig(TargetConfig["CandidateViewGenerator"]):
     """Number of samples per ray when using discretised collision checks."""
     step_clearance: float = 0.1
     """Distance threshold (metres) below which discretised collision samples are rejected."""
+
+    enforce_motion_realism: bool = False
+    """Whether to reject candidates violating egocentric local-motion bounds."""
+
+    max_step_distance_m: float | None = Field(default=None, gt=0.0)
+    """Maximum allowed candidate-center displacement from the reference pose."""
+
+    max_height_delta_m: float | None = Field(default=None, ge=0.0)
+    """Maximum absolute world-up displacement from the reference pose."""
+
+    max_backward_step_m: float | None = Field(default=None, ge=0.0)
+    """Maximum allowed backward displacement in the reference frame."""
+
+    max_yaw_delta_deg: float | None = Field(default=None, ge=0.0)
+    """Maximum allowed candidate forward-axis yaw change from the reference pose."""
 
     mesh_samples: int | None = None
     """Optional number of mesh samples used by mesh-distance rules when applicable."""
@@ -446,6 +469,9 @@ class CandidateViewGenerator:
             ),
             debug={"view_dirs_delta": view_dirs_delta} if view_dirs_delta is not None else {},
         )
+        if self.config.position_target_point_world is not None:
+            ctx.mark_debug("target_bearing_yaw_rad", _target_bearing_yaw_rad(ctx))
+            ctx.mark_debug("target_distance_m", _target_distance_m(ctx))
 
         self._apply_rules(ctx)
 
@@ -455,6 +481,8 @@ class CandidateViewGenerator:
         rules: list[Rule] = []
         if cfg.ensure_free_space:
             rules.append(FreeSpaceRule(cfg))
+        if cfg.enforce_motion_realism:
+            rules.append(MotionRealismRule(cfg))
         if cfg.min_distance_to_mesh > 0:
             rules.append(MinDistanceToMeshRule(cfg))
         if cfg.ensure_collision_free:
@@ -515,9 +543,33 @@ def _clone_camera_template(
     return data.to(device)[0].unsqueeze(0).expand(n, -1).clone()
 
 
+def _target_bearing_yaw_rad(ctx: CandidateContext) -> torch.Tensor:
+    """Compute world-horizontal candidate-to-target bearing for diagnostics."""
+
+    target = torch.as_tensor(
+        ctx.cfg.position_target_point_world,
+        device=ctx.centers_world.device,
+        dtype=ctx.centers_world.dtype,
+    ).reshape(1, 3)
+    delta = target - ctx.centers_world
+    return torch.atan2(delta[:, 0], delta[:, 2])
+
+
+def _target_distance_m(ctx: CandidateContext) -> torch.Tensor:
+    """Compute candidate-center distance to the actor-visible target point."""
+
+    target = torch.as_tensor(
+        ctx.cfg.position_target_point_world,
+        device=ctx.centers_world.device,
+        dtype=ctx.centers_world.dtype,
+    ).reshape(1, 3)
+    return torch.linalg.norm(target - ctx.centers_world, dim=1)
+
+
 __all__ = [
     "CandidateViewGenerator",
     "CandidateViewGeneratorConfig",
+    "CandidatePositionMode",
     "CollisionBackend",
     "SamplingStrategy",
 ]

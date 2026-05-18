@@ -160,7 +160,7 @@
     orientation: orientation,
   )
   tree[
-    - #code-strong("rollouts.zarr/") -- schema 0.5 selected-depth shard #group
+    - #code-strong("rollouts.zarr/") -- schema 0.7 root-gain target-crops shard #group
       - #code("zarr.json") -- compact attrs, counts, manifest hash #leaf
       - #code("manifest.json") -- resolved config, TOML, provenance, coverage #leaf
       - #code-strong("metadata/") #group
@@ -169,7 +169,7 @@
         - #code("field_retention_policy") -- JSON bytes #leaf
       - #code-strong("dictionaries/") -- compact string dictionaries #group
         - #code("scene, snippet, split") -- ids for source coverage #leaf
-        - #code("policy, rollout, transition") -- ids for branch semantics #leaf
+        - #code("policy, rollout") -- ids for branch semantics #leaf
         - #code("target, class_name, target_source") -- ids for target rows #leaf
         - #code("config, score_source, reason") -- ids for lineage #leaf
       - #code-strong("sources/") -- one row per VIN source root #group
@@ -193,7 +193,9 @@
         - #code("policy_id, chain_id") -- policy and branch ids #array_node
         - #code("horizon, branch_factor, beam_width") -- int16[R] #array_node
         - #code("root_pose_world") -- PoseTW float32[R,12] #array_node
-        - #code("final_cumulative_target_rri") -- $G_0^((H))$; float32[R] #array_node
+        - #code("root_time_ns, root_frame_index") -- rollout root lineage #array_node
+        - #code("final_cumulative_target_root_gain") -- $G_0^((H))$; float32[R] #array_node
+        - #code("final_cumulative_target_rri") -- diagnostic float32[R] #array_node
       - #code-strong("lineage/") -- rollout config/protocol ids #group
         - #code("rollout_row_id") -- int64[R] #array_node
         - #code("candidate_config_id, oracle_config_id") -- int32[R] #array_node
@@ -204,7 +206,8 @@
         - #code("step_index") -- $t$; int16[T] #array_node
         - #code("selected_candidate_row_id") -- int64[T] foreign key #array_node
         - #code("num_candidates, num_valid_candidates") -- int32[T] #array_node
-        - #code("cumulative_target_rri") -- float32[T] #array_node
+        - #code("cumulative_target_root_gain") -- float32[T] #array_node
+        - #code("cumulative_target_rri") -- diagnostic float32[T] #array_node
       - #code-strong("candidates/") -- finite candidate shells #group
         - row identity #group
           - #code("candidate_row_id") -- int64[C], candidate primary key #array_node
@@ -216,7 +219,8 @@
         - masks and labels #group
           - #code("actor_action_mask") -- $#symb.rl.validity_mask$; bool[C] #array_node
           - #code("oracle_label_mask, q_train_mask, selected_mask") -- bool[C] #array_node
-          - #code("target_rri") -- $r_t^e(q_(t,i))$; float32[C] #array_node
+          - #code("target_root_gain") -- default reward float32[C] #array_node
+          - #code("target_rri") -- diagnostic $r_t^e(q_(t,i))$; float32[C] #array_node
           - #code("scene_rri") -- diagnostic float32[C] #array_node
         - provenance and invalidity #group
           - #code("strategy_id, mixture_id") -- int32[C] provenance #array_node
@@ -225,12 +229,17 @@
         - #code("step_row_id, candidate_row_id") -- int64[T] links #array_node
         - #code("depth_m") -- float16[T,240,240], metres #array_node
         - #code("valid_mask") -- bool[T,240,240] #array_node
+      - #code-strong("target_eval_crops/") -- oracle/eval-only fixed target crops #group
+        - #code("crop_row_id, step_row_id, candidate_row_id") -- row links #array_node
+        - #code("points_world") -- float32[K,50000,3] #array_node
+        - #code("lengths, mask") -- int32[K], bool[K,50000] #array_node
       - #code-strong("q_h/") -- derived hot training view, validated from row tables #derived
         - #code("source_row_id, target_row_id") -- state joins #array_node
         - #code("candidate_row_id, valid_action_mask") -- [T,N_q] #array_node
         - #code("q_train_mask") -- training mask #array_node
-        - #code("one_step_target_rri") -- $r_t^e(q_(t,i))$; float32[T,N_q] #array_node
-        - #code("td_* and bootstrap_*") -- selected transition links #array_node
+        - #code("one_step_target_root_gain") -- reward float32[T,N_q] #array_node
+        - #code("one_step_target_rri") -- diagnostic float32[T,N_q] #array_node
+        - #code("td_reward, td_*") -- selected transition reward and links #array_node
   ]
 }
 
@@ -268,17 +277,18 @@
         - #code("rollout_row_id") -- int64[1] #array_node
         - #code("chain_id") -- retained branch index #leaf
         - #code("policy_id") -- random, greedy, lookahead, softmax #leaf
-        - #code("final_cumulative_target_rri") -- $G_0^((H))$; float32[1] #array_node
+        - #code("final_cumulative_target_root_gain") -- $G_0^((H))$; float32[1] #array_node
         - #code-strong("steps/") -- $t=0, ..., H-1$ #group
           - #code-strong("step_t/") #group
             - #code("step_index") -- $t$; int16[1] #array_node
             - #code("selected_candidate_row_id") -- action chosen at step $t$ #array_node
-            - #code("cumulative_target_rri") -- float32[1] #array_node
+            - #code("cumulative_target_root_gain") -- float32[1] #array_node
             - #code-strong("candidate_shell/") -- $#symb.oracle.candidates_t$ #group
               - #code("pose_world_cam") -- $#symb.oracle.candidate_qti$; float32[N_q,12] #array_node
               - #code("actor_action_mask") -- $#symb.rl.validity_mask$; bool[N_q] #array_node
               - #code("invalid_reason_bitset") -- uint32[N_q] #array_node
-              - #code("target_rri") -- $r_t^e(q_(t,i))$; float32[N_q] #array_node
+              - #code("target_root_gain") -- default reward float32[N_q] #array_node
+              - #code("target_rri") -- diagnostic float32[N_q] #array_node
               - #code("selected_mask") -- one true row when action exists #array_node
             - #code-strong("retained_depth/") -- optional selected-heavy payload #group
               - #code("depth") -- $#symb.oracle.depth_q$; float16[H_img,W_img] #array_node

@@ -55,12 +55,15 @@ o_{t+1}^{\mathrm{sel}}=\mathcal{G}(M_{\mathrm{GT}},q_{t,a_t}),
 P_{t+1}=P_t\cup P(o_{t+1}^{\mathrm{sel}},q_{t,a_t}).
 $$
 
-All-candidate GT renders, GT target crops, and all-candidate target-RRI labels remain oracle-only before selection.
+All-candidate GT renders, GT target crops, root-normalized target gains, and
+all-candidate target-RRI diagnostics remain oracle-only before selection.
 
-The immediate learning reward is target RRI for the selected valid candidate:
+The immediate learning reward is target point-mesh error reduction normalized
+by the rollout-root target error:
 
 $$
-r_t^e=\mathrm{RRI}_e(q_{t,a_t}\mid P_t,M_e).
+r_{t,\mathrm{root}}^e=
+\frac{\Delta_t^e-\Delta_{t+1}^e}{\Delta_0^e+\epsilon}.
 $$
 
 The finite-horizon return used by rollout ranking and $Q_H$ training is:
@@ -68,10 +71,13 @@ The finite-horizon return used by rollout ranking and $Q_H$ training is:
 $$
 G_t^{(H)}
 =
-\sum_{k=0}^{H-1}\gamma^k r_{t+k}^e.
+\sum_{k=0}^{H-1}\gamma^k r_{t+k,\mathrm{root}}^e.
 $$
 
-Keep $\gamma$ symbolic in notation. The first thesis result should report cumulative target RRI under equal acquisition budget; episode-normalized rewards and log-improvement rewards remain follow-up ablations:
+Keep $\gamma$ symbolic in notation. The first thesis result should report
+cumulative root-normalized target gain under equal acquisition budget, with
+state-relative target RRI retained as a diagnostic; log-improvement rewards
+remain follow-up ablations:
 
 $$
 r_t^{\log,e}
@@ -122,7 +128,7 @@ $$
 \right].
 $$
 
-The experimental ladder is $\operatorname{ArgTopK}\rightarrow\operatorname{ArgTop1}_1\rightarrow\operatorname{ArgTop1}_2\rightarrow\cdots\rightarrow\operatorname{ArgTop1}_H$. The scientific question is whether the first action chosen by an $h$-step oracle rollout improves cumulative target RRI over depth-one greedy under the same candidate budget, horizon, and acquisition cost.
+The experimental ladder is $\operatorname{ArgTopK}\rightarrow\operatorname{ArgTop1}_1\rightarrow\operatorname{ArgTop1}_2\rightarrow\cdots\rightarrow\operatorname{ArgTop1}_H$. The scientific question is whether the first action chosen by an $h$-step oracle rollout improves root-normalized target gain over depth-one greedy under the same candidate budget, horizon, and acquisition cost.
 
 ## Q_H Training Contract {#q-h-training-contract}
 
@@ -148,7 +154,7 @@ A replay row for $Q_H$ training should contain at least:
 | actor input | $s_t^{\mathrm{cf0}}$ feature references, $z_e$, selected-view history, budget state, and candidate-query features |
 | candidate table | candidate poses/actions, per-candidate validity mask, invalid reason codes, and candidate provenance |
 | selected transition | selected valid action, selected-view synthetic observation reference if retained, $P_t$ and $P_{t+1}$ references or hashes, and next-state feature references |
-| labels | $r_t^e$, $G_t^{(H)}$ or bootstrapped target, terminal/horizon flag, oracle provenance, and any diagnostic scene-level RRI |
+| labels | $r_{t,\mathrm{root}}^e$, $G_t^{(H)}$ or bootstrapped target, terminal/horizon flag, oracle provenance, diagnostic target RRI, and any diagnostic scene-level RRI |
 
 A masked DQN-style target is:
 

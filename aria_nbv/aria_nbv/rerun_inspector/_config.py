@@ -174,9 +174,6 @@ class RerunInspectorRolloutPlotConfig(BaseConfig):
     candidate_top_k: int = Field(default=5, ge=1)
     """Number of valid per-step candidate RRI ranks shown in the plot."""
 
-    log_all_candidates: bool = False
-    """Reserved forensic mode; default plots only selected, top-k, and fanout summaries."""
-
 
 class RerunInspectorRolloutDepthConfig(BaseConfig):
     """Selected-depth visualization policy for rollout-Zarr inspection."""
@@ -184,11 +181,20 @@ class RerunInspectorRolloutDepthConfig(BaseConfig):
     enabled: bool = True
     """Log selected-action depth rasters when ``rollouts.zarr/selected_depth`` is available."""
 
+    representation: Literal["depth_image", "point_cloud", "both"] = "depth_image"
+    """Display representation for persisted selected-depth observations."""
+
     colormap: str = "turbo"
     """Rerun depth colormap used for selected-depth images."""
 
     point_fill_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     """Rerun point fill ratio for back-projected selected-depth pixels."""
+
+    max_points: int = Field(default=20_000, ge=0)
+    """Maximum unprojected selected-depth points logged for point-cloud display."""
+
+    point_radius: float = Field(default=0.006, gt=0.0)
+    """Rerun point radius for unprojected selected-depth point clouds."""
 
     require_selected_depth: bool = False
     """Raise when selected-depth rows are missing instead of logging metadata warnings."""
@@ -255,9 +261,6 @@ class RerunInspectorPrimitivesConfig(BaseConfig):
 
     log_metadata: bool = True
     """Log sample metadata as a Rerun text document."""
-
-    log_mesh: bool = True
-    """Log a GT mesh only when the inventory and sample expose one."""
 
     log_candidate_points: bool = False
     """Log candidate point clouds only when the inventory and sample expose them."""

@@ -9,7 +9,7 @@ import torch
 from power_spherical import HypersphericalUniform, PowerSpherical  # type: ignore[import-untyped]
 
 from .geometry import DEVICE_FWD
-from .types import SamplingStrategy
+from .types import CandidatePositionMode, SamplingStrategy
 
 if TYPE_CHECKING:
     from efm3d.aria.pose import PoseTW
@@ -77,6 +77,58 @@ class PositionSampler:
         dirs = torch.randn(n_draw, 3, device=self.cfg.device, dtype=torch.float32)
         return dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
 
+    def _target_direction_ref(self, reference_pose: PoseTW) -> torch.Tensor:
+        """Return normalized actor-visible target bearing in the reference frame."""
+
+        target_world = self.cfg.position_target_point_world
+        if target_world is None:
+            raise ValueError(f"{self.cfg.position_mode.value} requires position_target_point_world.")
+        target_world = torch.as_tensor(target_world, device=self.cfg.device, dtype=torch.float32).reshape(1, 3)
+        target_ref = reference_pose.inverse().transform(target_world).reshape(3)
+        if torch.linalg.norm(target_ref) < 1e-6:
+            target_ref = torch.tensor(DEVICE_FWD, device=self.cfg.device, dtype=torch.float32)
+        return target_ref / torch.linalg.norm(target_ref).clamp_min(1e-8)
+
+    def _direction_around(self, base: torch.Tensor, noise: torch.Tensor, *, spread: float) -> torch.Tensor:
+        """Blend a base direction with orthogonal noise in the reference frame."""
+
+        base = base.to(device=noise.device, dtype=noise.dtype).reshape(1, 3)
+        base = base / base.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+        parallel = (noise * base).sum(dim=-1, keepdim=True) * base
+        orthogonal = noise - parallel
+        dirs = base + float(spread) * orthogonal
+        return dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+
+    def _apply_position_mode(self, dirs_rig: torch.Tensor, reference_pose: PoseTW) -> torch.Tensor:
+        """Map raw angular samples to the configured position family."""
+
+        match self.cfg.position_mode:
+            case CandidatePositionMode.UPPER_BOUND_FREE_SHELL:
+                return dirs_rig
+            case CandidatePositionMode.FORWARD_LOCAL:
+                forward = torch.tensor(DEVICE_FWD, device=dirs_rig.device, dtype=dirs_rig.dtype)
+                return self._direction_around(forward, dirs_rig, spread=0.45)
+            case CandidatePositionMode.LOCAL_REFINEMENT:
+                forward = torch.tensor(DEVICE_FWD, device=dirs_rig.device, dtype=dirs_rig.dtype)
+                return self._direction_around(forward, dirs_rig, spread=0.25)
+            case CandidatePositionMode.REVISIT_BACKTRACK:
+                backward = torch.tensor([0.0, 0.0, -1.0], device=dirs_rig.device, dtype=dirs_rig.dtype)
+                return self._direction_around(backward, dirs_rig, spread=0.35)
+            case CandidatePositionMode.TARGET_BEARING_LOCAL:
+                target_dir = self._target_direction_ref(reference_pose).to(device=dirs_rig.device, dtype=dirs_rig.dtype)
+                return self._direction_around(target_dir, dirs_rig, spread=0.4)
+            case CandidatePositionMode.LATERAL_TARGET_BYPASS:
+                target_dir = self._target_direction_ref(reference_pose).to(device=dirs_rig.device, dtype=dirs_rig.dtype)
+                up = torch.tensor([0.0, 1.0, 0.0], device=dirs_rig.device, dtype=dirs_rig.dtype)
+                lateral = torch.cross(up, target_dir, dim=0)
+                if torch.linalg.norm(lateral) < 1e-6:
+                    lateral = torch.tensor([1.0, 0.0, 0.0], device=dirs_rig.device, dtype=dirs_rig.dtype)
+                lateral = lateral / lateral.norm().clamp_min(1e-8)
+                signs = torch.where(dirs_rig[:, 0] >= 0.0, 1.0, -1.0).to(dtype=dirs_rig.dtype).unsqueeze(1)
+                vertical = up.reshape(1, 3) * dirs_rig[:, 1:2].clamp(-0.35, 0.35)
+                dirs = 0.55 * target_dir.reshape(1, 3) + signs * 0.85 * lateral.reshape(1, 3) + vertical
+                return dirs / dirs.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+
     def sample(self, reference_pose: PoseTW) -> tuple[torch.Tensor, torch.Tensor]:
         """Draw candidate centers and offsets in reference frame.
 
@@ -110,6 +162,7 @@ class PositionSampler:
 
         # Work entirely in reference (rig) frame for angle limits.
         dirs_rig = self._scale_into_caps(dirs_rig)
+        dirs_rig = self._apply_position_mode(dirs_rig, reference_pose)
 
         dirs_world = reference_pose.rotate(dirs_rig)
         offsets_rig = dirs_rig
