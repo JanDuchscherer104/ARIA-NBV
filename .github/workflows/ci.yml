@@ -49,7 +49,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHON_INTERPRETER: python
-      CI_RENDER_DIR: ${{ runner.temp }}/aria-nbv-ci-renders
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -69,4 +68,6 @@ jobs:
         uses: typst-community/setup-typst@v5.1.0
 
       - name: Run root CI contract
+        env:
+          CI_RENDER_DIR: ${{ runner.temp }}/aria-nbv-ci-renders
         run: make ci
