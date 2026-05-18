@@ -16,6 +16,7 @@ template:
 | `LRZ_CONTAINER_IMAGE` | Enroot/Pyxis image URI, for example `nvcr.io#nvidia/pytorch:24.10-py3`. |
 | `RUN_ID` | Human-readable run ID used in staging, logs, checkpoints, and manifests. |
 | `DATASET_VERSION` | Dataset/cache version or immutable store version being consumed. |
+| `CONFIG_PATH` | Rollout writer TOML with explicit DSS-backed paths. Start from `.configs/build_rollouts_v1_lrz.template.toml`. |
 | `SHARD_MANIFEST` | JSONL or table that maps Slurm array task IDs to deterministic shards. |
 
 ## DSS Staging Layout
@@ -105,6 +106,10 @@ credentials under `$HOME`.
   outside the final completed shard path.
 - Large reruns should start from a manifest filter of missing or failed shard
   IDs, not from a blind re-scan of the full DSS tree.
+- For rollout campaigns, use `nbv-status-rollout-shards --shard-manifest
+  "$SHARD_MANIFEST" --final-root "$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards"
+  --output-json "$ARIA_DSS/data/staging/rollouts/$RUN_ID/manifests/status.json"`
+  to list succeeded, failed, incomplete, and missing shards.
 
 ## Atomic Write Contract
 
@@ -125,3 +130,21 @@ credentials under `$HOME`.
 | Rollout generation | `scripts/templates/lrz/rollout_generation_dry_run.sbatch` | `$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards/` |
 | VIN training | `scripts/templates/lrz/vin_training_dry_run.sbatch` | `$ARIA_DSS/checkpoints/vin/$RUN_ID/` |
 | Diagnostics | `scripts/templates/lrz/diagnostics_dry_run.sbatch` | `$ARIA_DSS/logs/diagnostics/$RUN_ID/` |
+
+## Real Rollout Array Template
+
+Use `scripts/templates/lrz/rollout_generation.sbatch` after a one-row local or
+interactive LRZ smoke succeeds. The real template runs `nbv-build-rollouts`
+inside Pyxis for one deterministic shard per array task and expects:
+
+1. A copied, edited rollout config based on
+   `.configs/build_rollouts_v1_lrz.template.toml`.
+2. A shard manifest planned with `nbv-plan-rollout-shards`.
+3. An array range matching the manifest shard count.
+4. `RUN_ID`, `CONFIG_PATH`, `SHARD_MANIFEST`, `ARIA_DSS`, `ARIA_REPO`, and
+   `LRZ_CONTAINER_IMAGE` exported in the submission environment.
+
+Copy the template before submitting and replace the `/ABS/PATH/TO/ARIA_DSS`
+`#SBATCH --output` and `#SBATCH --error` placeholders with the concrete DSS log
+directory. Slurm parses `#SBATCH` directives before the shell starts, so those
+lines do not expand `$ARIA_DSS` or other shell variables.
