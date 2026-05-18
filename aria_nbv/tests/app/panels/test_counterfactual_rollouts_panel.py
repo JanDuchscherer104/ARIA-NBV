@@ -355,5 +355,77 @@ def test_counterfactual_trajectory_rows_capture_step_count_score_and_final_pose(
     assert rows[0]["final_z"] == 3.0
 
 
+def test_trajectory_metric_rows_use_empirical_95_band_not_min_mean_max() -> None:
+    step = CounterfactualStepResult(
+        step_index=0,
+        candidates=SimpleNamespace(mask_valid=torch.tensor([True, False, True, False])),
+        selected_valid_index=0,
+        selected_shell_index=0,
+        selection_score=0.2,
+        selection_score_label="target_rri",
+        selected_metrics={"target_rri": 0.2},
+        metric_vectors={"target_rri": torch.tensor([0.0, 100.0, 0.2, 100.0])},
+    )
+    rollouts = CounterfactualRolloutResult(
+        root_pose_world=PoseTW.from_Rt(torch.eye(3), torch.zeros(3)),
+        trajectories=[
+            CounterfactualTrajectory(root_pose_world=PoseTW.from_Rt(torch.eye(3), torch.zeros(3)), steps=[step])
+        ],
+        horizon=1,
+        branch_factor=1,
+        beam_width=None,
+        selection_policy="temperature_softmax",
+        score_label="target_rri",
+    )
+
+    rows = rollout_panel._trajectory_metric_rows(rollouts)
+
+    assert set(rows.columns).isdisjoint({"fanout_min", "fanout_mean", "fanout_max"})
+    assert rows.loc[0, "fanout_q025"] == pytest.approx(np.quantile([0.0, 0.2], 0.025))
+    assert rows.loc[0, "fanout_q975"] == pytest.approx(np.quantile([0.0, 0.2], 0.975))
+    assert rows.loc[0, "top_target_rri"] == pytest.approx([0.2, 0.0])
+
+
+def test_valid_step_metric_values_rejects_mask_metric_length_mismatch() -> None:
+    step = SimpleNamespace(
+        candidates=SimpleNamespace(mask_valid=torch.tensor([True, False, True])),
+        metric_vectors={"target_rri": torch.tensor([0.0, 0.1, 0.2, 0.3])},
+    )
+
+    with pytest.raises(ValueError, match="Candidate validity mask shape"):
+        rollout_panel._valid_step_metric_values(step, "target_rri")
+
+
+def test_fanout_band_figure_uses_filled_band_and_selected_line() -> None:
+    rows = rollout_panel.pd.DataFrame(
+        [
+            {
+                "trajectory": 0,
+                "step": 1,
+                "selected_target_rri": 0.2,
+                "fanout_q025": 0.05,
+                "fanout_q975": 0.8,
+            },
+            {
+                "trajectory": 0,
+                "step": 2,
+                "selected_target_rri": 0.3,
+                "fanout_q025": 0.02,
+                "fanout_q975": 0.5,
+            },
+        ]
+    )
+
+    fig = rollout_panel._build_fanout_band_figure(rows)
+
+    assert fig.layout.title.text == "Valid-candidate target-RRI empirical 95% band"
+    assert "CI" not in fig.layout.title.text
+    assert any(trace.fill == "tonexty" for trace in fig.data)
+    assert any("selected r_t^e" in str(trace.name) for trace in fig.data)
+    assert not any("candidate min" in str(trace.name) for trace in fig.data)
+    assert not any("candidate mean" in str(trace.name) for trace in fig.data)
+    assert not any("candidate max" in str(trace.name) for trace in fig.data)
+
+
 def test_rl_page_is_hidden_by_default() -> None:
     assert RlPageConfig().enabled is False

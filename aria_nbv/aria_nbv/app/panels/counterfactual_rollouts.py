@@ -492,19 +492,21 @@ def _counterfactual_trajectory_rows(
     for traj_idx, trajectory in enumerate(rollouts.trajectories):
         final_pos = trajectory.final_pose_world().t.detach().cpu().reshape(-1).tolist()
         metric_summary = summarize_target_rollout_metrics([step.selected_metrics for step in trajectory.steps])
-        rows.append({
-            "trajectory": traj_idx,
-            "steps": len(trajectory.steps),
-            "cumulative_score": float(trajectory.cumulative_score),
-            "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
-            "G_target": metric_summary.cumulative_return,
-            "J_endpoint": metric_summary.endpoint_gain,
-            "log_gain": metric_summary.log_gain,
-            "terminated_early": bool(trajectory.terminated_early),
-            "final_x": float(final_pos[0]),
-            "final_y": float(final_pos[1]),
-            "final_z": float(final_pos[2]),
-        })
+        rows.append(
+            {
+                "trajectory": traj_idx,
+                "steps": len(trajectory.steps),
+                "cumulative_score": float(trajectory.cumulative_score),
+                "cumulative_rri": (None if trajectory.cumulative_rri is None else float(trajectory.cumulative_rri)),
+                "G_target": metric_summary.cumulative_return,
+                "J_endpoint": metric_summary.endpoint_gain,
+                "log_gain": metric_summary.log_gain,
+                "terminated_early": bool(trajectory.terminated_early),
+                "final_x": float(final_pos[0]),
+                "final_y": float(final_pos[1]),
+                "final_z": float(final_pos[2]),
+            }
+        )
     return rows
 
 
@@ -521,21 +523,21 @@ def _trajectory_metric_rows(rollouts: CounterfactualRolloutResult) -> pd.DataFra
             if selected_target_rri is not None:
                 cumulative += selected_target_rri
             valid_target_rri = _valid_step_metric_values(step, "target_rri")
-            fanout_min = float(np.min(valid_target_rri)) if valid_target_rri.size else None
-            fanout_mean = float(np.mean(valid_target_rri)) if valid_target_rri.size else None
-            fanout_max = float(np.max(valid_target_rri)) if valid_target_rri.size else None
+            fanout_q025 = float(np.quantile(valid_target_rri, 0.025)) if valid_target_rri.size else None
+            fanout_q975 = float(np.quantile(valid_target_rri, 0.975)) if valid_target_rri.size else None
             top_values = sorted(valid_target_rri.tolist(), reverse=True)[:5]
-            rows.append({
-                "trajectory": traj_idx,
-                "step": int(step.step_index) + 1,
-                "selected_target_rri": selected_target_rri,
-                "G_target": cumulative if selected_target_rri is not None else None,
-                "fanout_min": fanout_min,
-                "fanout_mean": fanout_mean,
-                "fanout_max": fanout_max,
-                "valid_candidates": int(step.candidates.mask_valid.sum().item()),
-                "top_target_rri": top_values,
-            })
+            rows.append(
+                {
+                    "trajectory": traj_idx,
+                    "step": int(step.step_index) + 1,
+                    "selected_target_rri": selected_target_rri,
+                    "G_target": cumulative if selected_target_rri is not None else None,
+                    "fanout_q025": fanout_q025,
+                    "fanout_q975": fanout_q975,
+                    "valid_candidates": int(step.candidates.mask_valid.sum().item()),
+                    "top_target_rri": top_values,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -547,8 +549,17 @@ def _valid_step_metric_values(step: object, metric_name: str) -> np.ndarray:
     if values is None:
         return np.asarray([], dtype=float)
     values_np = values.detach().cpu().numpy().reshape(-1)
+    mask = np.ones(values_np.shape, dtype=bool)
+    candidates = getattr(step, "candidates", None)
+    mask_valid = getattr(candidates, "mask_valid", None)
+    if mask_valid is not None:
+        mask = mask_valid.detach().cpu().numpy().reshape(-1).astype(bool, copy=False)
+        if mask.shape != values_np.shape:
+            raise ValueError(
+                f"Candidate validity mask shape {mask.shape} must match metric vector shape {values_np.shape}."
+            )
     finite = np.isfinite(values_np)
-    return values_np[finite].astype(float, copy=False)
+    return values_np[finite & mask].astype(float, copy=False)
 
 
 def _metric_float(value: object) -> float | None:
@@ -562,6 +573,71 @@ def _metric_float(value: object) -> float | None:
 def _format_optional_metric(value: object) -> str:
     value_float = _metric_float(value)
     return "n/a" if value_float is None else f"{value_float:.4f}"
+
+
+_ROLLOUT_PLOT_COLORS = (
+    "#636EFA",
+    "#EF553B",
+    "#00CC96",
+    "#AB63FA",
+    "#FFA15A",
+    "#19D3F3",
+    "#FF6692",
+    "#B6E880",
+)
+
+
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    hex_clean = hex_color.lstrip("#")
+    red, green, blue = (int(hex_clean[idx : idx + 2], 16) for idx in (0, 2, 4))
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def _build_fanout_band_figure(step_df: pd.DataFrame) -> go.Figure:
+    """Build the empirical candidate-band plot for live target-RRI rollouts."""
+
+    fig = go.Figure()
+    for traj_idx, traj_df in step_df.groupby("trajectory", sort=True):
+        traj_sorted = traj_df.sort_values("step")
+        color = _ROLLOUT_PLOT_COLORS[int(traj_idx) % len(_ROLLOUT_PLOT_COLORS)]
+        fig.add_trace(
+            go.Scatter(
+                x=traj_sorted["step"],
+                y=traj_sorted["fanout_q025"],
+                mode="lines",
+                line={"width": 0, "color": color},
+                hoverinfo="skip",
+                showlegend=False,
+                name=f"traj {traj_idx} candidate q2.5",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=traj_sorted["step"],
+                y=traj_sorted["fanout_q975"],
+                mode="lines",
+                fill="tonexty",
+                fillcolor=_hex_to_rgba(color, 0.18),
+                line={"width": 0, "color": color},
+                name=f"traj {traj_idx} empirical 95% band",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=traj_sorted["step"],
+                y=traj_sorted["selected_target_rri"],
+                mode="lines+markers",
+                line={"color": color, "width": 3},
+                marker={"color": color, "size": 7},
+                name=f"traj {traj_idx} selected r_t^e",
+            )
+        )
+    fig.update_layout(
+        title="Valid-candidate target-RRI empirical 95% band",
+        xaxis_title="rollout step",
+        yaxis_title="candidate target RRI",
+    )
+    return fig
 
 
 def _target_rows_table(rows: tuple[TargetCandidateRow, ...]) -> list[dict[str, object]]:
@@ -926,15 +1002,17 @@ def _render_live_rollouts_tab() -> None:
         backprojection_stride=int(backprojection_stride),
     )
 
-    run_key = "|".join([
-        load_key,
-        scoring_mode.value,
-        "" if selected_target is None else selected_target.target_id,
-        config_signature(candidate_config),
-        config_signature(rollout_cfg),
-        config_signature(target_scorer_cfg),
-        config_signature(scene_scorer_cfg),
-    ])
+    run_key = "|".join(
+        [
+            load_key,
+            scoring_mode.value,
+            "" if selected_target is None else selected_target.target_id,
+            config_signature(candidate_config),
+            config_signature(rollout_cfg),
+            config_signature(target_scorer_cfg),
+            config_signature(scene_scorer_cfg),
+        ]
+    )
     rollout_cache = st.session_state.setdefault("cf_live_rollout_cache", {})
     if st.button("Run / refresh live rollouts", key="cf_run_live_rollouts"):
         try:
@@ -1217,55 +1295,29 @@ def _render_live_rollout_metric_dashboard(
         yaxis_title="target RRI / cumulative return",
     )
 
-    fanout_fig = go.Figure()
-    for traj_idx, traj_df in step_df.groupby("trajectory", sort=True):
-        fanout_fig.add_trace(
-            go.Scatter(
-                x=traj_df["step"],
-                y=traj_df["fanout_max"],
-                mode="lines",
-                name=f"traj {traj_idx} candidate max",
-                line={"width": 1},
-            )
-        )
-        fanout_fig.add_trace(
-            go.Scatter(
-                x=traj_df["step"],
-                y=traj_df["fanout_mean"],
-                mode="lines+markers",
-                name=f"traj {traj_idx} candidate mean",
-            )
-        )
-        fanout_fig.add_trace(
-            go.Scatter(
-                x=traj_df["step"],
-                y=traj_df["fanout_min"],
-                mode="lines",
-                name=f"traj {traj_idx} candidate min",
-                line={"width": 1, "dash": "dot"},
-            )
-        )
-    fanout_fig.update_layout(
-        title="Valid-candidate target-RRI fanout",
-        xaxis_title="rollout step",
-        yaxis_title="candidate target RRI",
-    )
+    fanout_fig = _build_fanout_band_figure(step_df)
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
         st.plotly_chart(rri_fig, width="stretch")
     with chart_col2:
         st.plotly_chart(fanout_fig, width="stretch")
+        st.caption(
+            "Band shows the 2.5-97.5 percentile range of valid candidate target-RRI at each rollout "
+            "step; the selected line shows the action actually taken."
+        )
 
     top_rows = []
     for row in step_df.itertuples(index=False):
         for rank, value in enumerate(row.top_target_rri, start=1):
-            top_rows.append({
-                "trajectory": int(row.trajectory),
-                "step": int(row.step),
-                "rank": rank,
-                "top_target_rri": float(value),
-            })
+            top_rows.append(
+                {
+                    "trajectory": int(row.trajectory),
+                    "step": int(row.step),
+                    "rank": rank,
+                    "top_target_rri": float(value),
+                }
+            )
     if top_rows:
         top_df = pd.DataFrame(top_rows)
         top_fig = go.Figure()
