@@ -257,8 +257,7 @@ class CounterfactualStepResult:
 
     @property
     def selected_pose_world(self) -> PoseTW:
-        pose = _pose_at(self.candidates.poses_world_cam(), self.selected_valid_index)
-        return rotate_yaw_cw90(pose)
+        return _pose_at(self.candidates.poses_world_cam(), self.selected_valid_index)
 
     @property
     def selected_view(self) -> CameraTW:
@@ -340,7 +339,13 @@ CounterfactualEvaluatorFn = Callable[
 
 
 class CounterfactualPoseGeneratorConfig(TargetConfig["CounterfactualPoseGenerator"]):
-    """Configuration for multi-step counterfactual rollout generation."""
+    """Configuration for multi-step finite-candidate rollout generation.
+
+    Candidate sampling stays in `pose_generation`: each rollout step regenerates
+    a shell from the current pose/history, applies hard validity masks, and
+    selects valid actions by the configured policy. Persistence, source-row
+    lineage, and `Q_H` replay views are owned by `aria_nbv.rollouts`.
+    """
 
     @property
     def target_type(self) -> type["CounterfactualPoseGenerator"]:
@@ -471,7 +476,13 @@ class CounterfactualOracleRriScorer:
 
 
 class CounterfactualPoseGenerator:
-    """Expand a multi-step counterfactual pose tree from the current generator."""
+    """Expand a multi-step counterfactual pose tree from the current generator.
+
+    The generator returns in-memory trajectories only. Callers such as
+    `RolloutDatasetWriter` provide source samples and oracle evaluators, then
+    decide which rollout records and diagnostics are retained in standalone
+    replay stores.
+    """
 
     def __init__(self, config: CounterfactualPoseGeneratorConfig) -> None:
         self.config = config
@@ -749,7 +760,11 @@ class CounterfactualPoseGenerator:
         trajectory: CounterfactualTrajectory,
         branch_count: int,
     ) -> list[CounterfactualSelectionRecord]:
-        order = torch.argsort(scores, descending=True)
+        finite_scores = torch.isfinite(scores)
+        if not bool(finite_scores.any().item()):
+            return []
+        ranked_scores = torch.where(finite_scores, scores, torch.full_like(scores, float("-inf")))
+        order = torch.argsort(ranked_scores, descending=True)
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
 
@@ -757,6 +772,8 @@ class CounterfactualPoseGenerator:
         selected_centers: list[torch.Tensor] = []
         for index_tensor in order:
             index = int(index_tensor.item())
+            if not bool(finite_scores[index].item()):
+                continue
             center = centers[index]
             if not self._passes_distance_guards(center=center, history=history, selected_centers=selected_centers):
                 continue
@@ -765,9 +782,9 @@ class CounterfactualPoseGenerator:
             if len(selected) >= branch_count:
                 break
 
-        if not selected and order.numel() > 0:
-            selected.append(int(order[0].item()))
-        return [self._one_hot_selection_record(scores=scores, valid_index=index) for index in selected]
+        if not selected:
+            selected.append(int(torch.nonzero(finite_scores, as_tuple=False).reshape(-1)[0].item()))
+        return [self._one_hot_selection_record(scores=ranked_scores, valid_index=index) for index in selected]
 
     def _sample_valid_candidates(
         self,
@@ -779,7 +796,7 @@ class CounterfactualPoseGenerator:
     ) -> list[CounterfactualSelectionRecord]:
         centers = valid_poses.t.reshape(-1, 3)
         history = trajectory.history_centers_world().to(device=centers.device, dtype=centers.dtype)
-        remaining = torch.ones(scores.shape[0], device=scores.device, dtype=torch.bool)
+        remaining = torch.isfinite(scores).to(device=scores.device, dtype=torch.bool)
         selected_centers: list[torch.Tensor] = []
         records: list[CounterfactualSelectionRecord] = []
 
@@ -881,6 +898,7 @@ class CounterfactualPoseGenerator:
         mask = mask.to(device=logits.device, dtype=torch.bool).reshape(-1)
         if mask.shape != logits.shape:
             raise ValueError(f"Selection mask shape {tuple(mask.shape)} must match logits {tuple(logits.shape)}.")
+        mask &= torch.isfinite(logits)
         if not bool(mask.any().item()):
             raise ValueError("Cannot sample from an empty valid-candidate mask.")
 

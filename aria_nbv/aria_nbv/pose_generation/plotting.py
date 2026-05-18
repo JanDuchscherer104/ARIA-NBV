@@ -725,7 +725,7 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         include_axes: bool = False,
         include_center: bool = False,
         max_frustums_per_trajectory: int | None = None,
-        display_rotate: bool = True,
+        display_rotate: bool = False,
         color_by_target_rri: bool = True,
         colorscale: str = "Viridis",
     ) -> Self:
@@ -831,9 +831,7 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
         if show_frusta:
             metric_values = _valid_metric_values(step, "target_rri")
             if color_frusta_by_target_rri and metric_values.size:
-                from aria_nbv.utils import rotate_yaw_cw90
-
-                poses = self._pose_list_from_input(rotate_yaw_cw90(step.candidates.poses_world_cam()))
+                poses = self._pose_list_from_input(step.candidates.poses_world_cam())
                 indices = np.arange(len(poses))
                 if max_frustums is not None and len(indices) > max_frustums:
                     indices = np.linspace(0, len(poses) - 1, num=max_frustums, dtype=int)
@@ -859,7 +857,7 @@ class CounterfactualPlotBuilder(CandidatePlotBuilder):
                     max_frustums=max_frustums,
                     include_axes=False,
                     include_center=False,
-                    display_rotate=True,
+                    display_rotate=False,
                 )
 
         ref_pose = trajectory.reference_pose_world(step_index)

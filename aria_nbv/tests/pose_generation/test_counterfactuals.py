@@ -50,6 +50,7 @@ from aria_nbv.rendering import CandidateDepthRendererConfig
 from aria_nbv.rendering.candidate_pointclouds import CandidatePointClouds
 from aria_nbv.rollouts import RolloutLineage, RolloutZarrRecord
 from aria_nbv.rri_metrics.oracle_rri import OracleRRIConfig
+from aria_nbv.utils.data_plotting import get_frustum_segments
 
 
 def _identity_pose(device: torch.device | str = "cpu") -> PoseTW:
@@ -445,6 +446,16 @@ def _fake_rri_evaluator(result, trajectory, step_index):
     )
 
 
+def _expected_frustum_trace(cam: CameraTW, pose: PoseTW, *, scale: float) -> np.ndarray:
+    return np.concatenate(
+        [
+            np.vstack([segment, np.full((1, 3), np.nan, dtype=float)])
+            for segment in get_frustum_segments(cam, pose, scale)
+        ],
+        axis=0,
+    )
+
+
 def test_counterfactual_rollout_greedy_length_and_step_radius() -> None:
     rollouts = _run_rollouts(horizon=3, branch_factor=1)
     assert len(rollouts.trajectories) == 1
@@ -579,8 +590,21 @@ def test_counterfactual_plot_builder_keeps_actor_obb_when_gt_target_invalid() ->
     assert any(trace.name == "Active target / actor-visible" for trace in fig.data)
 
 
-def test_counterfactual_selected_frusta_are_rotated_and_colored_by_target_rri() -> None:
+def test_counterfactual_selected_pose_world_uses_raw_candidate_pose_without_second_cw90() -> None:
     rollouts = _run_rollouts(horizon=1, branch_factor=1, score_candidates=_fake_rri_evaluator)
+    trajectory = rollouts.trajectories[0]
+    step = trajectory.steps[0]
+    raw_pose_row = step.candidates.poses_world_cam().tensor().reshape(-1, 12)[step.selected_valid_index]
+
+    assert torch.allclose(step.selected_pose_world.tensor().reshape(-1), raw_pose_row)
+    assert torch.allclose(trajectory.pose_chain_world().tensor().reshape(-1, 12)[1], raw_pose_row)
+
+
+def test_counterfactual_selected_frusta_are_colored_and_use_raw_candidate_pose() -> None:
+    rollouts = _run_rollouts(horizon=1, branch_factor=1, score_candidates=_fake_rri_evaluator)
+    step = rollouts.trajectories[0].steps[0]
+    raw_pose = step.candidates.poses_world_cam()[step.selected_valid_index]
+    expected = _expected_frustum_trace(step.selected_view, raw_pose, scale=0.6)
 
     fig = (
         CounterfactualPlotBuilder.from_rollouts(
@@ -595,10 +619,14 @@ def test_counterfactual_selected_frusta_are_rotated_and_colored_by_target_rri() 
     frustum_traces = [trace for trace in fig.data if "target_rri=" in str(trace.name)]
     assert frustum_traces
     assert frustum_traces[0].line.color != "crimson"
+    actual = np.column_stack([frustum_traces[0].x, frustum_traces[0].y, frustum_traces[0].z]).astype(float)
+    np.testing.assert_allclose(actual, expected, equal_nan=True)
 
 
-def test_counterfactual_step_shell_frusta_are_colored_by_target_rri() -> None:
+def test_counterfactual_step_shell_frusta_are_colored_and_use_raw_candidate_poses() -> None:
     rollouts = _run_rollouts(horizon=1, branch_factor=1, score_candidates=_fake_rri_evaluator)
+    step = rollouts.trajectories[0].steps[0]
+    expected = _expected_frustum_trace(step.candidates.views[0], step.candidates.poses_world_cam()[0], scale=0.5)
 
     fig = (
         CounterfactualPlotBuilder.from_rollouts(
@@ -612,6 +640,8 @@ def test_counterfactual_step_shell_frusta_are_colored_by_target_rri() -> None:
 
     frustum_traces = [trace for trace in fig.data if "target_rri=" in str(trace.name)]
     assert frustum_traces
+    actual = np.column_stack([frustum_traces[0].x, frustum_traces[0].y, frustum_traces[0].z]).astype(float)
+    np.testing.assert_allclose(actual, expected, equal_nan=True)
 
 
 def test_counterfactual_rollout_tracks_cumulative_rri_and_selected_point_clouds() -> None:
@@ -669,6 +699,45 @@ def test_temperature_softmax_branch_factor_samples_distinct_candidates() -> None
 
     assert len(selected) == 3
     assert len(set(selected)) == 3
+
+
+def test_counterfactual_selection_ignores_nonfinite_evaluator_scores() -> None:
+    def _nonfinite_evaluator(result, trajectory, step_index):
+        del trajectory, step_index
+        valid_poses = result.poses_world_cam()
+        num_valid = int(valid_poses.t.reshape(-1, 3).shape[0])
+        scores = torch.linspace(0.0, 1.0, num_valid, device=valid_poses.t.device)
+        scores[0] = float("nan")
+        if scores.numel() > 1:
+            scores[1] = float("inf")
+        return CounterfactualCandidateEvaluation(
+            scores=scores,
+            score_label="stress_score",
+            metric_vectors={"rri": torch.nan_to_num(scores, nan=0.0, posinf=0.0)},
+        )
+
+    greedy = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.ORACLE_GREEDY,
+        score_candidates=_nonfinite_evaluator,
+    )
+    softmax = _run_rollouts(
+        horizon=1,
+        branch_factor=1,
+        selection_policy=CounterfactualSelectionPolicy.TEMPERATURE_SOFTMAX,
+        score_candidates=_nonfinite_evaluator,
+    )
+
+    greedy_step = greedy.trajectories[0].steps[0]
+    softmax_step = softmax.trajectories[0].steps[0]
+
+    assert torch.isfinite(torch.tensor(greedy_step.selection_score))
+    assert greedy_step.selection_logits is not None
+    assert not torch.isfinite(greedy_step.selection_logits[:2]).any()
+    assert softmax_step.selection_probabilities is not None
+    assert torch.isfinite(softmax_step.selection_probabilities).all()
+    assert softmax_step.selection_probabilities[:2].tolist() == [0.0, 0.0]
 
 
 def test_counterfactual_path_plot_uses_rri_colorbar_when_available() -> None:
