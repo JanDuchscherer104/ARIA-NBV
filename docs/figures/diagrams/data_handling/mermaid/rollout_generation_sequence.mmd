@@ -37,10 +37,13 @@ sequenceDiagram
           RRI-->>CLI: target rewards and retained diagnostics
           CLI->>POL: select valid q_ti_star under recipe policy
           POL-->>CLI: selected candidate and policy metadata
-          CLI->>CLI: advance counterfactual state with selected depth only
+          CLI->>CLI: advance with low-res selected point cloud
+          CLI->>REN: render selected q_ti_star at selected_depth resolution
+          REN-->>CLI: 240 x 240 depth and valid mask
         end
       end
       CLI->>STORE: write sources, targets, rollouts, steps, candidates
+      CLI->>STORE: write selected_depth and derived q_h view
     end
   end
   CLI->>STORE: write zarr.json and manifest.json

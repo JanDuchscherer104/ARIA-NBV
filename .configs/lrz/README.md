@@ -3,6 +3,9 @@
 This directory documents the LRZ staging contract used by the dry-run Slurm
 templates in `scripts/templates/lrz/`. These files are planning aids only. They
 do not define a package storage schema and are not consumed by `aria_nbv`.
+The full data-generation operator sequence lives in
+`aria_nbv/aria_nbv/data_handling/README.md`; this file only owns LRZ/DSS
+placement, Slurm/Pyxis, and campaign retry semantics.
 
 ## Required Operator Variables
 
@@ -148,3 +151,35 @@ Copy the template before submitting and replace the `/ABS/PATH/TO/ARIA_DSS`
 `#SBATCH --output` and `#SBATCH --error` placeholders with the concrete DSS log
 directory. Slurm parses `#SBATCH` directives before the shell starts, so those
 lines do not expand `$ARIA_DSS` or other shell variables.
+
+Minimal LRZ rollout campaign flow:
+
+```sh
+export ARIA_DSS=/dss/.../aria-nbv
+export ARIA_REPO=$HOME/src/ARIA-NBV
+export LRZ_CONTAINER_IMAGE='nvcr.io#nvidia/pytorch:24.10-py3'
+export RUN_ID=rollouts-v1-smoke-YYYYMMDD
+export CONFIG_PATH="$ARIA_DSS/data/staging/rollouts/build_rollouts_${RUN_ID}.toml"
+export SHARD_MANIFEST="$ARIA_DSS/data/staging/manifests/rollout_shards_${RUN_ID}.jsonl"
+
+cd "$ARIA_REPO/aria_nbv"
+uv run nbv-plan-rollout-shards \
+  --config-path "$CONFIG_PATH" \
+  --rows-per-shard 1 \
+  --output-manifest "$SHARD_MANIFEST"
+
+sbatch "$ARIA_DSS/data/staging/rollouts/rollout_generation_${RUN_ID}.sbatch"
+
+uv run nbv-status-rollout-shards \
+  --shard-manifest "$SHARD_MANIFEST" \
+  --final-root "$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards" \
+  --output-json "$ARIA_DSS/data/staging/rollouts/$RUN_ID/manifests/status.json" \
+  --require-complete
+```
+
+For retries, derive the retry set from `nbv-status-rollout-shards`, not from a
+recursive DSS scan. A final shard directory is reusable only when validation
+passes and both `_owner.json` and `_SUCCESS.json` are present. If a final shard
+path exists without a valid success marker, move or remove it only after
+operator review; never overwrite a partial final path in place. If a temp shard
+path still exists, confirm that no active job owns it before removing it.

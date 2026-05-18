@@ -29,12 +29,13 @@ flowchart LR
   end
 
   subgraph Rollout["Manifest-backed rollout shard"]
-    RollRoot["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr/}}\\\\\\text{schema 0.4 manifested shard}\\end{array}$$"]
+    RollRoot["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr/}}\\\\\\text{schema 0.5 selected-depth shard}\\end{array}$$"]
     RollZarr["$$\\begin{array}{c}\\texttt{zarr.json}\\\\\\text{compact attrs + manifest hash}\\end{array}$$"]
     RollManifest["$$\\begin{array}{c}\\texttt{manifest.json}\\\\\\text{resolved config + provenance}\\end{array}$$"]
     RollDict["$$\\begin{array}{c}\\texttt{dictionaries/}\\\\\\text{string dictionaries}\\end{array}$$"]
     RollTables["$$\\begin{array}{c}\\texttt{sources, targets, rollouts}\\\\\\texttt{steps, candidates, lineage}\\end{array}$$"]
-    RollDerived["$$\\begin{array}{c}\\texttt{q\\_h\\_view()}\\\\\\text{derived, not persisted}\\end{array}$$"]
+    RollDepth["$$\\begin{array}{c}\\texttt{selected\\_depth/}\\\\\\text{selected history rasters}\\end{array}$$"]
+    RollQH["$$\\begin{array}{c}\\texttt{q\\_h/}\\\\\\text{derived hot training view}\\end{array}$$"]
   end
 
   VinRoot --> VinManifest
@@ -45,7 +46,9 @@ flowchart LR
   RollRoot --> RollManifest
   RollRoot --> RollDict
   RollRoot --> RollTables
-  RollTables -. "read-time tensorization" .-> RollDerived
+  RollRoot --> RollDepth
+  RollTables -. "selected row links" .-> RollDepth
+  RollTables -. "derive + validate" .-> RollQH
   VinIndex -->|"$$\\texttt{source\\_row\\_id}\\ +\\ \\text{hashes}$$"| RollTables
   VinShard -. "referenced, not copied" .-> RollTables
 
@@ -54,8 +57,8 @@ flowchart LR
   classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
   classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
 
-  class VinRoot,RollRoot,VinManifest,VinIndex,VinSplits,VinShard,RollZarr,RollManifest,RollDict,RollTables data;
-  class RollDerived output;
+  class VinRoot,RollRoot,VinManifest,VinIndex,VinSplits,VinShard,RollZarr,RollManifest,RollDict,RollTables,RollDepth data;
+  class RollQH output;
 
   style Vin fill:#f7f3ff,stroke:#cdb2ff,stroke-width:2px,rx:12,ry:12
   style Rollout fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12

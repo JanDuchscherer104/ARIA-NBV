@@ -43,7 +43,7 @@ flowchart TB
     Depth["$$\\begin{array}{c}\\textbf{selected depth}\\\\\\mathbf{D}_{q_{t,i^\\star}},\\ \\mathbf{M}_{q_{t,i^\\star}}\\\\\\texttt{float16/bool}[H_{\\mathrm{img}},W_{\\mathrm{img}}]\\end{array}$$"]
   end
 
-  QH["$$\\begin{array}{c}\\textbf{derived }Q_H\\textbf{ view}\\\\\\text{candidate ids, masks, rewards}\\\\\\text{shape }[H,N_q]\\end{array}$$"]
+  QH["$$\\begin{array}{c}\\textbf{persisted }\\texttt{q\\_h/}\\textbf{ view}\\\\\\text{derived ids, masks, rewards}\\\\\\text{shape }[H,N_q]\\end{array}$$"]
 
   Sample --> Source --> Backbones
   Sample --> Target --> Match

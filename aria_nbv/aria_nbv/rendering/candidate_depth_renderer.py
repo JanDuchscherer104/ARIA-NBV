@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import torch
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.typed_payloads import from_serializable, to_serializable
@@ -108,6 +108,12 @@ class CandidateDepthRendererConfig(TargetConfig["CandidateDepthRenderer"]):
     resolution_scale: float | None = 0.5
     """Optional uniform scale (0<scale<=1) applied to H,W for rendering. """
 
+    output_width_px: int | None = Field(default=None, ge=1)
+    """Optional exact rendered width in pixels; overrides ``resolution_scale`` when paired with height."""
+
+    output_height_px: int | None = Field(default=None, ge=1)
+    """Optional exact rendered height in pixels; overrides ``resolution_scale`` when paired with width."""
+
     verbosity: Verbosity = Field(
         default=Verbosity.VERBOSE,
     )
@@ -117,6 +123,14 @@ class CandidateDepthRendererConfig(TargetConfig["CandidateDepthRenderer"]):
     """Enable detailed debug logging."""
 
     _resolve_device = field_validator("device", mode="before")(BaseConfig._resolve_device)
+
+    @model_validator(mode="after")
+    def _validate_output_size(self) -> "CandidateDepthRendererConfig":
+        """Reject half-specified exact render sizes."""
+
+        if (self.output_width_px is None) != (self.output_height_px is None):
+            raise ValueError("output_width_px and output_height_px must be set together.")
+        return self
 
 
 class CandidateDepthRenderer:
@@ -137,6 +151,38 @@ class CandidateDepthRenderer:
         candidates: CandidateSamplingResult,
     ) -> CandidateDepths:
         """Render depth maps for valid candidate poses within a snippet."""
+        return self._render_subset(sample, candidates, compact_indices=None)
+
+    def render_compact_indices(
+        self,
+        sample: EfmSnippetView,
+        candidates: CandidateSamplingResult,
+        compact_indices: torch.Tensor | list[int] | tuple[int, ...],
+    ) -> CandidateDepths:
+        """Render depth maps for explicit compact-valid candidate rows.
+
+        Args:
+            sample: Snippet with an attached mesh.
+            candidates: Full candidate sampling result.
+            compact_indices: Row indices into ``candidates.views``. These are
+                compact valid-candidate indices, not full-shell indices.
+
+        Returns:
+            Rendered depth batch aligned with ``compact_indices`` and carrying
+            full-shell ``candidate_indices`` for joins.
+        """
+
+        return self._render_subset(sample, candidates, compact_indices=compact_indices)
+
+    def _render_subset(
+        self,
+        sample: EfmSnippetView,
+        candidates: CandidateSamplingResult,
+        *,
+        compact_indices: torch.Tensor | list[int] | tuple[int, ...] | None,
+    ) -> CandidateDepths:
+        """Render either the configured prefix or an explicit compact subset."""
+
         if not sample.has_mesh or sample.mesh is None:
             msg = "CandidateDepthRenderer requires snippets with attached meshes."
             self.console.error(msg)
@@ -149,13 +195,18 @@ class CandidateDepthRenderer:
         )
         pose_batch, camera_calib, candidate_indices = self._select_candidate_views(
             candidates,
+            compact_indices=compact_indices,
         )
         self.console.log(
             f"Attempting renders for {pose_batch.tensor().shape[0]} candidates (GUI slice).",
         )
         self.console.dbg_summary("candidate_indices", candidate_indices)
 
-        if self.config.resolution_scale is not None:
+        if self.config.output_width_px is not None and self.config.output_height_px is not None:
+            new_size = (int(self.config.output_width_px), int(self.config.output_height_px))
+            self.console.log(f"Scaling candidate camera intrinsics to exact size {new_size}")
+            camera_calib = camera_calib.scale_to_size(new_size)  # type: ignore[arg-type]
+        elif self.config.resolution_scale is not None:
             scale = float(self.config.resolution_scale)
             self.console.log(f"Scaling candidate camera intrinsics by {scale}")
             base_size = camera_calib.size[0]
@@ -207,6 +258,8 @@ class CandidateDepthRenderer:
     def _select_candidate_views(
         self,
         candidates: CandidateSamplingResult,
+        *,
+        compact_indices: torch.Tensor | list[int] | tuple[int, ...] | None = None,
     ) -> tuple[PoseTW, CameraTW, torch.Tensor]:
         """Select a subset of candidate poses for rendering.
 
@@ -221,12 +274,20 @@ class CandidateDepthRenderer:
         if num_candidates == 0:
             raise ValueError("No candidates provided for rendering.")
 
-        num_render = min(
-            num_candidates,
-            max(1, int(self.config.max_candidates_final)),
-        )
-
-        candidate_idx = torch.arange(num_render, device=device, dtype=torch.long)
+        if compact_indices is None:
+            num_render = min(
+                num_candidates,
+                max(1, int(self.config.max_candidates_final)),
+            )
+            candidate_idx = torch.arange(num_render, device=device, dtype=torch.long)
+        else:
+            candidate_idx = torch.as_tensor(compact_indices, device=device, dtype=torch.long).reshape(-1)
+            if candidate_idx.numel() == 0:
+                raise ValueError("At least one compact candidate index is required for rendering.")
+            if torch.any(candidate_idx < 0) or torch.any(candidate_idx >= num_candidates):
+                raise IndexError(
+                    f"Compact candidate indices must be in [0,{num_candidates}), got {candidate_idx.detach().cpu().tolist()}."
+                )
 
         selected_views = cam_views[candidate_idx]
         poses_world_cam = candidates.poses_world_cam(device=device)[candidate_idx]

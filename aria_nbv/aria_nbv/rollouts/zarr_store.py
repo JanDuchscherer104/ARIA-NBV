@@ -3,11 +3,12 @@
 This module is the implementation-contract owner for `rollouts.zarr`. A store
 contains compact row tables for rollout chains, steps, full-shell candidates,
 shared VIN source rows, lineage, target records, masks, and reason codes. The
-padded `Q_H` tensors used by finite-candidate value learning are derived by the
-reader from factual `steps/` and `candidates/` tables. The store deliberately
-does not mutate or migrate the strict VIN offline store; rollout replay is a
-separate artifact with source manifest, split, target, candidate-mixture,
-policy, and oracle config hashes.
+padded `Q_H` tensors used by finite-candidate value learning are persisted in a
+derived `q_h/` group for high-throughput training and are validated against the
+canonical factual `steps/` and `candidates/` tables. The store deliberately does
+not mutate or migrate the strict VIN offline store; rollout replay is a
+separate artifact with source manifest, split, target, candidate-mixture, policy,
+and oracle config hashes.
 
 `q_train_mask` is true only when a row is non-padded, actor-selectable,
 target-valid, GT-label-valid, and has a finite target-RRI label. Invalid
@@ -28,6 +29,7 @@ import torch
 import zarr
 from efm3d.aria.pose import PoseTW
 from pydantic import Field, field_validator
+from zarr.codecs import BloscCname, BloscCodec, BloscShuffle
 from zarr.storage import LocalStore
 
 from ..configs import PathConfig
@@ -61,11 +63,39 @@ if TYPE_CHECKING:
 ROLLOUT_ZARR_SCHEMA_ID = "aria_nbv.rollout_zarr_q_invalidity"
 """Schema id stored as a root attribute on rollout replay stores."""
 
-ROLLOUT_ZARR_SCHEMA_VERSION = "0.4-manifested-shards"
-"""Manifest-backed clean table-owner rollout replay schema version."""
+ROLLOUT_ZARR_SCHEMA_VERSION = "0.5-selected-depth"
+"""Manifest-backed rollout replay schema version with selected-action depth retention."""
 
 DEFAULT_RETURN_SEMANTICS = "cumulative_target_rri"
 """Default return target family for initial ``Q_H`` replay views."""
+
+SELECTED_DEPTH_INVALID_FILL_VALUE = 0.0
+"""Fill value written for invalid selected-depth pixels before float16 storage."""
+
+SELECTED_DEPTH_CODEC = "blosc:zstd:clevel=5:bitshuffle"
+"""Human-readable selected-depth compressor contract stored in metadata."""
+
+Q_H_ARRAY_NAMES = (
+    "state_step_row_id",
+    "source_row_id",
+    "candidate_row_id",
+    "valid_action_mask",
+    "q_train_mask",
+    "target_row_id",
+    "selected_candidate_index",
+    "one_step_target_rri",
+    "one_step_scene_rri",
+    "bootstrap_next_step_row_id",
+    "terminal_mask",
+    "invalid_reason_bitset",
+    "discount",
+    "td_selected_candidate_row_id",
+    "td_reward_target_rri",
+    "td_next_step_row_id",
+    "td_terminal_mask",
+    "td_discount",
+)
+"""Arrays persisted in the derived finite-candidate ``q_h/`` training view."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +239,18 @@ CANDIDATE_TABLE = _TableSchema(
 )
 """Canonical `candidates/` table fields and dtypes."""
 
+SELECTED_DEPTH_TABLE = _TableSchema(
+    "selected_depth",
+    (
+        _TableField("step_row_id", np.int64),
+        _TableField("candidate_row_id", np.int64),
+        _TableField("focal_px", np.float32),
+        _TableField("principal_point_px", np.float32),
+        _TableField("image_size_hw", np.int32),
+    ),
+)
+"""Metadata rows aligned with selected-action depth rasters."""
+
 
 @dataclass(slots=True)
 class RolloutZarrWriteResult:
@@ -258,6 +300,7 @@ class _RolloutTables:
     lineage: dict[str, np.ndarray]
     steps: dict[str, np.ndarray]
     candidates: dict[str, np.ndarray]
+    selected_depth: dict[str, np.ndarray]
 
 
 class RolloutZarrStoreConfig(BaseConfig):
@@ -272,6 +315,8 @@ class RolloutZarrStoreConfig(BaseConfig):
     field_retention_policy: str = "compact"
     source_offline_store_version: str = "unknown-source-version"
     split_manifest_hash: str = "unknown-split-manifest"
+    q_h_chunk_states: int = Field(default=64, ge=1)
+    """Number of state rows per chunk in the persisted derived ``q_h/`` view."""
 
     _resolve_store_dir = field_validator("store_dir", mode="before")(resolve_cache_artifact_dir)
 
@@ -302,13 +347,15 @@ class RolloutZarrStoreReader:
         }
 
     def q_h_view(self, *, discount_gamma: float | None = None, horizon: int | None = None) -> dict[str, np.ndarray]:
-        """Build the padded finite-candidate ``Q_H`` view from factual store tables.
+        """Return the padded finite-candidate ``Q_H`` training view.
 
-        The view is intentionally derived rather than persisted. This keeps the
-        store schema factual while still giving training and inspection code the
-        dense candidate-query tensors they need.
+        With default arguments this reads the persisted derived ``q_h/`` group.
+        Passing ``discount_gamma`` or ``horizon`` recomputes the view from the
+        canonical factual tables for audits and ablations.
         """
 
+        if discount_gamma is None and horizon is None and "q_h" in self.root:
+            return _read_q_h_arrays(self.root)
         gamma = float(self.root.attrs.get("discount_gamma", 1.0) if discount_gamma is None else discount_gamma)
         if horizon is None:
             horizon_values = np.asarray(self.root["rollouts/horizon"])
@@ -328,6 +375,15 @@ def write_rollout_zarr_store(
     source_offline_store_version: str = "unknown-source-version",
     split_manifest_hash: str = "unknown-split-manifest",
     manifest_context: RolloutStoreManifestContext | None = None,
+    selected_depth_enabled: bool = True,
+    selected_depth_width_px: int = 240,
+    selected_depth_height_px: int = 240,
+    selected_depth_chunk_steps: int = 16,
+    selected_depth_renderer: str = "Pytorch3DDepthRenderer",
+    selected_depth_znear_m: float | None = 1e-3,
+    selected_depth_zfar_m: float | None = 20.0,
+    selected_depth_source_resolution: str = "exact_output_size",
+    q_h_chunk_states: int = 64,
 ) -> RolloutZarrWriteResult:
     """Write rollout records into a standalone ``rollouts.zarr`` store."""
 
@@ -342,6 +398,15 @@ def write_rollout_zarr_store(
         source_offline_store_version=source_offline_store_version,
         split_manifest_hash=split_manifest_hash,
         manifest_context=manifest_context,
+        selected_depth_enabled=selected_depth_enabled,
+        selected_depth_width_px=selected_depth_width_px,
+        selected_depth_height_px=selected_depth_height_px,
+        selected_depth_chunk_steps=selected_depth_chunk_steps,
+        selected_depth_renderer=selected_depth_renderer,
+        selected_depth_znear_m=selected_depth_znear_m,
+        selected_depth_zfar_m=selected_depth_zfar_m,
+        selected_depth_source_resolution=selected_depth_source_resolution,
+        q_h_chunk_states=q_h_chunk_states,
     ).write()
 
 
@@ -361,6 +426,15 @@ class _RolloutZarrWriteSession:
         source_offline_store_version: str,
         split_manifest_hash: str,
         manifest_context: RolloutStoreManifestContext | None,
+        selected_depth_enabled: bool,
+        selected_depth_width_px: int,
+        selected_depth_height_px: int,
+        selected_depth_chunk_steps: int,
+        selected_depth_renderer: str,
+        selected_depth_znear_m: float | None,
+        selected_depth_zfar_m: float | None,
+        selected_depth_source_resolution: str,
+        q_h_chunk_states: int,
     ) -> None:
         self.output_dir = Path(store_dir).expanduser().resolve()
         self.records = records
@@ -372,16 +446,41 @@ class _RolloutZarrWriteSession:
         self.source_offline_store_version = source_offline_store_version
         self.split_manifest_hash = split_manifest_hash
         self.manifest_context = manifest_context or RolloutStoreManifestContext.programmatic()
+        self.selected_depth_enabled = bool(selected_depth_enabled)
+        self.selected_depth_width_px = int(selected_depth_width_px)
+        self.selected_depth_height_px = int(selected_depth_height_px)
+        self.selected_depth_chunk_steps = int(selected_depth_chunk_steps)
+        self.selected_depth_renderer = str(selected_depth_renderer)
+        self.selected_depth_znear_m = selected_depth_znear_m
+        self.selected_depth_zfar_m = selected_depth_zfar_m
+        self.selected_depth_source_resolution = str(selected_depth_source_resolution)
+        self.q_h_chunk_states = int(q_h_chunk_states)
+        if self.selected_depth_width_px < 1 or self.selected_depth_height_px < 1:
+            raise ValueError("selected_depth_width_px and selected_depth_height_px must be positive.")
+        if self.selected_depth_chunk_steps < 1:
+            raise ValueError("selected_depth_chunk_steps must be positive.")
+        if self.q_h_chunk_states < 1:
+            raise ValueError("q_h_chunk_states must be positive.")
 
     def write(self) -> RolloutZarrWriteResult:
         """Materialize the configured rollout traces to disk."""
 
         created_at_utc = utc_timestamp()
         dictionaries = _build_dictionaries(self.records)
-        table = _flatten_records(self.records, dictionaries)
+        table = _flatten_records(
+            self.records,
+            dictionaries,
+            selected_depth_width_px=self.selected_depth_width_px,
+            selected_depth_height_px=self.selected_depth_height_px,
+        )
+        q_h_horizon = _table_horizon(table)
+        q_h_arrays = _build_q_h_arrays(table, horizon=q_h_horizon, gamma=self.discount_gamma)
         root_metadata = _root_metadata_payload(
             records=self.records,
             tables=table,
+            q_h_arrays=q_h_arrays,
+            q_h_horizon=q_h_horizon,
+            q_h_chunk_states=self.q_h_chunk_states,
             return_semantics=self.return_semantics,
             discount_gamma=self.discount_gamma,
             target_protocol_version=self.target_protocol_version,
@@ -389,12 +488,21 @@ class _RolloutZarrWriteSession:
             field_retention_policy=self.field_retention_policy,
             source_offline_store_version=self.source_offline_store_version,
             split_manifest_hash=self.split_manifest_hash,
+            selected_depth_enabled=self.selected_depth_enabled,
+            selected_depth_width_px=self.selected_depth_width_px,
+            selected_depth_height_px=self.selected_depth_height_px,
+            selected_depth_chunk_steps=self.selected_depth_chunk_steps,
+            selected_depth_renderer=self.selected_depth_renderer,
+            selected_depth_znear_m=self.selected_depth_znear_m,
+            selected_depth_zfar_m=self.selected_depth_zfar_m,
+            selected_depth_source_resolution=self.selected_depth_source_resolution,
             created_at_utc=created_at_utc,
             manifest_sha256="",
         )
         manifest_payload = _build_manifest_payload(
             records=self.records,
             tables=table,
+            q_h_arrays=q_h_arrays,
             dictionaries=dictionaries,
             context=self.manifest_context,
             root_attrs=root_metadata,
@@ -417,6 +525,25 @@ class _RolloutZarrWriteSession:
         )
 
         _write_rollout_tables(groups, table)
+        _write_selected_depth_group(
+            groups["selected_depth"],
+            table.selected_depth,
+            enabled=self.selected_depth_enabled,
+            width_px=self.selected_depth_width_px,
+            height_px=self.selected_depth_height_px,
+            chunk_steps=self.selected_depth_chunk_steps,
+            renderer=self.selected_depth_renderer,
+            znear_m=self.selected_depth_znear_m,
+            zfar_m=self.selected_depth_zfar_m,
+            source_resolution=self.selected_depth_source_resolution,
+        )
+        _write_q_h_group(
+            groups["q_h"],
+            q_h_arrays,
+            chunk_states=self.q_h_chunk_states,
+            horizon=q_h_horizon,
+            gamma=self.discount_gamma,
+        )
         written_manifest_digest = write_rollout_store_manifest(self.output_dir, manifest_payload)
         if written_manifest_digest != manifest_digest:
             raise RuntimeError("Rollout manifest digest changed while writing.")
@@ -458,6 +585,7 @@ class _RolloutZarrValidator:
         candidate_row_id = np.asarray(self.root["candidates/candidate_row_id"])
         self._validate_q_h(candidate_row_id)
         self._validate_candidates(candidate_row_id)
+        self._validate_selected_depth()
         self._validate_sources()
         self._validate_targets()
         self._validate_required_lineage()
@@ -512,7 +640,19 @@ class _RolloutZarrValidator:
             self.errors.append("Rollout manifest schema_version does not match the current rollout Zarr schema.")
 
     def _validate_q_h(self, candidate_row_id: np.ndarray) -> None:
-        q_h = _build_q_h_arrays(_read_tables_from_root(self.root), horizon=_stored_horizon(self.root), gamma=1.0)
+        derived = _build_q_h_arrays(
+            _read_tables_from_root(self.root),
+            horizon=_stored_horizon(self.root),
+            gamma=float(self.root.attrs.get("discount_gamma", 1.0)),
+        )
+        persisted = _read_q_h_arrays_if_present(self.root)
+        missing = [name for name in Q_H_ARRAY_NAMES if name not in persisted]
+        if missing:
+            self.errors.append(f"Missing q_h arrays: {missing}.")
+            q_h = derived
+        else:
+            self._validate_persisted_q_h(persisted, derived)
+            q_h = persisted
         q_candidate_row_id = q_h["candidate_row_id"]
         q_train_mask = q_h["q_train_mask"]
         valid_action_mask = q_h["valid_action_mask"]
@@ -525,6 +665,33 @@ class _RolloutZarrValidator:
             self.errors.append("Q_H q_train_mask is true for invalid or padded candidates.")
         if np.any(q_train_mask & (~np.isfinite(one_step_target_rri))):
             self.errors.append("Q_H q_train_mask is true without a finite explicit target-RRI label.")
+
+    def _validate_persisted_q_h(self, persisted: dict[str, np.ndarray], derived: dict[str, np.ndarray]) -> None:
+        group = self.root["q_h"]
+        expected_state_count = int(derived["state_step_row_id"].shape[0])
+        expected_max_candidates = (
+            int(derived["candidate_row_id"].shape[1]) if derived["candidate_row_id"].ndim == 2 else 0
+        )
+        if int(group.attrs.get("state_count", -1)) != expected_state_count:
+            self.errors.append("q_h/state_count attr does not match the derived state count.")
+        if int(group.attrs.get("max_candidates", -1)) != expected_max_candidates:
+            self.errors.append("q_h/max_candidates attr does not match the derived candidate width.")
+        if int(group.attrs.get("horizon", -1)) != _stored_horizon(self.root):
+            self.errors.append("q_h/horizon attr does not match rollouts/horizon.")
+        if float(group.attrs.get("discount_gamma", float("nan"))) != float(self.root.attrs.get("discount_gamma", 1.0)):
+            self.errors.append("q_h/discount_gamma attr does not match root discount_gamma.")
+
+        for name in Q_H_ARRAY_NAMES:
+            actual = persisted[name]
+            expected = derived[name]
+            if actual.shape != expected.shape:
+                self.errors.append(f"q_h/{name} shape {actual.shape} does not match derived shape {expected.shape}.")
+                continue
+            if np.dtype(actual.dtype) != np.dtype(expected.dtype):
+                self.errors.append(f"q_h/{name} dtype {actual.dtype} does not match derived dtype {expected.dtype}.")
+                continue
+            if _q_h_arrays_differ(actual, expected):
+                self.errors.append(f"q_h/{name} does not match the derived factual-table view.")
 
     def _validate_candidates(self, candidate_row_id: np.ndarray) -> None:
         selected_mask = np.asarray(self.root["candidates/selected_mask"])
@@ -541,6 +708,45 @@ class _RolloutZarrValidator:
                 self.errors.append(
                     f"Candidate table field {name!r} has {array.shape[0]} rows, expected {candidate_row_id.shape[0]}."
                 )
+
+    def _validate_selected_depth(self) -> None:
+        if not bool(self.root.attrs.get("selected_depth_enabled", False)):
+            return
+
+        group = self.root["selected_depth"]
+        required = set(SELECTED_DEPTH_TABLE.names) | {"depth_m", "valid_mask"}
+        missing = sorted(name for name in required if name not in group)
+        if missing:
+            self.errors.append(f"Missing selected_depth arrays: {missing}.")
+            return
+
+        step_row_id = np.asarray(self.root["steps/step_row_id"], dtype=np.int64)
+        selected_candidate_row_id = np.asarray(self.root["steps/selected_candidate_row_id"], dtype=np.int64)
+        depth_step_row_id = np.asarray(group["step_row_id"], dtype=np.int64)
+        depth_candidate_row_id = np.asarray(group["candidate_row_id"], dtype=np.int64)
+        if not np.array_equal(depth_step_row_id, step_row_id):
+            self.errors.append("selected_depth/step_row_id must contain exactly one row for every rollout step.")
+        if not np.array_equal(depth_candidate_row_id, selected_candidate_row_id):
+            self.errors.append("selected_depth/candidate_row_id must align with steps/selected_candidate_row_id.")
+
+        expected_shape = (
+            int(step_row_id.shape[0]),
+            int(self.root.attrs.get("selected_depth_height_px", -1)),
+            int(self.root.attrs.get("selected_depth_width_px", -1)),
+        )
+        depth_m = group["depth_m"]
+        valid_mask = group["valid_mask"]
+        if tuple(depth_m.shape) != expected_shape:
+            self.errors.append(f"selected_depth/depth_m shape {depth_m.shape} must equal {expected_shape}.")
+        if tuple(valid_mask.shape) != expected_shape:
+            self.errors.append(f"selected_depth/valid_mask shape {valid_mask.shape} must equal {expected_shape}.")
+        if np.dtype(depth_m.dtype) != np.dtype(np.float16):
+            self.errors.append("selected_depth/depth_m must be float16.")
+        if np.dtype(valid_mask.dtype) != np.dtype(np.bool_):
+            self.errors.append("selected_depth/valid_mask must be bool.")
+        for name in ("focal_px", "principal_point_px", "image_size_hw"):
+            if tuple(group[name].shape) != (int(step_row_id.shape[0]), 2):
+                self.errors.append(f"selected_depth/{name} must have shape (num_steps, 2).")
 
     def _validate_sources(self) -> None:
         source_row_id = np.asarray(self.root["sources/source_row_id"])
@@ -578,9 +784,7 @@ class _RolloutZarrValidator:
             elif not np.isfinite(root_pose_world).all():
                 self.errors.append("rollouts/root_pose_world contains non-finite values.")
 
-        q_state_target_row_id = _build_q_h_arrays(
-            _read_tables_from_root(self.root), horizon=_stored_horizon(self.root), gamma=1.0
-        )["target_row_id"]
+        q_state_target_row_id = _q_h_arrays_for_validation(self.root)["target_row_id"]
         step_rollout_row_id = np.asarray(self.root["steps/rollout_row_id"])
         rollout_row_id = np.asarray(self.root["rollouts/rollout_row_id"])
         target_by_rollout = {
@@ -598,7 +802,7 @@ class _RolloutZarrValidator:
 
     def _validate_required_lineage(self) -> None:
         target_row_id = np.asarray(self.root["targets/target_row_id"])
-        q_h = _build_q_h_arrays(_read_tables_from_root(self.root), horizon=_stored_horizon(self.root), gamma=1.0)
+        q_h = _q_h_arrays_for_validation(self.root)
         q_state_target_row_id = q_h["target_row_id"]
         q_train_mask = q_h["q_train_mask"]
         target_valid_by_id = {
@@ -674,6 +878,8 @@ def _required_groups() -> tuple[str, ...]:
         "rollouts",
         "steps",
         "candidates",
+        "selected_depth",
+        "q_h",
     )
 
 
@@ -681,6 +887,9 @@ def _root_metadata_payload(
     *,
     records: list[RolloutZarrRecord],
     tables: _RolloutTables,
+    q_h_arrays: dict[str, np.ndarray],
+    q_h_horizon: int,
+    q_h_chunk_states: int,
     return_semantics: str,
     discount_gamma: float,
     target_protocol_version: str,
@@ -688,6 +897,14 @@ def _root_metadata_payload(
     field_retention_policy: str,
     source_offline_store_version: str,
     split_manifest_hash: str,
+    selected_depth_enabled: bool,
+    selected_depth_width_px: int,
+    selected_depth_height_px: int,
+    selected_depth_chunk_steps: int,
+    selected_depth_renderer: str,
+    selected_depth_znear_m: float | None,
+    selected_depth_zfar_m: float | None,
+    selected_depth_source_resolution: str,
     created_at_utc: str,
     manifest_sha256: str,
 ) -> dict[str, Any]:
@@ -714,11 +931,36 @@ def _root_metadata_payload(
         "return_semantics": return_semantics,
         "discount_gamma": float(discount_gamma),
         "field_retention_policy": field_retention_policy,
+        "selected_depth_enabled": bool(selected_depth_enabled),
+        "selected_depth_width_px": int(selected_depth_width_px),
+        "selected_depth_height_px": int(selected_depth_height_px),
+        "selected_depth_dtype": "float16",
+        "selected_depth_valid_mask_dtype": "bool",
+        "selected_depth_units": "m",
+        "selected_depth_invalid_fill_value": SELECTED_DEPTH_INVALID_FILL_VALUE,
+        "selected_depth_codec": SELECTED_DEPTH_CODEC,
+        "selected_depth_chunk_steps": int(selected_depth_chunk_steps),
+        "selected_depth_role": "q_h_history_only",
+        "selected_depth_renderer": selected_depth_renderer,
+        "selected_depth_znear_m": _float_or_nan(selected_depth_znear_m),
+        "selected_depth_zfar_m": _float_or_nan(selected_depth_zfar_m),
+        "selected_depth_source_resolution": selected_depth_source_resolution,
+        "q_h_view_persisted": True,
+        "q_h_view_role": "training_core_derived_cache",
+        "q_h_source_tables": "steps,candidates,rollouts,targets",
+        "q_h_horizon": int(q_h_horizon),
+        "q_h_chunk_states": int(q_h_chunk_states),
+        "q_h_state_count": int(q_h_arrays["state_step_row_id"].shape[0]),
+        "q_h_max_candidates": int(q_h_arrays["candidate_row_id"].shape[1])
+        if q_h_arrays["candidate_row_id"].ndim == 2
+        else 0,
         "num_sources": int(tables.sources["source_row_id"].shape[0]),
         "num_targets": int(len(_unique_targets(records))),
         "num_rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
         "num_steps": int(tables.steps["step_row_id"].shape[0]),
         "num_candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+        "num_selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
+        "num_q_h_states": int(q_h_arrays["state_step_row_id"].shape[0]),
     }
 
 
@@ -726,6 +968,7 @@ def _build_manifest_payload(
     *,
     records: list[RolloutZarrRecord],
     tables: _RolloutTables,
+    q_h_arrays: dict[str, np.ndarray],
     dictionaries: dict[str, list[str]],
     context: RolloutStoreManifestContext,
     root_attrs: dict[str, Any],
@@ -746,6 +989,11 @@ def _build_manifest_payload(
             "rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
             "steps": int(tables.steps["step_row_id"].shape[0]),
             "candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+            "selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
+            "q_h_states": int(q_h_arrays["state_step_row_id"].shape[0]),
+            "q_h_max_candidates": int(q_h_arrays["candidate_row_id"].shape[1])
+            if q_h_arrays["candidate_row_id"].ndim == 2
+            else 0,
         },
         "source_coverage": _source_coverage(records),
         "config_hashes": _manifest_config_hashes(records),
@@ -1272,12 +1520,19 @@ def _target_rows_from_records(records: list[RolloutZarrRecord]) -> dict[int, dic
     return rows
 
 
-def _flatten_records(records: list[RolloutZarrRecord], dictionaries: dict[str, list[str]]) -> _RolloutTables:
+def _flatten_records(
+    records: list[RolloutZarrRecord],
+    dictionaries: dict[str, list[str]],
+    *,
+    selected_depth_width_px: int,
+    selected_depth_height_px: int,
+) -> _RolloutTables:
     source_rows: dict[str, list[Any]] = _empty_rows(SOURCE_TABLE)
     rollout_rows: dict[str, list[Any]] = _empty_rows(ROLLOUT_TABLE)
     lineage_rows: dict[str, list[Any]] = _empty_rows(LINEAGE_TABLE)
     step_rows: dict[str, list[Any]] = _empty_rows(STEP_TABLE)
     candidate_rows: dict[str, list[Any]] = _empty_candidate_rows()
+    selected_depth_rows: dict[str, list[Any]] = _empty_selected_depth_rows()
 
     candidate_row_id = 0
     step_row_id = 0
@@ -1366,6 +1621,12 @@ def _flatten_records(records: list[RolloutZarrRecord], dictionaries: dict[str, l
             step_rows["cumulative_scene_rri"].append(_nan_if_none(running_scene_rri))
             transition_id = f"{lineage.rollout_id}:step={step.step_index}:shell={step.selected_shell_index}"
             step_rows["transition_id"].append(_dict_id(dictionaries["transition"], transition_id))
+            _append_selected_depth_row(
+                selected_depth_rows,
+                step=step,
+                step_row_id=this_step_row_id,
+                selected_candidate_row_id=selected_candidate_row_id,
+            )
 
             for shell_index in range(int(candidate_valid.shape[0])):
                 _append_candidate_row(
@@ -1389,6 +1650,11 @@ def _flatten_records(records: list[RolloutZarrRecord], dictionaries: dict[str, l
         lineage=_rows_to_numpy_table(lineage_rows, LINEAGE_TABLE),
         steps=_rows_to_numpy_table(step_rows, STEP_TABLE),
         candidates=_rows_to_numpy_table(candidate_rows, CANDIDATE_TABLE),
+        selected_depth=_rows_to_numpy_selected_depth_table(
+            selected_depth_rows,
+            width_px=selected_depth_width_px,
+            height_px=selected_depth_height_px,
+        ),
     )
 
 
@@ -1450,6 +1716,13 @@ def _empty_candidate_rows() -> dict[str, list[Any]]:
     return _empty_rows(CANDIDATE_TABLE)
 
 
+def _empty_selected_depth_rows() -> dict[str, list[Any]]:
+    rows = _empty_rows(SELECTED_DEPTH_TABLE)
+    rows["depth_m"] = []
+    rows["valid_mask"] = []
+    return rows
+
+
 def _append_candidate_row(
     rows: dict[str, list[Any]],
     *,
@@ -1487,7 +1760,9 @@ def _append_candidate_row(
     rows["q_train_mask"].append(q_train)
     rows["padded_mask"].append(False)
     rows["selected_mask"].append(is_selected)
-    rows["heavy_diag_available_mask"].append(bool(is_selected and step.selected_point_cloud_world is not None))
+    rows["heavy_diag_available_mask"].append(
+        bool(is_selected and (step.selected_point_cloud_world is not None or step.selected_depth_m is not None))
+    )
     rows["strategy_id"].append(_full_shell_value(step.candidates.strategy_id, shell_index, candidate_valid, default=-1))
     rows["mixture_id"].append(_full_shell_value(step.candidates.mixture_id, shell_index, candidate_valid, default=-1))
     rows["sampler_probability"].append(
@@ -1511,6 +1786,45 @@ def _append_candidate_row(
     rows["selection_entropy"].append(_nan_if_none(step.selection_entropy))
 
 
+def _append_selected_depth_row(
+    rows: dict[str, list[Any]],
+    *,
+    step: CounterfactualStepResult,
+    step_row_id: int,
+    selected_candidate_row_id: int,
+) -> None:
+    """Append one selected-action depth row when the step carries a raster."""
+
+    if step.selected_depth_m is None and step.selected_depth_valid_mask is None:
+        return
+    if step.selected_depth_m is None or step.selected_depth_valid_mask is None:
+        raise ValueError("selected_depth_m and selected_depth_valid_mask must be present together.")
+
+    depth = torch.as_tensor(step.selected_depth_m).detach().cpu()
+    valid_mask = torch.as_tensor(step.selected_depth_valid_mask).detach().cpu().to(dtype=torch.bool)
+    if depth.ndim != 2:
+        raise ValueError(f"selected_depth_m must have shape (H,W), got {tuple(depth.shape)}.")
+    if valid_mask.shape != depth.shape:
+        raise ValueError(
+            f"selected_depth_valid_mask shape {tuple(valid_mask.shape)} must match depth {tuple(depth.shape)}."
+        )
+
+    depth_np = depth.to(dtype=torch.float32).numpy()
+    valid_np = valid_mask.numpy().astype(bool, copy=False)
+    depth_filled = np.where(np.isfinite(depth_np) & valid_np, depth_np, SELECTED_DEPTH_INVALID_FILL_VALUE).astype(
+        np.float16
+    )
+
+    height, width = depth_filled.shape
+    rows["step_row_id"].append(int(step_row_id))
+    rows["candidate_row_id"].append(int(selected_candidate_row_id))
+    rows["depth_m"].append(depth_filled)
+    rows["valid_mask"].append(valid_np)
+    rows["focal_px"].append(_fixed_float_vector(step.selected_depth_focal_px, length=2))
+    rows["principal_point_px"].append(_fixed_float_vector(step.selected_depth_principal_point_px, length=2))
+    rows["image_size_hw"].append(_selected_depth_image_size(step, height=height, width=width))
+
+
 def _write_rollout_tables(groups: dict[str, zarr.Group], tables: _RolloutTables) -> None:
     for name, values in tables.sources.items():
         _write_array(groups["sources"], name, values)
@@ -1522,6 +1836,72 @@ def _write_rollout_tables(groups: dict[str, zarr.Group], tables: _RolloutTables)
         _write_array(groups["steps"], name, values)
     for name, values in tables.candidates.items():
         _write_array(groups["candidates"], name, values)
+
+
+def _write_selected_depth_group(
+    group: zarr.Group,
+    values: dict[str, np.ndarray],
+    *,
+    enabled: bool,
+    width_px: int,
+    height_px: int,
+    chunk_steps: int,
+    renderer: str,
+    znear_m: float | None,
+    zfar_m: float | None,
+    source_resolution: str,
+) -> None:
+    """Write selected-action depth rasters and row metadata."""
+
+    group.attrs.update(
+        {
+            "enabled": bool(enabled),
+            "width_px": int(width_px),
+            "height_px": int(height_px),
+            "depth_dtype": "float16",
+            "valid_mask_dtype": "bool",
+            "units": "m",
+            "invalid_fill_value": SELECTED_DEPTH_INVALID_FILL_VALUE,
+            "codec": SELECTED_DEPTH_CODEC,
+            "chunk_steps": int(chunk_steps),
+            "role": "q_h_history_only",
+            "renderer": renderer,
+            "znear_m": _float_or_nan(znear_m),
+            "zfar_m": _float_or_nan(zfar_m),
+            "source_resolution": source_resolution,
+        }
+    )
+    for name in SELECTED_DEPTH_TABLE.names:
+        _write_array(group, name, values[name])
+    _write_selected_depth_array(group, "depth_m", values["depth_m"], chunk_steps=chunk_steps)
+    _write_selected_depth_array(group, "valid_mask", values["valid_mask"], chunk_steps=chunk_steps)
+
+
+def _write_q_h_group(
+    group: zarr.Group,
+    values: dict[str, np.ndarray],
+    *,
+    chunk_states: int,
+    horizon: int,
+    gamma: float,
+) -> None:
+    """Write the derived dense finite-candidate training view."""
+
+    state_count = int(values["state_step_row_id"].shape[0])
+    max_candidates = int(values["candidate_row_id"].shape[1]) if values["candidate_row_id"].ndim == 2 else 0
+    group.attrs.update(
+        {
+            "view_role": "training_core_derived_cache",
+            "source_tables": "steps,candidates,rollouts,targets",
+            "state_count": state_count,
+            "max_candidates": max_candidates,
+            "horizon": int(horizon),
+            "discount_gamma": float(gamma),
+            "chunk_states": int(chunk_states),
+        }
+    )
+    for name in Q_H_ARRAY_NAMES:
+        _write_q_h_array(group, name, values[name], chunk_states=chunk_states)
 
 
 def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> dict[str, np.ndarray]:
@@ -1536,6 +1916,7 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
 
     q = {
         "state_step_row_id": step_ids,
+        "source_row_id": np.full((state_count,), -1, dtype=np.int64),
         "candidate_row_id": np.full((state_count, max_candidates), -1, dtype=np.int64),
         "valid_action_mask": np.zeros((state_count, max_candidates), dtype=np.bool_),
         "q_train_mask": np.zeros((state_count, max_candidates), dtype=np.bool_),
@@ -1565,7 +1946,9 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
         rollout_id = int(steps["rollout_row_id"][row])
         rollout_matches = np.nonzero(rollouts["rollout_row_id"] == rollout_id)[0]
         if rollout_matches.size == 1:
-            q["target_row_id"][row] = int(rollouts["target_row_id"][int(rollout_matches[0])])
+            rollout_row = int(rollout_matches[0])
+            q["source_row_id"][row] = int(rollouts["source_row_id"][rollout_row])
+            q["target_row_id"][row] = int(rollouts["target_row_id"][rollout_row])
         selected_local_index = -1
         for local_index, candidate_index in enumerate(indices):
             q["candidate_row_id"][row, local_index] = int(candidates["candidate_row_id"][candidate_index])
@@ -1594,6 +1977,11 @@ def _build_q_h_arrays(tables: _RolloutTables, *, horizon: int, gamma: float) -> 
     return q
 
 
+def _table_horizon(tables: _RolloutTables) -> int:
+    values = tables.rollouts["horizon"]
+    return int(values.max()) if values.size else 1
+
+
 def _rows_to_numpy_table(rows: dict[str, list[Any]], schema: _TableSchema) -> dict[str, np.ndarray]:
     expected = set(schema.names)
     if set(rows) != expected:
@@ -1603,6 +1991,30 @@ def _rows_to_numpy_table(rows: dict[str, list[Any]], schema: _TableSchema) -> di
     return {name: np.asarray(rows[name], dtype=dtype) for name, dtype in schema.dtypes.items()}
 
 
+def _rows_to_numpy_selected_depth_table(
+    rows: dict[str, list[Any]],
+    *,
+    width_px: int,
+    height_px: int,
+) -> dict[str, np.ndarray]:
+    expected = set(SELECTED_DEPTH_TABLE.names) | {"depth_m", "valid_mask"}
+    if set(rows) != expected:
+        missing = sorted(expected - set(rows))
+        extra = sorted(set(rows) - expected)
+        raise ValueError(f"Selected-depth fields do not match schema; missing={missing}, extra={extra}.")
+    table = {name: np.asarray(rows[name], dtype=dtype) for name, dtype in SELECTED_DEPTH_TABLE.dtypes.items()}
+    for name in ("focal_px", "principal_point_px", "image_size_hw"):
+        dtype = SELECTED_DEPTH_TABLE.dtypes[name]
+        table[name] = np.asarray(rows[name], dtype=dtype).reshape((-1, 2))
+    if rows["depth_m"]:
+        table["depth_m"] = np.stack(rows["depth_m"], axis=0).astype(np.float16, copy=False)
+        table["valid_mask"] = np.stack(rows["valid_mask"], axis=0).astype(np.bool_, copy=False)
+    else:
+        table["depth_m"] = np.empty((0, int(height_px), int(width_px)), dtype=np.float16)
+        table["valid_mask"] = np.empty((0, int(height_px), int(width_px)), dtype=np.bool_)
+    return table
+
+
 def _read_tables_from_root(root: Any) -> _RolloutTables:
     return _RolloutTables(
         sources=_read_group_table(root, SOURCE_TABLE),
@@ -1610,11 +2022,43 @@ def _read_tables_from_root(root: Any) -> _RolloutTables:
         lineage=_read_group_table(root, LINEAGE_TABLE),
         steps=_read_group_table(root, STEP_TABLE),
         candidates=_read_group_table(root, CANDIDATE_TABLE),
+        selected_depth=_read_selected_depth_table(root),
     )
 
 
 def _read_group_table(root: Any, schema: _TableSchema) -> dict[str, np.ndarray]:
     return {field.name: np.asarray(root[f"{schema.name}/{field.name}"]) for field in schema.fields}
+
+
+def _read_selected_depth_table(root: Any) -> dict[str, np.ndarray]:
+    group = root["selected_depth"]
+    values = {field.name: np.asarray(group[field.name]) for field in SELECTED_DEPTH_TABLE.fields}
+    values["depth_m"] = np.empty((0, 0, 0), dtype=np.float16)
+    values["valid_mask"] = np.empty((0, 0, 0), dtype=bool)
+    return values
+
+
+def _read_q_h_arrays(root: Any) -> dict[str, np.ndarray]:
+    group = root["q_h"]
+    return {name: np.asarray(group[name]) for name in Q_H_ARRAY_NAMES}
+
+
+def _read_q_h_arrays_if_present(root: Any) -> dict[str, np.ndarray]:
+    if "q_h" not in root:
+        return {}
+    group = root["q_h"]
+    return {name: np.asarray(group[name]) for name in Q_H_ARRAY_NAMES if name in group}
+
+
+def _q_h_arrays_for_validation(root: Any) -> dict[str, np.ndarray]:
+    values = _read_q_h_arrays_if_present(root)
+    if all(name in values for name in Q_H_ARRAY_NAMES):
+        return values
+    return _build_q_h_arrays(
+        _read_tables_from_root(root),
+        horizon=_stored_horizon(root),
+        gamma=float(root.attrs.get("discount_gamma", 1.0)),
+    )
 
 
 def _stored_horizon(root: Any) -> int:
@@ -1630,6 +2074,41 @@ def _max_candidates_per_step(steps: dict[str, np.ndarray], candidates: dict[str,
 def _write_array(group: zarr.Group, name: str, values: np.ndarray) -> zarr.Array:
     array = np.asarray(values)
     chunks = _default_chunks(array)
+    zarr_array = group.create_array(name, shape=array.shape, chunks=chunks, dtype=array.dtype, overwrite=True)
+    zarr_array[...] = array
+    return zarr_array
+
+
+def _write_selected_depth_array(
+    group: zarr.Group,
+    name: str,
+    values: np.ndarray,
+    *,
+    chunk_steps: int,
+) -> zarr.Array:
+    array = np.asarray(values)
+    chunks = _selected_depth_chunks(array, chunk_steps=chunk_steps)
+    zarr_array = group.create_array(
+        name,
+        shape=array.shape,
+        chunks=chunks,
+        dtype=array.dtype,
+        compressors=_selected_depth_compressors(array.dtype),
+        overwrite=True,
+    )
+    zarr_array[...] = array
+    return zarr_array
+
+
+def _write_q_h_array(
+    group: zarr.Group,
+    name: str,
+    values: np.ndarray,
+    *,
+    chunk_states: int,
+) -> zarr.Array:
+    array = np.asarray(values)
+    chunks = _q_h_chunks(array, chunk_states=chunk_states)
     zarr_array = group.create_array(name, shape=array.shape, chunks=chunks, dtype=array.dtype, overwrite=True)
     zarr_array[...] = array
     return zarr_array
@@ -1651,6 +2130,42 @@ def _default_chunks(array: np.ndarray) -> tuple[int, ...] | None:
     if array.ndim == 1:
         return (min(max(int(array.shape[0]), 1), 1024),)
     return (1, *array.shape[1:])
+
+
+def _selected_depth_chunks(array: np.ndarray, *, chunk_steps: int) -> tuple[int, ...]:
+    if array.ndim != 3:
+        raise ValueError(f"Selected-depth arrays must have shape (D,H,W), got {array.shape}.")
+    first = max(1, min(int(chunk_steps), max(int(array.shape[0]), 1)))
+    return (first, int(array.shape[1]), int(array.shape[2]))
+
+
+def _q_h_chunks(array: np.ndarray, *, chunk_states: int) -> tuple[int, ...] | None:
+    if array.ndim == 0:
+        return None
+    first = max(1, min(int(chunk_states), max(int(array.shape[0]), 1)))
+    if array.ndim == 1:
+        return (first,)
+    if array.ndim == 2:
+        second = max(1, int(array.shape[1]))
+        return (first, second)
+    return (first, *tuple(max(1, int(dim)) for dim in array.shape[1:]))
+
+
+def _q_h_arrays_differ(actual: np.ndarray, expected: np.ndarray) -> bool:
+    if np.issubdtype(actual.dtype, np.floating):
+        return not np.allclose(actual, expected, equal_nan=True)
+    return not np.array_equal(actual, expected)
+
+
+def _selected_depth_compressors(dtype: np.dtype[Any]) -> tuple[BloscCodec, ...]:
+    return (
+        BloscCodec(
+            typesize=np.dtype(dtype).itemsize,
+            cname=BloscCname.zstd,
+            clevel=5,
+            shuffle=BloscShuffle.bitshuffle,
+        ),
+    )
 
 
 def _dict_id(values: list[str], value: str) -> int:
@@ -1708,6 +2223,15 @@ def _fixed_float_vector(value: Any, *, length: int) -> np.ndarray:
     array = np.asarray(value, dtype=np.float32).reshape(-1)
     if array.shape[0] != length:
         return np.full((length,), np.nan, dtype=np.float32)
+    return array
+
+
+def _selected_depth_image_size(step: CounterfactualStepResult, *, height: int, width: int) -> np.ndarray:
+    if step.selected_depth_image_size_hw is None:
+        return np.asarray([height, width], dtype=np.int32)
+    array = np.asarray(step.selected_depth_image_size_hw, dtype=np.int32).reshape(-1)
+    if array.shape[0] != 2:
+        return np.asarray([height, width], dtype=np.int32)
     return array
 
 

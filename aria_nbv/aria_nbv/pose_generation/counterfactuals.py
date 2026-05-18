@@ -254,6 +254,11 @@ class CounterfactualStepResult:
     selected_metrics: dict[str, float] = field(default_factory=dict)
     metric_vectors: dict[str, torch.Tensor] = field(default_factory=dict)
     selected_point_cloud_world: torch.Tensor | None = None
+    selected_depth_m: torch.Tensor | None = None
+    selected_depth_valid_mask: torch.Tensor | None = None
+    selected_depth_focal_px: tuple[float, float] | None = None
+    selected_depth_principal_point_px: tuple[float, float] | None = None
+    selected_depth_image_size_hw: tuple[int, int] | None = None
 
     @property
     def selected_pose_world(self) -> PoseTW:

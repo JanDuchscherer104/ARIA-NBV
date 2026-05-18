@@ -73,12 +73,18 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert manifest["counts"]["rollouts"] == result.num_rollouts
     assert manifest["counts"]["steps"] == result.num_steps
     assert manifest["counts"]["candidates"] == result.num_candidates
+    assert manifest["counts"]["q_h_states"] == result.num_steps
     assert manifest["generation"]["invocation"]["mode"] == "programmatic"
     assert manifest["source_coverage"]["scene_counts"] == {"fixture_box": 3}
     assert manifest["source_coverage"]["source_shard_counts"] == {"vin-shard-000000": 3}
     assert "splits" not in reader.root
     assert "sources" in reader.root
-    assert "q_h" not in reader.root
+    assert "q_h" in reader.root
+    assert "selected_depth" in reader.root
+    assert reader.root.attrs["q_h_view_persisted"] is True
+    assert reader.root.attrs["q_h_view_role"] == "training_core_derived_cache"
+    assert reader.root.attrs["q_h_chunk_states"] == 64
+    assert reader.root.attrs["q_h_state_count"] == result.num_steps
     assert set(reader.array("sources/source_row_id").tolist()) == {0, 1, 2}
     assert set(reader.array("rollouts/source_row_id").tolist()) == {0, 1, 2}
     root_pose = reader.array("rollouts/root_pose_world")
@@ -89,18 +95,61 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     selection_probabilities = reader.array("candidates/selection_probabilities")
     assert np.all(selection_probabilities[~candidate_valid] == 0.0)
     assert np.all(reader.array("candidates/selected_mask") <= candidate_valid)
+    selected_depth = reader.root["selected_depth"]
+    assert selected_depth.attrs["enabled"] is True
+    assert selected_depth.attrs["codec"] == "blosc:zstd:clevel=5:bitshuffle"
+    assert selected_depth.attrs["renderer"] == "Pytorch3DDepthRenderer"
+    assert selected_depth.attrs["source_resolution"] == "exact_output_size"
+    assert reader.root.attrs["selected_depth_role"] == "q_h_history_only"
+    assert reader.root.attrs["selected_depth_znear_m"] == pytest.approx(0.001)
+    assert reader.root.attrs["selected_depth_zfar_m"] == pytest.approx(20.0)
+    assert selected_depth["depth_m"].dtype == np.dtype(np.float16)
+    assert selected_depth["valid_mask"].dtype == np.dtype(np.bool_)
+    assert selected_depth["depth_m"].shape == (result.num_steps, 240, 240)
+    assert selected_depth["valid_mask"].shape == (result.num_steps, 240, 240)
+    assert selected_depth["depth_m"].chunks == (min(16, result.num_steps), 240, 240)
+    assert np.array_equal(reader.array("selected_depth/step_row_id"), reader.array("steps/step_row_id"))
+    assert np.array_equal(
+        reader.array("selected_depth/candidate_row_id"),
+        reader.array("steps/selected_candidate_row_id"),
+    )
 
-    assert "q_h" not in reader.root
     q_h = reader.q_h_view()
+    q_h_group = reader.root["q_h"]
+    assert q_h_group.attrs["view_role"] == "training_core_derived_cache"
+    assert q_h_group.attrs["chunk_states"] == 64
+    assert q_h_group.attrs["state_count"] == result.num_steps
     q_candidate_row_id = q_h["candidate_row_id"]
     valid_action_mask = q_h["valid_action_mask"]
     q_train_mask = q_h["q_train_mask"]
 
+    assert np.array_equal(reader.array("q_h/state_step_row_id"), q_h["state_step_row_id"])
+    assert set(q_h["source_row_id"].tolist()) == {0, 1, 2}
     assert q_candidate_row_id.shape == valid_action_mask.shape
     assert np.all(q_train_mask <= valid_action_mask)
     assert "q_target_target_rri" not in q_h
     assert np.all(~valid_action_mask[q_candidate_row_id < 0])
     assert np.allclose(q_h["discount"][:2], np.asarray([1.0, 0.95], dtype=np.float32))
+    derived_q_h = reader.q_h_view(discount_gamma=0.95)
+    for name, actual in q_h.items():
+        expected = derived_q_h[name]
+        if np.issubdtype(actual.dtype, np.floating):
+            assert np.allclose(actual, expected, equal_nan=True)
+        else:
+            assert np.array_equal(actual, expected)
+
+
+def test_rollout_zarr_validation_requires_selected_depth_when_enabled(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=9)[:1]
+    for step in _steps(records[0]):
+        step.selected_depth_m = None
+        step.selected_depth_valid_mask = None
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("selected_depth/step_row_id" in error or "selected-depth" in error for error in validation.errors)
 
 
 def test_rollout_zarr_selected_action_td_fields_align_with_step_rows(tmp_path) -> None:

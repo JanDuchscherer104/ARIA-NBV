@@ -282,7 +282,7 @@ $
 
 == Candidate Transitions
 
-Selecting a candidate means choosing a valid index $a_t=i in cal(A)_t$ and then rendering or retrieving only $q_(t,i)$ for the transition. Oracle rendering follows the repository's PyTorch3D depth-rendering path, so camera-frame and rasterizer conventions are part of the label contract rather than model input @PyTorch3D-Cameras-2025. Greedy selection chooses the highest current score; temperature-softmax widens rollout support over valid candidate scores; Gumbel-Top-$K$ is a deferred diversity method if temperature-softmax produces insufficient branch diversity:
+Selecting a candidate means choosing a valid index $a_t=i in cal(A)_t$ and then rendering or retrieving only $q_(t,i)$ for the transition. Oracle rendering follows the repository's PyTorch3D depth-rendering path, so camera-frame and rasterizer conventions are part of the label contract rather than model input @PyTorch3D-Cameras-2025. The current rollout writer keeps the all-candidate #RRI scoring render low-resolution and then re-renders only materialized selected actions as losslessly compressed high-resolution depth in `rollouts.zarr`. These selected-depth rasters become the durable actor-history observation for #symb.rl.qh/history encoders, while #symb.vin.field_evl_0 stays frozen for the first value-learning path. Greedy selection chooses the highest current score; temperature-softmax widens rollout support over valid candidate scores; Gumbel-Top-$K$ is a deferred diversity method if temperature-softmax produces insufficient branch diversity:
 
 $
   P(a_t = i | s_t)

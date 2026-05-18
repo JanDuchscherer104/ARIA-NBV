@@ -178,6 +178,22 @@ class RerunInspectorRolloutPlotConfig(BaseConfig):
     """Reserved forensic mode; default plots only selected, top-k, and fanout summaries."""
 
 
+class RerunInspectorRolloutDepthConfig(BaseConfig):
+    """Selected-depth visualization policy for rollout-Zarr inspection."""
+
+    enabled: bool = True
+    """Log selected-action depth rasters when ``rollouts.zarr/selected_depth`` is available."""
+
+    colormap: str = "turbo"
+    """Rerun depth colormap used for selected-depth images."""
+
+    point_fill_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
+    """Rerun point fill ratio for back-projected selected-depth pixels."""
+
+    require_selected_depth: bool = False
+    """Raise when selected-depth rows are missing instead of logging metadata warnings."""
+
+
 class RerunInspectorEfmVoxelConfig(BaseConfig):
     """EFM voxel-field visualization policy."""
 
@@ -309,6 +325,9 @@ class RerunOfflineInspectorConfig(TargetConfig[Any]):
     rollout_plots: RerunInspectorRolloutPlotConfig = Field(default_factory=RerunInspectorRolloutPlotConfig)
     """Rollout branch/RRI scalar plotting policy."""
 
+    rollout_depths: RerunInspectorRolloutDepthConfig = Field(default_factory=RerunInspectorRolloutDepthConfig)
+    """Selected-depth visualization policy for rollout-Zarr inspection."""
+
     efm_voxels: RerunInspectorEfmVoxelConfig = Field(default_factory=RerunInspectorEfmVoxelConfig)
     """EFM voxel-field visualization settings."""
 
@@ -328,6 +347,7 @@ __all__ = [
     "RerunInspectorOutputConfig",
     "RerunInspectorPerformanceConfig",
     "RerunInspectorPrimitivesConfig",
+    "RerunInspectorRolloutDepthConfig",
     "RerunInspectorRolloutPlotConfig",
     "RerunInspectorSelectionConfig",
     "RerunOfflineInspectorConfig",

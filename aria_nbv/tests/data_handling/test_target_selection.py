@@ -248,6 +248,19 @@ def test_selector_rejects_vin_oracle_batch_input() -> None:
         _selector(k=1).select(sample.to_vin_oracle_batch())
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
+def test_selector_handles_cuda_reference_pose_with_cpu_obbs() -> None:
+    sample = _sample(detected_obbs=_obb_block([[0.0, 0.0, 0.0]]), points=[[0.0, 0.0, 0.0]])
+    sample.oracle.reference_pose_world_rig = PoseTW(sample.oracle.reference_pose_world_rig.tensor().cuda())
+
+    result = _selector(k=1).select(sample)
+
+    assert len(result.selected_rows) == 1
+    assert result.selected_rows[0].relative_pose_reference_object == pytest.approx(
+        (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+    )
+
+
 def test_selected_target_matches_compatible_gt_obb() -> None:
     detected = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[10])
     gt = _obb_block([[0.0, 0.0, 0.0]], sem_ids=[1], inst_ids=[99])

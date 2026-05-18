@@ -38,7 +38,7 @@ flowchart LR
   end
 
   subgraph Replay["Derived multi-step replay"]
-    RolloutStore["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr}}\\\\\\text{manifest-backed factual tables}\\\\ G_0^{(H)},\\ Q_H\\ \\text{view}\\end{array}$$"]
+    RolloutStore["$$\\begin{array}{c}\\textbf{\\texttt{rollouts.zarr}}\\\\\\text{manifest-backed factual tables}\\\\\\texttt{selected\\_depth/}+\\texttt{q\\_h/}\\end{array}$$"]
   end
 
   subgraph Consumers["Consumers"]

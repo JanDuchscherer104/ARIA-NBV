@@ -133,6 +133,11 @@ def _attach_fixture_candidate_provenance(result: CounterfactualRolloutResult) ->
             step.candidates.strategy_id = torch.arange(n, dtype=torch.int64) % 4
             step.candidates.mixture_id = torch.arange(n, dtype=torch.int64) % 2
             step.candidates.sampler_probability = torch.full((n,), 1.0 / float(max(n, 1)), dtype=torch.float32)
+            step.selected_depth_m = torch.full((240, 240), 1.0 + float(step.step_index), dtype=torch.float32)
+            step.selected_depth_valid_mask = torch.ones((240, 240), dtype=torch.bool)
+            step.selected_depth_focal_px = (120.0, 120.0)
+            step.selected_depth_principal_point_px = (120.0, 120.0)
+            step.selected_depth_image_size_hw = (240, 240)
 
 
 def _config_hash(config: BaseConfig) -> str:

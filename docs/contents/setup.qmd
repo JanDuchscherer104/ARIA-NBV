@@ -136,6 +136,11 @@ Relative immutable-store names such as `vin_offline` resolve under
 Use copied local TOML configs with absolute paths when a machine needs a
 different data mount.
 
+This public setup page covers prerequisites, raw ASE access, and lightweight
+smoke commands. The active operator runbook for local and LRZ data generation
+recipes lives in `aria_nbv/aria_nbv/data_handling/README.md`; keep volatile
+campaign commands there rather than duplicating them in Quarto.
+
 ## ASE Access and Weights {#ase-access-and-weights}
 
 Request ASE access through the
@@ -187,9 +192,9 @@ uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
 
 ## One-Scene Smoke {#one-scene-smoke}
 
-Use the focused [one-scene smoke checks](impl/one_scene_smoke.qmd) before
-touching larger stores. The sidecar smoke config writes one sample to
-`vin_offline_rerun_smoke_v7`:
+Use the focused one-scene smoke checks before touching larger stores. The
+data-handling README owns the active local and LRZ command recipes; the sidecar
+smoke config writes one sample to `vin_offline_rerun_smoke_v7`:
 
 ```sh
 cd aria_nbv

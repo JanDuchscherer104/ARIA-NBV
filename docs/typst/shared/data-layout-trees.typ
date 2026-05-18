@@ -139,7 +139,8 @@
           - #code("rollout_row_id + step_index") -- time index $t$ #array_node
         - #code-strong("candidates/") -- finite candidate shell per step #group
           - #code("step_row_id + shell_index") -- candidate row $q_(t,i)$ #array_node
-        - #code-strong("q_h_view()") -- reader-derived tensors from steps and candidates #derived
+        - #code-strong("selected_depth/") -- selected-action history depth #group
+        - #code-strong("q_h/") -- persisted derived training view #derived
   ]
 }
 
@@ -159,7 +160,7 @@
     orientation: orientation,
   )
   tree[
-    - #code-strong("rollouts.zarr/") -- schema 0.4 manifested shard #group
+    - #code-strong("rollouts.zarr/") -- schema 0.5 selected-depth shard #group
       - #code("zarr.json") -- compact attrs, counts, manifest hash #leaf
       - #code("manifest.json") -- resolved config, TOML, provenance, coverage #leaf
       - #code-strong("metadata/") #group
@@ -220,7 +221,16 @@
         - provenance and invalidity #group
           - #code("strategy_id, mixture_id") -- int32[C] provenance #array_node
           - #code("invalid_reason_bitset") -- uint32[C] #array_node
-      - #code-strong("q_h_view()") -- derived from steps + candidates; not persisted #derived
+      - #code-strong("selected_depth/") -- selected-action history rasters #group
+        - #code("step_row_id, candidate_row_id") -- int64[T] links #array_node
+        - #code("depth_m") -- float16[T,240,240], metres #array_node
+        - #code("valid_mask") -- bool[T,240,240] #array_node
+      - #code-strong("q_h/") -- derived hot training view, validated from row tables #derived
+        - #code("source_row_id, target_row_id") -- state joins #array_node
+        - #code("candidate_row_id, valid_action_mask") -- [T,N_q] #array_node
+        - #code("q_train_mask") -- training mask #array_node
+        - #code("one_step_target_rri") -- $r_t^e(q_(t,i))$; float32[T,N_q] #array_node
+        - #code("td_* and bootstrap_*") -- selected transition links #array_node
   ]
 }
 
@@ -273,9 +283,9 @@
             - #code-strong("retained_depth/") -- optional selected-heavy payload #group
               - #code("depth") -- $#symb.oracle.depth_q$; float16[H_img,W_img] #array_node
               - #code("valid_mask") -- $#symb.oracle.mask_q$; bool[H_img,W_img] #array_node
-        - #code-strong("q_h_view()") -- derived reader tensors, shape [H,N_q] #derived
+        - #code-strong("q_h/") -- persisted derived tensors, shape [H,N_q] #derived
           - #code("candidate ids, masks, rewards") -- selected-transition view #array_node
-          - #code("terminal/bootstrap fields") -- computed at read time #array_node
+          - #code("terminal/bootstrap fields") -- validated from row tables #array_node
   ]
 }
 
@@ -307,7 +317,8 @@
             - #code("metadata/, dictionaries/") #group
             - #code("sources/, targets/, rollouts/") #group
             - #code("lineage/, steps/, candidates/") #group
-            - #code("depths/") -- optional retention profile #group
+            - #code("selected_depth/") -- selected-action depth profile #group
+            - #code("q_h/") -- persisted derived training view #group
             - #code("diagnostics/") -- optional inspection payloads #group
           - #code-strong("shard=000001.zarr/") -- same contract #group
         - #code-strong("split=val/") -- independent validation shards #group

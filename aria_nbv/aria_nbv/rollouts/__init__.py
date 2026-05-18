@@ -12,6 +12,7 @@ from .dataset_writer import (
     RolloutDatasetWriterConfig,
     RolloutDatasetWriterStats,
     RolloutRecipeConfig,
+    SelectedDepthRetentionConfig,
 )
 from .manifest import (
     ROLLOUT_MANIFEST_FILENAME,
@@ -69,6 +70,7 @@ __all__ = [
     "RolloutDatasetWriterStats",
     "RolloutLineage",
     "RolloutRecipeConfig",
+    "SelectedDepthRetentionConfig",
     "RolloutShardCampaignStatus",
     "RolloutShardEntry",
     "RolloutShardRow",

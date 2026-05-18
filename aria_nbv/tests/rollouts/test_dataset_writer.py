@@ -12,8 +12,14 @@ from typing import Any
 
 import msgspec
 import pytest
+import torch
 
-from aria_nbv.rollouts.dataset_writer import RolloutDatasetWriter, _RolloutSourceLineageBuilder
+from aria_nbv.rendering import CandidateDepthRendererConfig
+from aria_nbv.rollouts.dataset_writer import (
+    RolloutDatasetWriter,
+    SelectedDepthRetentionConfig,
+    _RolloutSourceLineageBuilder,
+)
 from aria_nbv.rollouts.manifest import RolloutStoreManifestContext
 from aria_nbv.rollouts.shard_manifest import RolloutShardEntry, canonical_rollout_shard_id, write_rollout_shard_manifest
 from aria_nbv.rollouts.shards import plan_rollout_shards, run_rollout_shard, summarize_rollout_shard_campaign
@@ -23,6 +29,30 @@ from tests.rollout_fixtures import build_rollout_records
 
 class _FakeManifest(msgspec.Struct):
     version: int = 7
+
+
+class _FakeSelectedDepthRenderer:
+    def __init__(self, *, height: int, width: int) -> None:
+        self.height = height
+        self.width = width
+        self.calls: list[tuple[object, list[int]]] = []
+
+    def render_compact_indices(self, sample: object, candidates: object, compact_indices: list[int]):
+        del sample
+        self.calls.append((candidates, list(compact_indices)))
+        shell_indices = candidates.candidate_shell_indices(device=torch.device("cpu"))
+        selected_shell_index = shell_indices[int(compact_indices[0])]
+        camera = SimpleNamespace(
+            f=torch.tensor([[10.0, 11.0]], dtype=torch.float32),
+            c=torch.tensor([[2.0, 3.0]], dtype=torch.float32),
+            size=torch.tensor([[float(self.width), float(self.height)]], dtype=torch.float32),
+        )
+        return SimpleNamespace(
+            depths=torch.ones((1, self.height, self.width), dtype=torch.float32),
+            depths_valid_mask=torch.ones((1, self.height, self.width), dtype=torch.bool),
+            candidate_indices=selected_shell_index.reshape(1),
+            camera=camera,
+        )
 
 
 class _FakeSource:
@@ -118,6 +148,41 @@ def test_split_manifest_hash_tracks_source_rows_and_order() -> None:
 
     assert base != reordered
     assert base != changed_source
+
+
+def test_selected_depth_renderer_config_sets_exact_size_atomically() -> None:
+    base = CandidateDepthRendererConfig(output_width_px=None, output_height_px=None)
+
+    cfg = SelectedDepthRetentionConfig(width_px=240, height_px=240).renderer_config(base)
+
+    assert cfg.max_candidates_final == 1
+    assert cfg.resolution_scale is None
+    assert cfg.output_width_px == 240
+    assert cfg.output_height_px == 240
+
+
+def test_rollout_writer_selected_depth_render_is_once_per_materialized_step() -> None:
+    records = build_rollout_records(horizon=2, num_samples=6, seed=35)[:1]
+    for trajectory in records[0].result.trajectories:
+        for step in trajectory.steps:
+            step.selected_depth_m = None
+            step.selected_depth_valid_mask = None
+    fake_renderer = _FakeSelectedDepthRenderer(height=4, width=5)
+    writer = RolloutDatasetWriter.__new__(RolloutDatasetWriter)
+    writer.config = SimpleNamespace(selected_depth=SimpleNamespace(height_px=4, width_px=5))
+
+    writer._attach_selected_depths(
+        result=records[0].result,
+        sample=SimpleNamespace(efm_snippet_view=object()),
+        renderer=fake_renderer,
+    )
+
+    materialized_steps = [step for trajectory in records[0].result.trajectories for step in trajectory.steps]
+    assert len(fake_renderer.calls) == len(materialized_steps)
+    for step in materialized_steps:
+        assert step.selected_depth_m.shape == (4, 5)
+        assert step.selected_depth_valid_mask.shape == (4, 5)
+        assert step.selected_depth_image_size_hw == (4, 5)
 
 
 def test_rollout_shard_manifest_planning_is_deterministic_and_order_sensitive(tmp_path: Path) -> None:

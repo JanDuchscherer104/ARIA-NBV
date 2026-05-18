@@ -352,7 +352,7 @@ class ActorVisibleTargetSelector:
         obbs = ObbTW(valid_data)
         semidense_points = _semidense_points(sample, max_points=self.config.max_support_points)
         evl_points, evl_counts = _evl_support_points(sample, max_points=self.config.max_support_points)
-        reference_pose = _reference_pose_world_rig(sample)
+        reference_pose = _pose_on_device(_reference_pose_world_rig(sample), device=valid_data.device)
         scene_id = _first_scalar_string(sample.scene_id)
         snippet_id = _first_scalar_string(sample.snippet_id)
 
@@ -685,6 +685,12 @@ def _snippet_t_world_snippet(sample: "VinOfflineSample") -> PoseTW | None:
 
 def _reference_pose_world_rig(sample: "VinOfflineSample") -> PoseTW:
     return PoseTW(sample.oracle.reference_pose_world_rig.tensor().reshape(-1, 12)[:1])
+
+
+def _pose_on_device(pose: PoseTW, *, device: torch.device) -> PoseTW:
+    """Return ``pose`` on ``device`` so PoseTW composition does not mix devices."""
+
+    return PoseTW(pose.tensor().detach().to(device=device))
 
 
 def _semidense_points(sample: "VinOfflineSample", *, max_points: int) -> Tensor:

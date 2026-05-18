@@ -47,6 +47,16 @@ Root attributes:
 | `target_protocol_version` | yes | V0/V1 target contract version. |
 | `return_semantics` | yes | Example: `cumulative_target_rri`. |
 | `field_retention_policy` | yes | Example: `compact`, `selected_heavy`, or `audit`. |
+| `selected_depth_enabled` | yes | True when one selected-action depth row is required for every step. |
+| `selected_depth_width_px`, `selected_depth_height_px` | when enabled | Persisted selected-action raster size; default `240 x 240`. |
+| `selected_depth_dtype`, `selected_depth_valid_mask_dtype` | when enabled | Default `float16` depth and `bool` mask. |
+| `selected_depth_units` | when enabled | Metric metres. |
+| `selected_depth_invalid_fill_value` | when enabled | Default `0.0`; valid pixels are defined by the separate mask. |
+| `selected_depth_codec` | when enabled | Default `blosc:zstd:clevel=5:bitshuffle`. |
+| `selected_depth_chunk_steps` | when enabled | Default first chunk dimension, currently `16`. |
+| `selected_depth_role` | when enabled | Default `q_h_history_only`; not an oracle-label semantic. |
+| `selected_depth_renderer`, `selected_depth_znear_m`, `selected_depth_zfar_m` | when enabled | Renderer identity and depth clip planes. |
+| `selected_depth_source_resolution` | when enabled | Default `exact_output_size`; selected-depth output is rendered directly at persisted size. |
 
 Variable-length strings can be dictionary encoded. A future writer may use
 Zarr string dtypes where appropriate, but row linkage should not depend on
@@ -92,19 +102,33 @@ rollouts.zarr/
     candidate_pose_world_cam
     candidate_pose_relative
     metric_vectors
+  selected_depth/
+    step_row_id
+    candidate_row_id
+    depth_m
+    valid_mask
+    focal_px
+    principal_point_px
+    image_size_hw
   q_h/
     state_step_row_id
+    source_row_id
     candidate_row_id
     valid_action_mask
+    q_train_mask
+    target_row_id
     invalid_reason_bitset
     one_step_target_rri
     one_step_scene_rri
-    q_target_target_rri
-    q_target_scene_rri
     selected_candidate_index
     bootstrap_next_step_row_id
     terminal_mask
     discount
+    td_selected_candidate_row_id
+    td_reward_target_rri
+    td_next_step_row_id
+    td_terminal_mask
+    td_discount
   diagnostics/
     depth
     depth_valid_mask
@@ -211,6 +235,34 @@ target.
 - `step_runtime_ms`;
 - `reason_histogram_offset` for compact per-step invalidity summaries.
 
+## Selected-Action Depth
+
+`selected_depth/` is the durable selected-view observation table for the first
+`Q_H`/history-encoder path. It is separate from oracle transition labels:
+all-candidate RRI scoring continues to use the low-resolution render path
+configured under `target_scorer.depth`, while only materialized selected
+actions are re-rendered at the selected-depth resolution.
+
+Required arrays when `selected_depth_enabled=true`:
+
+| Array | Shape | Dtype | Notes |
+|---|---|---|---|
+| `step_row_id` | `[D]` | `int64` | Must equal `steps/step_row_id`; one row per step. |
+| `candidate_row_id` | `[D]` | `int64` | Must align with `steps/selected_candidate_row_id`. |
+| `depth_m` | `[D, H, W]` | `float16` | Metric metres; invalid pixels filled with `0.0`. |
+| `valid_mask` | `[D, H, W]` | `bool` | True exactly where `depth_m` is valid. |
+| `focal_px` | `[D, 2]` | `float32` | Selected-depth camera focal lengths in pixels. |
+| `principal_point_px` | `[D, 2]` | `float32` | Selected-depth principal point in pixels. |
+| `image_size_hw` | `[D, 2]` | `int32` | Persisted height and width. |
+
+Default retention is `240 x 240`, `float16` depth, `bool` mask, metric metres,
+Zarr v3 Blosc/Zstd level 5 with bitshuffle, and chunks
+`(16, 240, 240)`. `224 x 224` is a training-reader resize option, not the
+persisted artifact. Store/group metadata records the renderer, clip planes,
+source-resolution policy, units, invalid-fill value, and codec; row metadata
+records selected camera intrinsics. Selected-depth metadata must not be folded
+into target-RRI labels or invalidity reasons.
+
 ## Candidate Table
 
 `candidates/candidate_index` columns:
@@ -301,26 +353,36 @@ valid oracle target RRI, valid target record, and non-padded candidate row.
 
 ## Q_H Tensor View
 
-`q_h/` is a dense padded tensor view. The columnar candidate table is still the
-source of truth.
+`q_h/` is a dense padded tensor view persisted as a derived training-hot cache.
+The columnar candidate/step/rollout tables are still the source of truth, and
+validation must reject a store when persisted `q_h/` arrays diverge from those
+factual tables.
 
 Recommended tensor shapes:
 
 | Array | Shape | Dtype | Fill |
 |---|---|---|---|
 | `state_step_row_id` | `[S]` | `int64` | none |
+| `source_row_id` | `[S]` | `int64` | none |
 | `candidate_row_id` | `[S, C_max]` | `int64` | `-1` |
 | `valid_action_mask` | `[S, C_max]` | `bool` | `false` |
+| `q_train_mask` | `[S, C_max]` | `bool` | `false` |
 | `invalid_reason_bitset` | `[S, C_max]` | `uint32` | `0` for padded plus `valid_action_mask=false` |
 | `target_row_id` | `[S]` | `int64` | none |
 | `selected_candidate_index` | `[S]` | `int16/int32` | `-1` |
 | `one_step_target_rri` | `[S, C_max]` | `float32` | `NaN` |
 | `one_step_scene_rri` | `[S, C_max]` | `float32` | `NaN` |
-| `q_target_target_rri` | `[S, H_max, C_max]` | `float32` | `NaN` |
-| `q_target_scene_rri` | `[S, H_max, C_max]` | `float32` | `NaN` |
 | `bootstrap_next_step_row_id` | `[S, C_max]` | `int64` | `-1` |
 | `terminal_mask` | `[S, C_max]` | `bool` | `true` for terminal or unavailable branch |
 | `discount` | `[H_max]` | `float32` | none |
+| `td_selected_candidate_row_id` | `[S]` | `int64` | `-1` |
+| `td_reward_target_rri` | `[S]` | `float32` | `NaN` |
+| `td_next_step_row_id` | `[S]` | `int64` | `-1` |
+| `td_terminal_mask` | `[S]` | `bool` | `true` |
+| `td_discount` | `[S]` | `float32` | configured gamma |
+
+Multi-step target tensors such as `q_target_target_rri[S,H,C]` are future
+derived views, not part of the current schema `0.5-selected-depth` writer.
 
 Array attributes must record:
 
@@ -340,6 +402,7 @@ different `return_semantics` attribute.
 Heavy diagnostics may be materialized for selected actions, retained chains, or
 audit samples:
 
+- high-resolution selected-action depth is canonical under `selected_depth/`;
 - `diagnostics/depth`: rendered depth, ragged or padded by image shape;
 - `diagnostics/depth_valid_mask`;
 - `diagnostics/face_index`;

@@ -32,10 +32,12 @@ from ..pose_generation import (
     CandidateGenerationRuntimeContext,
     CandidateMixtureViewGeneratorConfig,
     CounterfactualPoseGeneratorConfig,
+    CounterfactualRolloutResult,
     CounterfactualSelectionPolicy,
     CounterfactualTargetOracleRriScorerConfig,
     TargetRriInvalidError,
 )
+from ..rendering import CandidateDepthRenderer, CandidateDepthRendererConfig
 from ..utils import BaseConfig, Console, TargetConfig, Verbosity
 from ..utils.fingerprints import stable_config_hash, stable_msgspec_hash
 from .manifest import RolloutStoreInvocation, RolloutStoreManifestContext, collect_runtime_provenance
@@ -151,6 +153,35 @@ class RolloutRecipeConfig(BaseConfig):
         ]
 
 
+class SelectedDepthRetentionConfig(BaseConfig):
+    """High-resolution selected-action depth retention for rollout stores."""
+
+    enabled: bool = True
+    """Persist one selected-action depth map for every materialized rollout step."""
+
+    width_px: int = Field(default=240, ge=1)
+    """Persisted selected-depth width in pixels."""
+
+    height_px: int = Field(default=240, ge=1)
+    """Persisted selected-depth height in pixels."""
+
+    chunk_steps: int = Field(default=16, ge=1)
+    """Number of selected steps per Zarr depth chunk."""
+
+    def renderer_config(self, base: CandidateDepthRendererConfig) -> CandidateDepthRendererConfig:
+        """Return a selected-only renderer config derived from the scorer renderer."""
+
+        return base.model_copy(
+            deep=True,
+            update={
+                "max_candidates_final": 1,
+                "resolution_scale": None,
+                "output_width_px": int(self.width_px),
+                "output_height_px": int(self.height_px),
+            },
+        )
+
+
 class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
     """Configuration for building standalone target-RRI rollout Zarr stores.
 
@@ -190,6 +221,9 @@ class RolloutDatasetWriterConfig(TargetConfig["RolloutDatasetWriter"]):
         default_factory=CounterfactualTargetOracleRriScorerConfig
     )
     """Target-specific oracle scorer that also emits diagnostic scene RRI."""
+
+    selected_depth: SelectedDepthRetentionConfig = Field(default_factory=SelectedDepthRetentionConfig)
+    """High-resolution selected-depth persistence; separate from low-res all-candidate RRI scoring."""
 
     store: RolloutZarrStoreConfig = Field(
         default_factory=lambda: RolloutZarrStoreConfig(
@@ -417,6 +451,7 @@ class RolloutDatasetWriter:
         if not records:
             raise RuntimeError(f"No rollout records were generated; skipped={self.stats.skipped_reasons}")
 
+        selected_depth_renderer_config = self.config.selected_depth.renderer_config(self.config.target_scorer.depth)
         result = write_rollout_zarr_store(
             self.config.store.store_dir,
             records,
@@ -433,6 +468,15 @@ class RolloutDatasetWriter:
                 runtime=collect_runtime_provenance(),
                 shard=None if shard_entry is None else shard_entry.to_jsonable(),
             ),
+            selected_depth_enabled=self.config.selected_depth.enabled,
+            selected_depth_width_px=self.config.selected_depth.width_px,
+            selected_depth_height_px=self.config.selected_depth.height_px,
+            selected_depth_chunk_steps=self.config.selected_depth.chunk_steps,
+            selected_depth_renderer=selected_depth_renderer_config.renderer.target_type.__name__,
+            selected_depth_znear_m=selected_depth_renderer_config.renderer.znear,
+            selected_depth_zfar_m=selected_depth_renderer_config.renderer.zfar,
+            selected_depth_source_resolution="exact_output_size",
+            q_h_chunk_states=self.config.store.q_h_chunk_states,
         )
         self.stats.rollouts_written = int(result.num_rollouts)
         validation = validate_rollout_zarr_store(result.store_dir)
@@ -519,6 +563,11 @@ class RolloutDatasetWriter:
                 f"target={target.target_id}: {exc}",
             )
             return records
+        selected_depth_renderer = (
+            self.config.selected_depth.renderer_config(self.config.target_scorer.depth).setup_target()
+            if self.config.selected_depth.enabled
+            else None
+        )
         for recipe in self.config.recipes:
             rollout_cfg = CounterfactualPoseGeneratorConfig(
                 candidate_config=self.config.candidate_mixture,
@@ -550,6 +599,12 @@ class RolloutDatasetWriter:
                     f"target={target.target_id}: {exc}",
                 )
                 continue
+            if selected_depth_renderer is not None:
+                self._attach_selected_depths(
+                    result=result,
+                    sample=sample,
+                    renderer=selected_depth_renderer,
+                )
 
             prefix = f"{sample.sample_index:08d}-target-{target_rank:02d}-{recipe.name}"
             records.append(
@@ -608,6 +663,43 @@ class RolloutDatasetWriter:
             )
         return records
 
+    def _attach_selected_depths(
+        self,
+        *,
+        result: CounterfactualRolloutResult,
+        sample: VinOfflineSample,
+        renderer: CandidateDepthRenderer,
+    ) -> None:
+        """Render and attach one high-resolution selected-depth map per retained step."""
+
+        if sample.efm_snippet_view is None:
+            raise ValueError("Selected-depth persistence requires sample.efm_snippet_view.")
+        for trajectory in result.trajectories:
+            for step in trajectory.steps:
+                batch = renderer.render_compact_indices(
+                    sample.efm_snippet_view,
+                    step.candidates,
+                    [step.selected_valid_index],
+                )
+                if int(batch.candidate_indices[0].detach().cpu().item()) != int(step.selected_shell_index):
+                    raise RuntimeError("Selected-depth render candidate index does not match selected shell index.")
+                depth = batch.depths[0].detach().cpu().to(dtype=torch.float32).clone()
+                valid_mask = batch.depths_valid_mask[0].detach().cpu().to(dtype=torch.bool).clone()
+                expected_shape = (int(self.config.selected_depth.height_px), int(self.config.selected_depth.width_px))
+                if tuple(depth.shape) != expected_shape:
+                    raise RuntimeError(
+                        f"Selected-depth render shape {tuple(depth.shape)} does not match {expected_shape}."
+                    )
+                camera = batch.camera
+                focal = camera.f.reshape(-1, 2)[0].detach().cpu().to(dtype=torch.float32)
+                principal = camera.c.reshape(-1, 2)[0].detach().cpu().to(dtype=torch.float32)
+                size_wh = camera.size.reshape(-1, 2)[0].detach().cpu().to(dtype=torch.float32)
+                step.selected_depth_m = depth
+                step.selected_depth_valid_mask = valid_mask
+                step.selected_depth_focal_px = (float(focal[0].item()), float(focal[1].item()))
+                step.selected_depth_principal_point_px = (float(principal[0].item()), float(principal[1].item()))
+                step.selected_depth_image_size_hw = (int(size_wh[1].item()), int(size_wh[0].item()))
+
     def _target_selection_temperature(self) -> float | None:
         if self.config.target_selector.policy.value == "temperature_softmax_top_k":
             return float(self.config.target_selector.temperature)
@@ -626,4 +718,5 @@ __all__ = [
     "RolloutDatasetWriterConfig",
     "RolloutDatasetWriterStats",
     "RolloutRecipeConfig",
+    "SelectedDepthRetentionConfig",
 ]

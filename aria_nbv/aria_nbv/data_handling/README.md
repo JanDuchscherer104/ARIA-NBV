@@ -58,8 +58,9 @@ The no-redundancy rule is strict:
 - Expensive EFM/backbone/VIN blocks stay in `vin_offline`.
 - Full meshes and raw snippets stay in ASE/ATEK/EFM source locations.
 - Rollout shards store compact factual replay tables plus lineage hashes.
-- `Q_H` tensors are derived by the reader from `steps/` and `candidates/`;
-  they are not persisted as a duplicate group.
+- `q_h/` is a derived, persisted training-hot view validated from `steps/`,
+  `candidates/`, `rollouts/`, and `targets/`; the factual tables remain
+  canonical.
 - Rich generation metadata lives in top-level `manifest.json`, not duplicated
   into Zarr arrays.
 
@@ -114,6 +115,11 @@ uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
 
 Use `--dry-run` to validate a writer TOML and inspect the resolved store path
 without loading snippets, EVL, or writing shards.
+
+This README owns both the storage contracts and the human/operator data
+generation workflow. The canonical CLI names are `nbv-downloader`,
+`nbv-build-offline`, `nbv-build-rollouts`, `nbv-plan-rollout-shards`,
+`nbv-status-rollout-shards`, `nbv-rollouts-info`, and `nbv-rerun-inspect`.
 
 ### Manifest-Backed Rollout Store
 
@@ -192,11 +198,37 @@ rollouts.zarr/
     scene_rri                           # float32[C]
     strategy_id, mixture_id             # int32[C]
     invalid_reason_bitset               # uint32[C]
+  selected_depth/
+    step_row_id                         # int64[T] -> steps/step_row_id
+    candidate_row_id                    # int64[T] -> candidates/candidate_row_id
+    depth_m                             # compressed float16[T, 240, 240], metres
+    valid_mask                          # compressed bool[T, 240, 240]
+    focal_px, principal_point_px        # float32[T, 2]
+    image_size_hw                       # int32[T, 2]
+  q_h/
+    state_step_row_id                   # int64[T]
+    source_row_id                       # int64[T]
+    candidate_row_id                    # int64[T, N_q]
+    valid_action_mask                   # bool[T, N_q]
+    q_train_mask                        # bool[T, N_q]
+    target_row_id                       # int64[T]
+    selected_candidate_index            # int32[T]
+    one_step_target_rri                 # float32[T, N_q]
+    one_step_scene_rri                  # float32[T, N_q]
+    bootstrap_next_step_row_id          # int64[T, N_q]
+    terminal_mask                       # bool[T, N_q]
+    invalid_reason_bitset               # uint32[T, N_q]
+    td_selected_candidate_row_id        # int64[T]
+    td_reward_target_rri                # float32[T]
+    td_next_step_row_id                 # int64[T]
+    td_terminal_mask                    # bool[T]
+    td_discount, discount               # float32 transition scalars
 ```
 
 `zarr.json` stays compact for Zarr tooling: schema id/version, manifest
 path/hash, source split, row counts, target protocol, return semantics, and
-retention policy. `manifest.json` is the human-readable generation record:
+retention policy, plus the selected-depth and `q_h/` role, resolution, chunk,
+and codec contracts. `manifest.json` is the human-readable generation record:
 resolved writer config, raw TOML hash/text for CLI runs, git/env summary,
 source scene/snippet coverage, config hashes, and aggregate counts. Users can
 inspect it without loading candidate, step, target, or depth arrays.
@@ -377,7 +409,8 @@ rollouts_v1/
         lineage/
         steps/
         candidates/
-        depths/                         # optional retained depth profile
+        selected_depth/                 # required selected-action depth profile
+        q_h/                            # persisted derived training-hot view
         diagnostics/                    # optional inspection payloads
       shard=000001.zarr/
     split=val/
@@ -407,8 +440,9 @@ relationships, not by nested directories:
 | `rollouts/`     | One row per retained branch/chain and policy recipe.                | Per-step candidate rows.                                       |
 | `lineage/`      | Rollout-row id plus config/protocol hashes.                         | Source, target, step, or candidate mirrors.                    |
 | `steps/`        | One row per time step in a rollout chain.                           | Full candidate shell payloads.                                 |
-| `candidates/`   | Full-shell candidate rows, masks, provenance, and RRI labels.       | `Q_H` tensors or duplicated selected-action transition tables. |
-| `depths/`       | Optional retained counterfactual depth renders by retention policy. | Required metadata or source depth streams.                     |
+| `candidates/`   | Full-shell candidate rows, masks, provenance, and RRI labels.       | Materialized training batches or selected-action rasters.      |
+| `selected_depth/` | Required selected-action depth maps for actor-history/Q_H inputs. | All-candidate depth renders or source depth streams.           |
+| `q_h/`          | Derived, chunked training-hot candidate-query tensors.              | Canonical facts that are not reconstructable from row tables.  |
 | `diagnostics/`  | Optional retained heavy debug payloads.                             | Any training-required field.                                   |
 
 Branch points are explicit:
@@ -488,14 +522,11 @@ multi_step_sample/
         invalid_reason_bitset           # rho_(t,i); uint32[N_q]
         target_rri                      # r_t^e(q_(t,i)); float32[N_q]
         scene_rri                       # scene diagnostic; float32[N_q]
-      selected_action_depth/            # optional retained depth payload
-        depth_m_f16                     # float16[H_img, W_img]
-        depth_valid_mask                # bool[H_img, W_img]
-        znear, zfar                     # float32[1]
-        normalization                   # scalar string/dict id
+      selected_action_depth             # backlink to selected_depth/ row
     step_001/
       ...
-  q_h_view()                            # derived reader view, not a Zarr group
+  q_h/ or q_h_view()                    # persisted derived view validated from factual tables
+    source_row_id                       # int64[H]
     candidate_row_id                    # int64[H, N_q]
     valid_action_mask                   # m_(t,i); bool[H, N_q]
     q_train_mask                        # bool[H, N_q]
@@ -511,16 +542,22 @@ multi_step_sample/
 
 In thesis notation, `cal(Q)_t` is the finite candidate set at step `t`, and
 `q_(t,i)` is one candidate pose/view. The default required depth modality is
-the selected-action depth render for `q_(t,i*)`, because that render advances
-the counterfactual state. A heavier retention profile may also store depth
-renders for every actor-valid `q_(t,i)`.
+the selected-action depth render for `q_(t,i*)`, because it is the durable
+actor-history observation used by future Q_H/history encoders. The current
+transition/RRI semantics still advance from the low-resolution selected point
+cloud emitted by the oracle path. A heavier retention profile may also store
+depth renders for every actor-valid `q_(t,i)`.
 
 ## Multi-Step Oracle Generation
 
 The rollout generator reuses immutable VIN rows for cached substrate features
-and raw snippet/mesh references for counterfactual rendering. It only advances
-the counterfactual state with the selected action depth; oracle labels for all
-valid candidates remain supervision/evaluation data.
+and raw snippet/mesh references for counterfactual rendering. It renders all
+valid candidates at the low resolution configured under `target_scorer.depth`
+for oracle RRI scoring, then re-renders only selected actions at the
+high-resolution `selected_depth` setting for durable actor-history/Q_H inputs.
+The initial writer keeps the high-resolution selected-depth rasters as
+Q_H/history evidence only; it does not change low-resolution RRI scoring or the
+current transition point-cloud semantics.
 
 ![Rollout generation sequence](../../../docs/figures/diagrams/data_handling/mermaid/rollout_generation_sequence.svg)
 
@@ -543,12 +580,266 @@ Depth storage should be explicit because it dominates rollout-store size.
 | `selected_action_plus_retained` | Selected-action depths plus retained oracle-lookahead beam actions.       | Debugging headroom and beam-chain evidence.                                    |
 | `all_valid_candidate_depth`     | Depth map for every actor-valid candidate row in materialized `cal(Q)_t`. | Optional heavier profile for dense candidate-depth ablations.                  |
 
-Depth maps should be stored as compressed metric `float16` arrays with a
-separate boolean valid mask. Shard metadata must record resolution, renderer,
-`znear`, `zfar`, invalid-fill policy, and normalization used by ML readers.
-Resolution is fixed per shard/profile; mixed depth shapes are a validation
-error. Full RGB, source depth streams, full meshes, and backbone tensors stay
-in their source stores and are referenced by path/hash/version.
+The default selected-depth profile stores metric metres as compressed
+`float16[T, 240, 240]` with invalid pixels filled by `0.0`, plus a separate
+compressed boolean valid mask. The lossless Zarr v3 codec contract is
+Blosc/Zstd level 5 with bitshuffle and `(16, 240, 240)` step chunks. The
+persisted artifact stays at the configured selected-depth resolution; `224x224`
+or other model-specific sizes are reader transforms for training, not stored
+dataset resolution. Shard metadata records resolution, renderer, `znear`, `zfar`,
+invalid-fill policy, and normalization used by ML readers. Resolution is fixed
+per shard/profile; mixed depth shapes are a validation error. Full RGB, source
+depth streams, full meshes, and backbone tensors stay in their source stores
+and are referenced by path/hash/version.
+
+## Operational Data Generation Runbook
+
+Use this runbook for raw ASE/ATEK-EFM input discovery and download, immutable
+VIN offline-store builds, local rollout smoke generation, shard-manifest
+planning, resumable LRZ rollout campaigns, validation, inspection, and common
+failure handling. It is intentionally operator-facing: schema definitions stay
+in the storage sections above, while command recipes and retry rules live here.
+
+### Quick Status
+
+Check the local immutable VIN store before training or rollout generation:
+
+```sh
+cd aria_nbv
+uv run nbv-summary --config-path offline_only.toml
+```
+
+Current compatibility gates:
+
+- VIN offline stores must match `OFFLINE_DATASET_VERSION`, currently `7`.
+- Rollout stores must match `ROLLOUT_ZARR_SCHEMA_VERSION`, currently
+  `0.5-selected-depth`.
+- A rollout store with the current schema can still be untrusted if validation
+  reports missing `manifest.json`, empty `sources/source_shard_id`, negative
+  `sources/source_shard_row`, or another lineage error.
+
+Inspect rollout stores with:
+
+```sh
+cd aria_nbv
+uv run nbv-rollouts-info --store ../.data/offline_cache/rollouts_v1_smoke.zarr --json
+uv run nbv-rollouts-info --store ../.data/offline_cache/rollouts_v1_smoke.zarr --validate
+```
+
+### Raw ASE/ATEK-EFM Inputs
+
+The downloader consumes the Project Aria download URL JSON files under
+`.data/aria_download_urls/`. List available scenes before downloading:
+
+```sh
+cd aria_nbv
+uv run nbv-downloader -m list -c efm -n 10
+```
+
+Download a small local subset with meshes and EFM shards:
+
+```sh
+cd aria_nbv
+uv run nbv-downloader -m download -c efm --ns 1 --max-shards 1
+```
+
+For larger local expansion, increase `--ns` and `--max-shards` deliberately.
+For LRZ, place large raw assets under `$ARIA_DSS/data/raw/`, not `$HOME`.
+
+### VIN Offline Generation
+
+Build immutable one-step stores through `nbv-build-offline`. Use `--dry-run`
+first because it validates the TOML and resolved output path without loading
+snippets, EVL, or writing shards.
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_81286.toml
+```
+
+The default config writes `store_dir = "vin_offline"` under
+`PathConfig().offline_cache_dir`, normally `.data/offline_cache/vin_offline`.
+The writer is immutable: if the destination exists and `overwrite = false`, the
+build fails. To generate more samples without destroying the current store, copy
+the TOML and give `[store].store_dir` a new name. Use `overwrite = true` only
+for deliberate smoke-store rebuilds.
+
+Small Rerun smoke store:
+
+```sh
+cd aria_nbv
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml --dry-run
+uv run nbv-build-offline --config-path ../.configs/build_vin_offline_rerun_smoke_v7.toml
+```
+
+Validate with `nbv-summary` and, when visual trust matters, save a Rerun
+recording:
+
+```sh
+cd aria_nbv
+uv run nbv-rerun-inspect \
+  --config-path ../.configs/rerun_offline.toml \
+  --split val \
+  --index 0 \
+  --save ../.artifacts/rerun/offline_sample.rrd
+```
+
+### Local Rollout Smoke
+
+Rollout generation consumes VIN offline rows and writes standalone rollout Zarr
+artifacts. First run a config-only smoke:
+
+```sh
+cd aria_nbv
+uv run nbv-build-rollouts --config-path ../.configs/build_rollouts_v1_smoke.toml --dry-run
+```
+
+Then build the local smoke store:
+
+```sh
+cd aria_nbv
+uv run nbv-build-rollouts --config-path ../.configs/build_rollouts_v1_smoke.toml
+uv run nbv-rollouts-info --store ../.data/offline_cache/rollouts_v1_smoke.zarr --validate
+```
+
+If validation fails, treat the store as stale or partial and regenerate it. Do
+not patch rollout Zarr arrays or manifests by hand to silence validation.
+
+### Sharded Rollout Generation
+
+Plan source-row shards from the same rollout writer TOML:
+
+```sh
+cd aria_nbv
+uv run nbv-plan-rollout-shards \
+  --config-path ../.configs/build_rollouts_v1_smoke.toml \
+  --rows-per-shard 1 \
+  --output-manifest /tmp/rollout_shards.jsonl
+```
+
+Run one local shard through temp-to-final promotion:
+
+```sh
+cd aria_nbv
+uv run nbv-build-rollouts \
+  --config-path ../.configs/build_rollouts_v1_smoke.toml \
+  --shard-manifest /tmp/rollout_shards.jsonl \
+  --shard-id shard-000000 \
+  --output-tmp /tmp/aria-rollouts/shard-000000.tmp \
+  --output-final /tmp/aria-rollouts/shard-000000
+```
+
+Check campaign status:
+
+```sh
+cd aria_nbv
+uv run nbv-status-rollout-shards \
+  --shard-manifest /tmp/rollout_shards.jsonl \
+  --final-root /tmp/aria-rollouts \
+  --require-complete
+```
+
+Completed shards are skipped only when the final directory validates and has
+current `_owner.json` and `_SUCCESS.json` sidecars. Stale temp directories and
+incomplete final directories require operator review before retry.
+
+### LRZ Rollout Campaign
+
+Use LRZ only after the local one-row smoke succeeds.
+
+1. SSH to LRZ and confirm storage:
+
+   ```sh
+   ssh login.ai.lrz.de
+   dssusrinfo all
+   export ARIA_DSS=/dss/.../aria-nbv
+   export ARIA_REPO=$HOME/src/ARIA-NBV
+   export LRZ_CONTAINER_IMAGE='nvcr.io#nvidia/pytorch:24.10-py3'
+   ```
+
+2. Initialize DSS layout when needed:
+
+   ```sh
+   cd "$ARIA_REPO"
+   .agents/skills/lrz-ai-systems/scripts/lrz-dss-init.sh "$ARIA_DSS"
+   ```
+
+3. Copy the rollout writer TOML and replace every placeholder with concrete
+   DSS paths:
+
+   ```sh
+   cd "$ARIA_REPO"
+   cp .configs/build_rollouts_v1_lrz.template.toml "$ARIA_DSS/data/staging/rollouts/build_rollouts_${RUN_ID}.toml"
+   ```
+
+   The copied config should point `[source.store].store_dir` at a VIN offline
+   store under `$ARIA_DSS/caches/vin/` and `[store].store_dir` at a nonsharded
+   preview or campaign path under `$ARIA_DSS/data/staging/rollouts/$RUN_ID/`.
+
+4. Plan shards:
+
+   ```sh
+   cd "$ARIA_REPO/aria_nbv"
+   uv run nbv-plan-rollout-shards \
+     --config-path "$CONFIG_PATH" \
+     --rows-per-shard 1 \
+     --output-manifest "$ARIA_DSS/data/staging/manifests/rollout_shards_${RUN_ID}.jsonl"
+   ```
+
+5. Copy and edit the Slurm template:
+
+   ```sh
+   cd "$ARIA_REPO"
+   cp scripts/templates/lrz/rollout_generation.sbatch "$ARIA_DSS/data/staging/rollouts/rollout_generation_${RUN_ID}.sbatch"
+   ```
+
+   Replace `/ABS/PATH/TO/ARIA_DSS` in `#SBATCH --output` and
+   `#SBATCH --error` with the concrete DSS log directory. Slurm parses
+   `#SBATCH` directives before the shell starts, so those lines do not expand
+   `$ARIA_DSS`.
+
+6. Submit the array with exported variables:
+
+   ```sh
+   export RUN_ID=rollouts-v1-smoke-YYYYMMDD
+   export CONFIG_PATH="$ARIA_DSS/data/staging/rollouts/build_rollouts_${RUN_ID}.toml"
+   export SHARD_MANIFEST="$ARIA_DSS/data/staging/manifests/rollout_shards_${RUN_ID}.jsonl"
+   sbatch "$ARIA_DSS/data/staging/rollouts/rollout_generation_${RUN_ID}.sbatch"
+   ```
+
+7. Summarize the campaign:
+
+   ```sh
+   cd "$ARIA_REPO/aria_nbv"
+   uv run nbv-status-rollout-shards \
+     --shard-manifest "$SHARD_MANIFEST" \
+     --final-root "$ARIA_DSS/data/staging/rollouts/$RUN_ID/shards" \
+     --output-json "$ARIA_DSS/data/staging/rollouts/$RUN_ID/manifests/status.json" \
+     --require-complete
+   ```
+
+### Troubleshooting
+
+- **Strict VIN version mismatch:** rebuild with the current
+  `nbv-build-offline`; do not add compatibility readers for old stores.
+- **Existing VIN store blocks generation:** copy the TOML to a new store name,
+  or set `overwrite = true` only when replacing a disposable smoke store.
+- **Rollout schema is stale:** regenerate the rollout store with the current
+  writer. Older schemas are audit artifacts, not training data.
+- **Rollout `manifest.json` is missing:** regenerate; do not fabricate a
+  manifest by hand.
+- **Rollout source shard lineage is missing:** regenerate from a current VIN
+  offline store and rollout writer. Source shard id and shard row must come from
+  `sample_index.jsonl`.
+- **Final rollout shard exists but `_SUCCESS.json` is absent or validation
+  fails:** move or remove the partial final path only after operator review,
+  then rerun that shard.
+- **Temporary shard path already exists:** inspect and remove stale temp data
+  only after confirming no active job owns it.
+- **LRZ job writes under `$HOME`:** source
+  `.agents/skills/lrz-ai-systems/scripts/lrz-aria-env.sh "$ARIA_DSS"` inside
+  the container and keep configs pointed at DSS paths.
 
 ## Training And Inspection
 

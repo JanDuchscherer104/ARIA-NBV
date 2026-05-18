@@ -84,6 +84,12 @@ max_candidates_final = 8
 resolution_scale = 0.2
 verbosity = 1
 
+[selected_depth]
+enabled = true
+width_px = 240
+height_px = 240
+chunk_steps = 16
+
 [store]
 store_dir = "/ABS/PATH/TO/ARIA_DSS/data/staging/rollouts/RUN_ID/nonsharded_preview.zarr"
 target_protocol_version = "v1_observed"

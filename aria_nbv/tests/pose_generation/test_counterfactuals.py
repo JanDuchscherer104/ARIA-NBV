@@ -807,6 +807,33 @@ def test_candidate_depth_renderer_reports_full_shell_candidate_indices() -> None
     assert candidate_indices.tolist() == [1, 3]
 
 
+def test_candidate_depth_renderer_renders_selected_compact_index_at_exact_size() -> None:
+    mesh, verts, faces = _mesh_triplet()
+    sample = SimpleNamespace(
+        has_mesh=True,
+        mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+    )
+    candidates = _candidate_result_for_pose(_identity_pose(), count=2)
+    renderer = CandidateDepthRendererConfig(
+        device="cpu",
+        max_candidates_final=1,
+        resolution_scale=0.1,
+        output_width_px=240,
+        output_height_px=240,
+        verbosity=0,
+    ).setup_target()
+
+    batch = renderer.render_compact_indices(sample, candidates, [1])
+
+    assert batch.depths.shape == (1, 240, 240)
+    assert batch.depths_valid_mask.shape == (1, 240, 240)
+    assert batch.candidate_indices.tolist() == [1]
+    assert torch.isfinite(batch.depths[batch.depths_valid_mask]).all()
+    assert torch.all(batch.depths[batch.depths_valid_mask] > 0.0)
+
+
 def test_candidate_depth_renderer_rejects_ambiguous_candidate_index_mapping() -> None:
     shell = PoseTW(
         torch.cat(

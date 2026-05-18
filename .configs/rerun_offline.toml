@@ -53,6 +53,12 @@ branch_scope     = "same_source_target"
 candidate_top_k  = 5
 log_all_candidates = false
 
+[rollout_depths]
+enabled                = true
+colormap               = "turbo"
+point_fill_ratio       = 0.2
+require_selected_depth = false
+
 [efm_voxels]
 enabled              = true
 log_occ_pr           = false

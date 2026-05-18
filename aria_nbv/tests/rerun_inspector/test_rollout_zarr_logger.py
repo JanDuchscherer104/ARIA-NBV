@@ -56,6 +56,7 @@ class _FakeRerun:
     SeriesPoints = _Archetype
     Transform3D = _Archetype
     Pinhole = _Archetype
+    DepthImage = _Archetype
     AnyValues = _Archetype
 
     class ViewCoordinates:
@@ -98,11 +99,23 @@ class _FakeRerun:
         self.logged_extras[entity_path] = args
 
 
-def _fixture_rollout_store(tmp_path: Path) -> Path:
+def _fixture_rollout_store(tmp_path: Path, *, selected_depth_enabled: bool = True) -> Path:
     records = build_rollout_records(horizon=2, num_samples=6, seed=13)
     if len(records) > 1:
-        records[1].lineage.source_row_id = records[0].lineage.source_row_id
-        records[1].lineage.target_row_id = records[0].lineage.target_row_id
+        base = records[0].lineage
+        sibling = records[1].lineage
+        sibling.source_row_id = base.source_row_id
+        sibling.source_sample_index = base.source_sample_index
+        sibling.source_sample_key = base.source_sample_key
+        sibling.scene_id = base.scene_id
+        sibling.snippet_id = base.snippet_id
+        sibling.split = base.split
+        sibling.source_cache_version = base.source_cache_version
+        sibling.source_offline_store_manifest_hash = base.source_offline_store_manifest_hash
+        sibling.split_manifest_hash = base.split_manifest_hash
+        sibling.source_shard_id = base.source_shard_id
+        sibling.source_shard_row = base.source_shard_row
+        sibling.target_row_id = base.target_row_id
     for record in records:
         for trajectory in record.result.trajectories:
             for step in trajectory.steps:
@@ -124,6 +137,9 @@ def _fixture_rollout_store(tmp_path: Path) -> Path:
                 )
                 for values in step.metric_vectors.values():
                     _mask_vector(values, invalid, fill=float("nan"))
+                if step.selected_depth_m is not None and step.selected_depth_valid_mask is not None:
+                    step.selected_depth_m[0, 0] = 42.0
+                    step.selected_depth_valid_mask[0, 0] = False
 
     result = write_rollout_zarr_store(
         tmp_path / "rollouts.zarr",
@@ -131,6 +147,7 @@ def _fixture_rollout_store(tmp_path: Path) -> Path:
         target_protocol_version="v1-observed",
         source_offline_store_version="7",
         split_manifest_hash="fixture-split-manifest",
+        selected_depth_enabled=selected_depth_enabled,
     )
     return result.store_dir
 
@@ -156,12 +173,19 @@ def _mask_vector(
             values[valid] = values[valid] / denom
 
 
-def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> None:
+def test_rollout_zarr_logger_logs_multistep_candidate_layers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     store_dir = _fixture_rollout_store(tmp_path)
     cfg = RerunOfflineInspectorConfig()
     cfg.output.save_path = tmp_path / "rollout.rrd"
     cfg.selection.rollout_context_mode = "off"
     fake = _FakeRerun()
+    monkeypatch.setattr(
+        "aria_nbv.rerun_inspector._rollout_zarr.RolloutZarrStoreReader.q_h_view",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("q_h_view must not be loaded eagerly")),
+    )
     logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
 
     logger.start()
@@ -176,6 +200,29 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
     assert any(path.startswith(f"{ENTITY_ROLLOUT_VALID_ROOT}/candidate_") for path in fake.logged)
     assert any(path.startswith(f"{ENTITY_ROLLOUT_INVALID_ROOT}/candidate_") for path in fake.logged)
     assert any(path.startswith(f"{ENTITY_ROLLOUT_SELECTED_ROOT}/candidate_") for path in fake.logged)
+
+    depth_calls = [
+        call
+        for call in fake.calls
+        if call[0] == "log"
+        and str(call[1]).startswith(f"{ENTITY_ROLLOUT_SELECTED_ROOT}/candidate_")
+        and str(call[1]).endswith("/camera/depth")
+    ]
+    assert len(depth_calls) == rows.step_rows.shape[0]
+    depth_path = str(depth_calls[0][1])
+    camera_path = depth_path.removesuffix("/depth")
+    depth_image = fake.logged[depth_path]
+    assert depth_image.kwargs["meter"] == 1.0
+    assert depth_image.kwargs["colormap"] == "turbo"
+    assert depth_image.kwargs["point_fill_ratio"] == pytest.approx(0.2)
+    depth_array = np.asarray(depth_image.args[0])
+    assert depth_array.shape == (240, 240)
+    assert np.isnan(depth_array[0, 0])
+
+    pinhole = fake.logged_extras[camera_path][0]
+    assert pinhole.kwargs["resolution"] == [240.0, 240.0]
+    assert pinhole.kwargs["focal_length"] == [120.0, 120.0]
+    assert pinhole.kwargs["principal_point"] == [120.0, 120.0]
 
     timeline_calls = [call for call in fake.calls if call[0] == "set_time"]
     assert ("rollout_step",) in [call[1] for call in timeline_calls]
@@ -216,12 +263,37 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(tmp_path: Path) -> 
     assert step_metadata["q_h"]["selected_transition_available"]
     assert step_metadata["invalid_candidate_count"] > 0
     assert step_metadata["display_validity_trusted"]
+    assert step_metadata["selected_depth"]["available"]
+    assert step_metadata["selected_depth"]["depth_entity"].endswith("/camera/depth")
 
     selected_path = fake.logged[ENTITY_ROLLOUT_SELECTED_PATH]
     assert len(selected_path.args[0]) == 2
     np.testing.assert_equal(np.asarray(selected_path.args[0][0]).shape, (2, 3))
     assert len(selected_path.kwargs["colors"]) == 2
     assert selected_path.kwargs["colors"][0] != selected_path.kwargs["colors"][1]
+
+
+def test_rollout_zarr_logger_warns_when_selected_depth_is_unavailable(tmp_path: Path) -> None:
+    store_dir = _fixture_rollout_store(tmp_path, selected_depth_enabled=False)
+    cfg = RerunOfflineInspectorConfig()
+    cfg.output.save_path = tmp_path / "rollout.rrd"
+    cfg.selection.rollout_context_mode = "off"
+    fake = _FakeRerun()
+
+    logger = RerunRolloutZarrLogger(cfg, rr_module=fake)
+    logger.start()
+    logger.log_store(store_dir=store_dir, rollout_index=0)
+
+    assert not any(str(call[1]).endswith("/camera/depth") for call in fake.calls if call[0] == "log")
+    step_metadata = json.loads(fake.logged[ENTITY_ROLLOUT_STEP_METADATA].args[0])
+    assert not step_metadata["selected_depth"]["available"]
+    assert step_metadata["selected_depth"]["warnings"]
+
+    cfg.rollout_depths.require_selected_depth = True
+    required_logger = RerunRolloutZarrLogger(cfg, rr_module=_FakeRerun())
+    required_logger.start()
+    with pytest.raises(ValueError, match="selected_depth unavailable"):
+        required_logger.log_store(store_dir=store_dir, rollout_index=0)
 
 
 def test_rollout_plot_helpers_resolve_sibling_branches_and_topk(tmp_path: Path) -> None:

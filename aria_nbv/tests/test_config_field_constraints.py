@@ -27,6 +27,7 @@ from aria_nbv.rerun_inspector._config import (
     RerunInspectorEfmVoxelConfig,
     RerunInspectorGeometryConfig,
     RerunInspectorOutputConfig,
+    RerunInspectorRolloutDepthConfig,
 )
 from aria_nbv.rl import CounterfactualRLEnvConfig
 from aria_nbv.rollouts import RolloutDatasetWriterConfig, RolloutRecipeConfig, RolloutZarrStoreConfig
@@ -70,6 +71,7 @@ def _mixture_component(**kwargs: object) -> CandidateMixtureComponentConfig:
         (RerunInspectorOutputConfig, {"spawn_port": 0}),
         (RerunInspectorGeometryConfig, {"mesh_alpha": 256}),
         (RerunInspectorCandidateConfig, {"subset_indices": [-1]}),
+        (RerunInspectorRolloutDepthConfig, {"point_fill_ratio": -0.1}),
         (RerunInspectorEfmVoxelConfig, {"occ_threshold": 1.1}),
         (CounterfactualRLEnvConfig, {"horizon": 0}),
         (GradNormLoggingConfig, {"max_items": 0}),

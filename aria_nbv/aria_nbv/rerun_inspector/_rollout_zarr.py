@@ -20,7 +20,11 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from ._config import RerunInspectorSelectionConfig, RerunOfflineInspectorConfig
+    from ._config import (
+        RerunInspectorRolloutDepthConfig,
+        RerunInspectorSelectionConfig,
+        RerunOfflineInspectorConfig,
+    )
 
 ENTITY_ROLLOUT_ROOT = "world/rollout"
 ENTITY_ROLLOUT_STEP_ROOT = f"{ENTITY_ROLLOUT_ROOT}/step"
@@ -113,7 +117,11 @@ class RerunRolloutZarrLogger:
         selected_path: list[list[float]] = _rollout_root_path(reader, rows=rows)
         for order, step_row_position in enumerate(rows.step_rows.tolist()):
             self._set_rollout_step_time(order)
-            step = _step_payload(reader, step_row_position=step_row_position)
+            step = _step_payload(
+                reader,
+                step_row_position=step_row_position,
+                rollout_depths=self.config.rollout_depths,
+            )
             self._log_step(step)
             if step.selected_center is not None:
                 selected_path.append(step.selected_center.tolist())
@@ -184,6 +192,7 @@ class RerunRolloutZarrLogger:
     def _log_step(self, step: "_RolloutStepPayload") -> None:
         for candidate in step.candidates:
             self._log_candidate_camera(candidate)
+            self._log_selected_depth(candidate)
             self._log_candidate_center(candidate)
         self.rr.log(ENTITY_ROLLOUT_VALID_COUNT, self.rr.Scalars(float(step.valid_candidate_count)))
         self.rr.log(ENTITY_ROLLOUT_SELECTED_PROBABILITY, self.rr.Scalars(_finite_or_zero(step.selected_probability)))
@@ -269,6 +278,22 @@ class RerunRolloutZarrLogger:
     def _log_candidate_camera(self, candidate: "_RolloutCandidatePayload") -> None:
         rotation = candidate.pose[:9].reshape(3, 3)
         translation = candidate.pose[9:12]
+        if candidate.selected_depth is None:
+            pinhole = self.rr.Pinhole(
+                fov_y=float(np.pi / 2.0),
+                aspect_ratio=1.0,
+                camera_xyz=self.rr.ViewCoordinates.LUF,
+                image_plane_distance=self.config.geometry.frustum_scale,
+            )
+        else:
+            height, width = candidate.selected_depth.image_size_hw
+            pinhole = self.rr.Pinhole(
+                resolution=[float(width), float(height)],
+                focal_length=candidate.selected_depth.focal_px.astype(float).tolist(),
+                principal_point=candidate.selected_depth.principal_point_px.astype(float).tolist(),
+                camera_xyz=self.rr.ViewCoordinates.LUF,
+                image_plane_distance=self.config.geometry.frustum_scale,
+            )
         self.rr.log(
             candidate.camera_entity,
             self.rr.Transform3D(
@@ -276,12 +301,7 @@ class RerunRolloutZarrLogger:
                 mat3x3=rotation.astype(float).tolist(),
                 relation=self.rr.TransformRelation.ParentFromChild,
             ),
-            self.rr.Pinhole(
-                fov_y=float(np.pi / 2.0),
-                aspect_ratio=1.0,
-                camera_xyz=self.rr.ViewCoordinates.LUF,
-                image_plane_distance=self.config.geometry.frustum_scale,
-            ),
+            pinhole,
             self.rr.AnyValues(
                 candidate_row_id=candidate.row_id,
                 shell_index=candidate.shell_index,
@@ -297,6 +317,19 @@ class RerunRolloutZarrLogger:
                 invalid_reason_bitset=candidate.reason_bitset,
                 primary_invalid_reason=candidate.primary_reason,
                 color_rgba=candidate.color,
+            ),
+        )
+
+    def _log_selected_depth(self, candidate: "_RolloutCandidatePayload") -> None:
+        if candidate.selected_depth is None:
+            return
+        self.rr.log(
+            f"{candidate.camera_entity}/depth",
+            self.rr.DepthImage(
+                candidate.selected_depth.depth_m,
+                meter=1.0,
+                colormap=self.config.rollout_depths.colormap,
+                point_fill_ratio=self.config.rollout_depths.point_fill_ratio,
             ),
         )
 
@@ -343,6 +376,18 @@ class _RolloutCandidatePayload:
     color: list[int]
     camera_entity: str
     center_entity: str
+    selected_depth: "_SelectedDepthPayload | None" = None
+
+
+@dataclass(frozen=True, slots=True)
+class _SelectedDepthPayload:
+    step_row_id: int
+    candidate_row_id: int
+    depth_m: NDArray[np.float32]
+    valid_mask: NDArray[np.bool_]
+    focal_px: NDArray[np.float32]
+    principal_point_px: NDArray[np.float32]
+    image_size_hw: tuple[int, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,6 +528,7 @@ def _step_payload(
     reader: RolloutZarrStoreReader,
     *,
     step_row_position: int,
+    rollout_depths: "RerunInspectorRolloutDepthConfig",
 ) -> _RolloutStepPayload:
     step_row_id = int(reader.array("steps/step_row_id")[step_row_position])
     step_index = int(reader.array("steps/step_index")[step_row_position])
@@ -509,6 +555,12 @@ def _step_payload(
     candidate_row_ids = reader.array("candidates/candidate_row_id")[row_positions].astype(np.int64).reshape(-1)
 
     selected_local = int(np.nonzero(selected)[0][0]) if selected.any() else -1
+    selected_depth, selected_depth_warnings = _selected_depth_payload(
+        reader,
+        step_row_id=step_row_id,
+        selected_candidate_row_id=selected_candidate_row_id,
+        config=rollout_depths,
+    )
     candidate_payloads = _candidate_payloads(
         candidate_row_ids=candidate_row_ids,
         shell_indices=shell_indices,
@@ -526,6 +578,7 @@ def _step_payload(
         entropy=entropy,
         reason_bitsets=reason_bitsets,
         primary_reasons=primary_reasons,
+        selected_depth=selected_depth,
     )
     metadata = {
         "step_row_id": step_row_id,
@@ -543,6 +596,17 @@ def _step_payload(
         "invalid_candidate_count": int((~display_valid).sum()),
         "stored_invalid_candidate_count": int((~stored_valid).sum()),
         "pose_frame": "stored_pose_world_cam",
+        "selected_depth": {
+            "enabled": bool(rollout_depths.enabled),
+            "available": selected_depth is not None,
+            "warnings": selected_depth_warnings,
+            "depth_entity": (
+                f"{candidate_payloads[selected_local].camera_entity}/depth"
+                if selected_depth is not None and selected_local >= 0
+                else None
+            ),
+            "image_size_hw": list(selected_depth.image_size_hw) if selected_depth is not None else None,
+        },
         "q_h": _q_h_metadata(reader, step_row_id=step_row_id),
     }
     return _RolloutStepPayload(
@@ -602,6 +666,85 @@ def _candidate_rows_for_step(reader: RolloutZarrStoreReader, *, step_row_id: int
     return row_positions[np.argsort(shell_indices, kind="stable")]
 
 
+def _selected_depth_payload(
+    reader: RolloutZarrStoreReader,
+    *,
+    step_row_id: int,
+    selected_candidate_row_id: int,
+    config: "RerunInspectorRolloutDepthConfig",
+) -> tuple[_SelectedDepthPayload | None, list[str]]:
+    """Read one selected-depth row lazily for a rollout step."""
+
+    if not config.enabled:
+        return None, []
+
+    def _handle_missing(message: str) -> tuple[None, list[str]]:
+        if config.require_selected_depth:
+            raise ValueError(message)
+        return None, [message]
+
+    if not bool(reader.root.attrs.get("selected_depth_enabled", False)):
+        return _handle_missing("selected_depth unavailable: store metadata has selected_depth_enabled=false.")
+
+    try:
+        group = reader.root["selected_depth"]
+        step_ids = np.asarray(group["step_row_id"], dtype=np.int64).reshape(-1)
+        candidate_ids = np.asarray(group["candidate_row_id"], dtype=np.int64).reshape(-1)
+    except KeyError as exc:
+        return _handle_missing(f"selected_depth unavailable: missing array {exc}.")
+
+    matches = np.nonzero(step_ids == int(step_row_id))[0]
+    if matches.size != 1:
+        return _handle_missing(
+            f"selected_depth unavailable: expected one row for step_row_id={step_row_id}, found {matches.size}."
+        )
+    selected_depth_row = int(matches[0])
+    stored_candidate_row_id = int(candidate_ids[selected_depth_row])
+    if stored_candidate_row_id != int(selected_candidate_row_id):
+        return _handle_missing(
+            "selected_depth candidate mismatch: "
+            f"depth candidate_row_id={stored_candidate_row_id}, step selected_candidate_row_id={selected_candidate_row_id}."
+        )
+
+    try:
+        depth = np.asarray(group["depth_m"][selected_depth_row], dtype=np.float32)
+        valid_mask = np.asarray(group["valid_mask"][selected_depth_row], dtype=np.bool_)
+        focal = np.asarray(group["focal_px"][selected_depth_row], dtype=np.float32).reshape(-1)
+        principal = np.asarray(group["principal_point_px"][selected_depth_row], dtype=np.float32).reshape(-1)
+        image_size = np.asarray(group["image_size_hw"][selected_depth_row], dtype=np.int32).reshape(-1)
+    except KeyError as exc:
+        return _handle_missing(f"selected_depth unavailable: missing dense array {exc}.")
+
+    if depth.ndim != 2 or valid_mask.shape != depth.shape:
+        return _handle_missing(
+            f"selected_depth shape mismatch: depth_m={tuple(depth.shape)} valid_mask={tuple(valid_mask.shape)}."
+        )
+    if focal.shape[0] != 2 or principal.shape[0] != 2 or image_size.shape[0] != 2:
+        return _handle_missing("selected_depth camera metadata must have two values per row.")
+
+    height, width = int(image_size[0]), int(image_size[1])
+    if (height, width) != tuple(depth.shape):
+        return _handle_missing(
+            f"selected_depth image_size_hw={(height, width)} does not match depth shape {tuple(depth.shape)}."
+        )
+
+    depth = depth.astype(np.float32, copy=True)
+    finite_valid = valid_mask & np.isfinite(depth)
+    depth[~finite_valid] = np.nan
+    return (
+        _SelectedDepthPayload(
+            step_row_id=int(step_row_id),
+            candidate_row_id=stored_candidate_row_id,
+            depth_m=depth,
+            valid_mask=valid_mask.astype(np.bool_, copy=True),
+            focal_px=focal.astype(np.float32, copy=True),
+            principal_point_px=principal.astype(np.float32, copy=True),
+            image_size_hw=(height, width),
+        ),
+        [],
+    )
+
+
 def _candidate_rri_summary(
     *,
     target_rri: NDArray[Any],
@@ -654,25 +797,54 @@ def _candidate_rri_summary(
 
 
 def _q_h_metadata(reader: RolloutZarrStoreReader, *, step_row_id: int) -> dict[str, Any]:
-    q_h = reader.q_h_view()
-    state_step_ids = q_h["state_step_row_id"].astype(np.int64).reshape(-1)
+    try:
+        state_step_ids = reader.array("steps/step_row_id").astype(np.int64).reshape(-1)
+        step_indices = reader.array("steps/step_index").astype(np.int64).reshape(-1)
+        step_rollout_ids = reader.array("steps/rollout_row_id").astype(np.int64).reshape(-1)
+        step_selected_candidate_ids = reader.array("steps/selected_candidate_row_id").astype(np.int64).reshape(-1)
+        candidate_step_ids = reader.array("candidates/step_row_id").astype(np.int64).reshape(-1)
+    except KeyError as exc:
+        return {"state_row_found": False, "warning": f"Q_H metadata unavailable: missing array {exc}."}
+
     matches = np.nonzero(state_step_ids == int(step_row_id))[0]
     if matches.size != 1:
         return {"state_row_found": False}
     row = int(matches[0])
-    valid_mask = q_h["valid_action_mask"][row].astype(bool)
-    train_mask = q_h["q_train_mask"][row].astype(bool)
+
+    candidate_rows = np.nonzero(candidate_step_ids == int(step_row_id))[0].astype(np.int64)
+    try:
+        valid_mask = reader.array("candidates/actor_action_mask")[candidate_rows].astype(bool)
+    except KeyError:
+        valid_mask = reader.array("candidates/candidate_valid_mask")[candidate_rows].astype(bool)
+    try:
+        train_mask = reader.array("candidates/q_train_mask")[candidate_rows].astype(bool) & valid_mask
+    except KeyError:
+        target_rri = reader.array("candidates/target_rri")[candidate_rows].astype(np.float32).reshape(-1)
+        train_mask = valid_mask & np.isfinite(target_rri)
+
+    selected_candidate_row_id = int(step_selected_candidate_ids[row])
+    candidate_row_ids = reader.array("candidates/candidate_row_id")[candidate_rows].astype(np.int64).reshape(-1)
+    selected_matches = np.nonzero(candidate_row_ids == selected_candidate_row_id)[0]
+    selected_local_index = int(selected_matches[0]) if selected_matches.size else -1
+    target_rri = reader.array("candidates/target_rri")[candidate_rows].astype(np.float32).reshape(-1)
+    td_reward_target_rri = float(target_rri[selected_local_index]) if selected_local_index >= 0 else float("nan")
+
+    rollout_row_id = int(step_rollout_ids[row])
+    next_step_matches = np.nonzero((step_rollout_ids == rollout_row_id) & (step_indices == int(step_indices[row]) + 1))[
+        0
+    ]
+    next_step_row_id = int(state_step_ids[int(next_step_matches[0])]) if next_step_matches.size else -1
     return {
         "state_row_found": True,
         "q_h_state_row": row,
         "valid_action_count": int(valid_mask.sum()),
         "trainable_action_count": int(train_mask.sum()),
-        "selected_candidate_index": int(q_h["selected_candidate_index"][row]),
-        "td_selected_candidate_row_id": int(q_h["td_selected_candidate_row_id"][row]),
-        "td_reward_target_rri": float(q_h["td_reward_target_rri"][row]),
-        "td_next_step_row_id": int(q_h["td_next_step_row_id"][row]),
-        "td_terminal": bool(q_h["td_terminal_mask"][row]),
-        "selected_transition_available": int(q_h["td_selected_candidate_row_id"][row]) >= 0,
+        "selected_candidate_index": selected_local_index,
+        "td_selected_candidate_row_id": selected_candidate_row_id,
+        "td_reward_target_rri": td_reward_target_rri,
+        "td_next_step_row_id": next_step_row_id,
+        "td_terminal": next_step_row_id < 0,
+        "selected_transition_available": selected_candidate_row_id >= 0,
     }
 
 
@@ -711,6 +883,7 @@ def _candidate_payloads(
     entropy: NDArray[Any],
     reason_bitsets: NDArray[Any],
     primary_reasons: NDArray[Any],
+    selected_depth: _SelectedDepthPayload | None,
 ) -> list[_RolloutCandidatePayload]:
     payloads: list[_RolloutCandidatePayload] = []
     for values in zip(
@@ -779,6 +952,7 @@ def _candidate_payloads(
                 color=color,
                 camera_entity=f"{candidate_root}/camera",
                 center_entity=f"{candidate_root}/center",
+                selected_depth=selected_depth if bool(is_selected) else None,
             ),
         )
     return payloads
