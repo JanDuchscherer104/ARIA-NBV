@@ -21,7 +21,7 @@ scene scores or low-quality invalid rows.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +34,7 @@ from zarr.codecs import BloscCname, BloscCodec, BloscShuffle
 from zarr.storage import LocalStore
 
 from ..configs import PathConfig
+from ..data_handling.efm_dataset_utils import compact_ase_atek_sample_id, raw_ase_atek_sample_id
 from ..utils import BaseConfig
 from ..utils.config_paths import resolve_cache_artifact_dir
 from .manifest import (
@@ -64,8 +65,8 @@ if TYPE_CHECKING:
 ROLLOUT_ZARR_SCHEMA_ID = "aria_nbv.rollout_zarr_q_invalidity"
 """Schema id stored as a root attribute on rollout replay stores."""
 
-ROLLOUT_ZARR_SCHEMA_VERSION = "0.7-root-gain-target-crops"
-"""Manifest-backed rollout replay schema version with root-gain Q_H semantics."""
+ROLLOUT_ZARR_SCHEMA_VERSION = "0.9-candidate-diagnostics"
+"""Manifest-backed rollout replay schema version with typed candidate-generation diagnostics."""
 
 DEFAULT_RETURN_SEMANTICS = "cumulative_target_root_gain"
 """Default return target family for root-normalized ``Q_H`` replay views."""
@@ -259,6 +260,25 @@ CANDIDATE_TABLE = _TableSchema(
 )
 """Canonical `candidates/` table fields and dtypes."""
 
+CANDIDATE_DIAGNOSTIC_TABLE = _TableSchema(
+    "candidate_diagnostics",
+    (
+        _TableField("candidate_row_id", np.int64),
+        _TableField("position_id", np.int32),
+        _TableField("mesh_distance_m", np.float32),
+        _TableField("path_min_clearance_m", np.float32),
+        _TableField("path_collision_mask", np.bool_),
+        _TableField("free_space_margin_m", np.float32),
+        _TableField("motion_step_length_m", np.float32),
+        _TableField("motion_height_delta_m", np.float32),
+        _TableField("motion_backward_step_m", np.float32),
+        _TableField("motion_yaw_delta_deg", np.float32),
+        _TableField("target_distance_m", np.float32),
+        _TableField("target_bearing_yaw_deg", np.float32),
+    ),
+)
+"""Typed candidate-generation diagnostics aligned one-to-one with `candidates/`."""
+
 SELECTED_DEPTH_TABLE = _TableSchema(
     "selected_depth",
     (
@@ -335,6 +355,7 @@ class _RolloutTables:
     lineage: dict[str, np.ndarray]
     steps: dict[str, np.ndarray]
     candidates: dict[str, np.ndarray]
+    candidate_diagnostics: dict[str, np.ndarray]
     selected_depth: dict[str, np.ndarray]
     target_eval_crops: dict[str, np.ndarray]
 
@@ -508,9 +529,10 @@ class _RolloutZarrWriteSession:
         """Materialize the configured rollout traces to disk."""
 
         created_at_utc = utc_timestamp()
-        dictionaries = _build_dictionaries(self.records)
+        records = _records_with_global_target_row_ids(self.records)
+        dictionaries = _build_dictionaries(records)
         table = _flatten_records(
-            self.records,
+            records,
             dictionaries,
             selected_depth_width_px=self.selected_depth_width_px,
             selected_depth_height_px=self.selected_depth_height_px,
@@ -519,7 +541,7 @@ class _RolloutZarrWriteSession:
         q_h_horizon = _table_horizon(table)
         q_h_arrays = _build_q_h_arrays(table, gamma=self.discount_gamma)
         root_metadata = _root_metadata_payload(
-            records=self.records,
+            records=records,
             tables=table,
             q_h_arrays=q_h_arrays,
             q_h_horizon=q_h_horizon,
@@ -544,7 +566,7 @@ class _RolloutZarrWriteSession:
             manifest_sha256="",
         )
         manifest_payload = _build_manifest_payload(
-            records=self.records,
+            records=records,
             tables=table,
             q_h_arrays=q_h_arrays,
             dictionaries=dictionaries,
@@ -563,7 +585,7 @@ class _RolloutZarrWriteSession:
         _write_metadata_group(groups["metadata"], field_retention_policy=self.field_retention_policy)
         _write_targets(
             groups["targets"],
-            self.records,
+            records,
             dictionaries,
             target_protocol_version=self.target_protocol_version,
         )
@@ -636,6 +658,7 @@ class _RolloutZarrValidator:
         candidate_row_id = np.asarray(self.root["candidates/candidate_row_id"])
         self._validate_q_h(candidate_row_id)
         self._validate_candidates(candidate_row_id)
+        self._validate_candidate_diagnostics(candidate_row_id)
         self._validate_selected_depth()
         self._validate_target_eval_crops()
         self._validate_sources()
@@ -773,6 +796,39 @@ class _RolloutZarrValidator:
                     f"Candidate table field {name!r} has {array.shape[0]} rows, expected {candidate_row_id.shape[0]}."
                 )
 
+    def _validate_candidate_diagnostics(self, candidate_row_id: np.ndarray) -> None:
+        if "candidate_diagnostics" not in self.root:
+            self.errors.append("Missing required group 'candidate_diagnostics'.")
+            return
+        group = self.root["candidate_diagnostics"]
+        missing = [name for name in CANDIDATE_DIAGNOSTIC_TABLE.names if name not in group]
+        if missing:
+            self.errors.append(f"Missing candidate_diagnostics arrays: {missing}.")
+            return
+        diag_candidate_row_id = np.asarray(group["candidate_row_id"], dtype=np.int64)
+        if not np.array_equal(diag_candidate_row_id, candidate_row_id.astype(np.int64)):
+            self.errors.append("candidate_diagnostics/candidate_row_id must align with candidates/candidate_row_id.")
+        for field in CANDIDATE_DIAGNOSTIC_TABLE.fields:
+            array = np.asarray(group[field.name])
+            if int(array.shape[0]) != int(candidate_row_id.shape[0]):
+                self.errors.append(
+                    f"Candidate diagnostic field {field.name!r} has {array.shape[0]} rows, "
+                    f"expected {candidate_row_id.shape[0]}."
+                )
+            if np.dtype(array.dtype) != np.dtype(field.dtype):
+                self.errors.append(
+                    f"Candidate diagnostic field {field.name!r} dtype {array.dtype} must be {np.dtype(field.dtype)}."
+                )
+        collision_mask = np.asarray(group["path_collision_mask"], dtype=np.bool_).reshape(-1)
+        if collision_mask.any():
+            actor_action_mask = np.asarray(self.root["candidates/actor_action_mask"], dtype=np.bool_).reshape(-1)
+            reason_bitset = np.asarray(self.root["candidates/invalid_reason_bitset"], dtype=np.uint32).reshape(-1)
+            path_bit = np.uint32(1 << INVALID_REASON_CODES["PATH_SEGMENT_COLLISION"])
+            if np.any(collision_mask & actor_action_mask):
+                self.errors.append("Path-colliding candidates must not be actor-selectable.")
+            if np.any(collision_mask & ((reason_bitset & path_bit) == 0)):
+                self.errors.append("path_collision_mask rows must include PATH_SEGMENT_COLLISION invalidity bits.")
+
     def _validate_selected_depth(self) -> None:
         if not bool(self.root.attrs.get("selected_depth_enabled", False)):
             return
@@ -893,6 +949,8 @@ class _RolloutZarrValidator:
         rollout_target_row_id = np.asarray(self.root["rollouts/target_row_id"])
         if not np.isin(rollout_target_row_id, target_row_id).all():
             self.errors.append("Rollout target_row_id contains ids not present in targets/target_row_id.")
+        if np.unique(target_row_id).shape[0] != target_row_id.shape[0]:
+            self.errors.append("targets/target_row_id must be unique within one rollout shard.")
         if "root_pose_world" not in self.root["rollouts"]:
             self.errors.append("Missing required rollout root_pose_world field.")
         else:
@@ -923,6 +981,55 @@ class _RolloutZarrValidator:
             self.errors.append("Q_H target_row_id does not match the parent rollout target_row_id.")
         elif q_state_target_row_id.shape != expected_state_target.shape:
             self.errors.append("Q_H target_row_id shape does not match the steps table.")
+        self._validate_target_source_lineage(target_row_id=target_row_id, rollout_target_row_id=rollout_target_row_id)
+
+    def _validate_target_source_lineage(
+        self,
+        *,
+        target_row_id: np.ndarray,
+        rollout_target_row_id: np.ndarray,
+    ) -> None:
+        """Validate that store-global target rows do not mix VIN source snippets."""
+
+        rollout_source_row_id = np.asarray(self.root["rollouts/source_row_id"], dtype=np.int64).reshape(-1)
+        if rollout_source_row_id.shape != rollout_target_row_id.shape:
+            self.errors.append("rollouts/source_row_id and rollouts/target_row_id must have the same shape.")
+            return
+
+        for row_id in target_row_id.tolist():
+            target_rollout_positions = np.nonzero(rollout_target_row_id == int(row_id))[0]
+            if target_rollout_positions.size == 0:
+                continue
+            source_ids = set(rollout_source_row_id[target_rollout_positions].astype(int).tolist())
+            if len(source_ids) > 1:
+                self.errors.append(
+                    f"targets/target_row_id={int(row_id)} is referenced by multiple source_row_id values: "
+                    f"{sorted(source_ids)}."
+                )
+
+        target_id_by_row_position = {int(row_id): index for index, row_id in enumerate(target_row_id.tolist())}
+        target_ids = _encoded_values(self.root, dictionary_name="target", array_path="targets/target_id")
+        matched_gt_target_ids = _encoded_values(
+            self.root,
+            dictionary_name="target",
+            array_path="targets/matched_gt_target_id",
+        )
+        rollout_snippets = _encoded_values(self.root, dictionary_name="snippet", array_path="rollouts/snippet_id")
+        for rollout_index, row_id in enumerate(rollout_target_row_id.astype(int).tolist()):
+            target_index = target_id_by_row_position.get(row_id)
+            if target_index is None or rollout_index >= len(rollout_snippets):
+                continue
+            snippet = rollout_snippets[rollout_index]
+            for array_name, identifier_values in (
+                ("target_id", target_ids),
+                ("matched_gt_target_id", matched_gt_target_ids),
+            ):
+                identifier = identifier_values[target_index] if target_index < len(identifier_values) else ""
+                if _target_identifier_mentions_other_snippet(identifier=identifier, snippet=snippet):
+                    self.errors.append(
+                        f"targets/{array_name} for target_row_id={row_id} does not match rollout snippet_id={snippet!r}."
+                    )
+                    return
 
     def _validate_required_lineage(self) -> None:
         target_row_id = np.asarray(self.root["targets/target_row_id"])
@@ -1002,6 +1109,7 @@ def _required_groups() -> tuple[str, ...]:
         "rollouts",
         "steps",
         "candidates",
+        "candidate_diagnostics",
         "selected_depth",
         "target_eval_crops",
         "q_h",
@@ -1087,6 +1195,11 @@ def _root_metadata_payload(
         "num_rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
         "num_steps": int(tables.steps["step_row_id"].shape[0]),
         "num_candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+        "candidate_diagnostics_enabled": True,
+        "candidate_diagnostics_role": "audit_rerun_only",
+        "candidate_diagnostics_unavailable_float": "NaN",
+        "candidate_diagnostics_unavailable_bool": "false",
+        "num_candidate_diagnostics": int(tables.candidate_diagnostics["candidate_row_id"].shape[0]),
         "num_selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
         "target_eval_crops_enabled": True,
         "target_eval_crops_role": "oracle_eval_only",
@@ -1122,6 +1235,7 @@ def _build_manifest_payload(
             "rollouts": int(tables.rollouts["rollout_row_id"].shape[0]),
             "steps": int(tables.steps["step_row_id"].shape[0]),
             "candidates": int(tables.candidates["candidate_row_id"].shape[0]),
+            "candidate_diagnostics": int(tables.candidate_diagnostics["candidate_row_id"].shape[0]),
             "selected_depths": int(tables.selected_depth["step_row_id"].shape[0]),
             "target_eval_crops": int(tables.target_eval_crops["crop_row_id"].shape[0]),
             "q_h_states": int(q_h_arrays["state_step_row_id"].shape[0]),
@@ -1146,9 +1260,9 @@ def _source_coverage(records: list[RolloutZarrRecord]) -> dict[str, Any]:
         rows[source_row_id] = {
             "source_row_id": source_row_id,
             "source_sample_index": lineage.source_sample_index,
-            "source_sample_key": lineage.source_sample_key,
+            "source_sample_key": compact_ase_atek_sample_id(lineage.source_sample_key or "") or None,
             "scene_id": lineage.scene_id,
-            "snippet_id": lineage.snippet_id,
+            "snippet_id": compact_ase_atek_sample_id(lineage.snippet_id or "") or None,
             "split": lineage.split,
             "source_shard_id": lineage.source_shard_id,
             "source_shard_row": lineage.source_shard_row,
@@ -1203,6 +1317,52 @@ def _add_manifest_hash(target: set[str], value: str | None) -> None:
         target.add(value)
 
 
+def _records_with_global_target_row_ids(records: list[RolloutZarrRecord]) -> list[RolloutZarrRecord]:
+    """Return records whose lineage target rows are unique within the rollout store.
+
+    ``TargetCandidateRow.target_row_id`` is selector-local to one source sample.
+    The rollout store needs a globally unique row key because ``rollouts/`` and
+    ``q_h/`` join through ``target_row_id``. Preserve the selector-local id in
+    ``target_source_index`` and assign dense store-local ids by first use.
+    """
+
+    target_row_by_key: dict[tuple[object, ...], int] = {}
+    normalized: list[RolloutZarrRecord] = []
+    for record in records:
+        lineage = record.lineage
+        target_key = _global_target_key(lineage)
+        global_target_row_id = target_row_by_key.setdefault(target_key, len(target_row_by_key))
+        target_source_index = lineage.target_source_index
+        if target_source_index is None and lineage.target_row_id is not None:
+            target_source_index = int(lineage.target_row_id)
+        normalized.append(
+            replace(
+                record,
+                lineage=replace(
+                    lineage,
+                    target_row_id=global_target_row_id,
+                    target_source_index=target_source_index,
+                ),
+            )
+        )
+    return normalized
+
+
+def _global_target_key(lineage: RolloutLineage) -> tuple[object, ...]:
+    """Return the source-scoped identity for one selected rollout target."""
+
+    selector_local_id = lineage.target_source_index
+    if selector_local_id is None:
+        selector_local_id = lineage.target_row_id
+    return (
+        _lineage_source_row_id(lineage),
+        lineage.target_id or "",
+        lineage.matched_gt_target_id or "",
+        -1 if lineage.matched_gt_target_row_id is None else int(lineage.matched_gt_target_row_id),
+        -1 if selector_local_id is None else int(selector_local_id),
+    )
+
+
 def _unique_targets(records: list[RolloutZarrRecord]) -> set[int]:
     """Return unique target row ids represented by rollout records."""
 
@@ -1237,7 +1397,9 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
         for _record, _trajectory, lineage in items
         if lineage.matched_gt_target_id is not None
     )
-    source_key_values = {lineage.source_sample_key or "" for _record, _trajectory, lineage in items}
+    source_key_values = {
+        compact_ase_atek_sample_id(lineage.source_sample_key or "") for _record, _trajectory, lineage in items
+    }
     source_shard_values = {lineage.source_shard_id or "" for _record, _trajectory, lineage in items}
     score_source_values = {
         step.selection_score_label
@@ -1249,7 +1411,9 @@ def _build_dictionaries(records: list[RolloutZarrRecord]) -> dict[str, list[str]
     target_match_status_values = {lineage.gt_match_status or "not_requested" for _record, _trajectory, lineage in items}
     return {
         "scene": sorted({lineage.scene_id or "" for _record, _trajectory, lineage in items}),
-        "snippet": sorted({lineage.snippet_id or "" for _record, _trajectory, lineage in items}),
+        "snippet": sorted(
+            {compact_ase_atek_sample_id(lineage.snippet_id or "") for _record, _trajectory, lineage in items}
+        ),
         "rollout": [lineage.rollout_id for _record, _trajectory, lineage in items],
         "target": sorted(target_values),
         "source_key": sorted(source_key_values),
@@ -1665,6 +1829,7 @@ def _flatten_records(
     lineage_rows: dict[str, list[Any]] = _empty_rows(LINEAGE_TABLE)
     step_rows: dict[str, list[Any]] = _empty_rows(STEP_TABLE)
     candidate_rows: dict[str, list[Any]] = _empty_candidate_rows()
+    candidate_diagnostic_rows: dict[str, list[Any]] = _empty_candidate_diagnostic_rows()
     selected_depth_rows: dict[str, list[Any]] = _empty_selected_depth_rows()
     target_eval_crop_rows: dict[str, list[Any]] = _empty_target_eval_crop_rows()
 
@@ -1702,7 +1867,9 @@ def _flatten_records(
         rollout_rows["root_trajectory_index"].append(_int_or_default(record.result.root_trajectory_index, default=-1))
         rollout_rows["root_frame_index"].append(_int_or_default(record.result.root_frame_index, default=-1))
         rollout_rows["scene_id"].append(_dict_id(dictionaries["scene"], lineage.scene_id or ""))
-        rollout_rows["snippet_id"].append(_dict_id(dictionaries["snippet"], lineage.snippet_id or ""))
+        rollout_rows["snippet_id"].append(
+            _dict_id(dictionaries["snippet"], compact_ase_atek_sample_id(lineage.snippet_id or ""))
+        )
         rollout_rows["target_row_id"].append(lineage.target_row_id if lineage.target_row_id is not None else 0)
         rollout_rows["policy_id"].append(_dict_id(dictionaries["policy"], _policy_name(record.result.selection_policy)))
         rollout_rows["horizon"].append(record.result.horizon)
@@ -1805,6 +1972,13 @@ def _flatten_records(
                     dictionaries=dictionaries,
                     target_label_valid=_lineage_target_label_valid(lineage),
                 )
+                _append_candidate_diagnostic_row(
+                    candidate_diagnostic_rows,
+                    step=step,
+                    candidate_valid=candidate_valid,
+                    candidate_row_id=candidate_row_id,
+                    shell_index=shell_index,
+                )
                 candidate_row_id += 1
         rollout_row_id += 1
 
@@ -1814,6 +1988,7 @@ def _flatten_records(
         lineage=_rows_to_numpy_table(lineage_rows, LINEAGE_TABLE),
         steps=_rows_to_numpy_table(step_rows, STEP_TABLE),
         candidates=_rows_to_numpy_table(candidate_rows, CANDIDATE_TABLE),
+        candidate_diagnostics=_rows_to_numpy_table(candidate_diagnostic_rows, CANDIDATE_DIAGNOSTIC_TABLE),
         selected_depth=_rows_to_numpy_selected_depth_table(
             selected_depth_rows,
             width_px=selected_depth_width_px,
@@ -1837,9 +2012,11 @@ def _append_source_row(
     rows["sample_index"].append(
         source_row_id if lineage.source_sample_index is None else int(lineage.source_sample_index)
     )
-    rows["sample_key_id"].append(_dict_id(dictionaries["source_key"], lineage.source_sample_key or ""))
+    rows["sample_key_id"].append(
+        _dict_id(dictionaries["source_key"], compact_ase_atek_sample_id(lineage.source_sample_key or ""))
+    )
     rows["scene_id"].append(_dict_id(dictionaries["scene"], lineage.scene_id or ""))
-    rows["snippet_id"].append(_dict_id(dictionaries["snippet"], lineage.snippet_id or ""))
+    rows["snippet_id"].append(_dict_id(dictionaries["snippet"], compact_ase_atek_sample_id(lineage.snippet_id or "")))
     rows["split_id"].append(_dict_id(dictionaries["split"], lineage.split or "unknown"))
     rows["source_cache_version_id"].append(_dict_id(dictionaries["config"], lineage.source_cache_version or ""))
     rows["source_offline_store_manifest_hash_id"].append(
@@ -1856,9 +2033,9 @@ def _source_identity(*, lineage: RolloutLineage, source_row_id: int) -> tuple[ob
     return (
         source_row_id,
         None if lineage.source_sample_index is None else int(lineage.source_sample_index),
-        lineage.source_sample_key,
+        compact_ase_atek_sample_id(lineage.source_sample_key or ""),
         lineage.scene_id,
-        lineage.snippet_id,
+        compact_ase_atek_sample_id(lineage.snippet_id or ""),
         lineage.split,
         lineage.source_cache_version,
         lineage.source_offline_store_manifest_hash,
@@ -1882,6 +2059,10 @@ def _empty_rows(schema: _TableSchema) -> dict[str, list[Any]]:
 
 def _empty_candidate_rows() -> dict[str, list[Any]]:
     return _empty_rows(CANDIDATE_TABLE)
+
+
+def _empty_candidate_diagnostic_rows() -> dict[str, list[Any]]:
+    return _empty_rows(CANDIDATE_DIAGNOSTIC_TABLE)
 
 
 def _empty_selected_depth_rows() -> dict[str, list[Any]]:
@@ -2093,6 +2274,50 @@ def _append_candidate_row(
     )
 
 
+def _append_candidate_diagnostic_row(
+    rows: dict[str, list[Any]],
+    *,
+    step: CounterfactualStepResult,
+    candidate_valid: torch.Tensor,
+    candidate_row_id: int,
+    shell_index: int,
+) -> None:
+    """Append typed candidate-generation diagnostics for one full-shell row."""
+
+    rows["candidate_row_id"].append(int(candidate_row_id))
+    rows["position_id"].append(_full_shell_value(step.candidates.position_id, shell_index, candidate_valid, default=-1))
+    rows["mesh_distance_m"].append(
+        _candidate_extra_value(step.candidates.extras, "min_distance_to_mesh", shell_index, candidate_valid)
+    )
+    rows["path_min_clearance_m"].append(
+        _candidate_extra_value(step.candidates.extras, "path_min_clearance_m", shell_index, candidate_valid)
+    )
+    rows["path_collision_mask"].append(
+        _candidate_extra_bool(step.candidates.extras, "path_collision_mask", shell_index, candidate_valid)
+    )
+    rows["free_space_margin_m"].append(
+        _candidate_extra_value(step.candidates.extras, "free_space_margin_m", shell_index, candidate_valid)
+    )
+    rows["motion_step_length_m"].append(
+        _candidate_extra_value(step.candidates.extras, "motion_step_length_m", shell_index, candidate_valid)
+    )
+    rows["motion_height_delta_m"].append(
+        _candidate_extra_value(step.candidates.extras, "motion_height_delta_m", shell_index, candidate_valid)
+    )
+    rows["motion_backward_step_m"].append(
+        _candidate_extra_value(step.candidates.extras, "motion_backward_step_m", shell_index, candidate_valid)
+    )
+    rows["motion_yaw_delta_deg"].append(
+        np.degrees(_candidate_extra_value(step.candidates.extras, "motion_yaw_delta_rad", shell_index, candidate_valid))
+    )
+    rows["target_distance_m"].append(
+        _candidate_extra_value(step.candidates.extras, "target_distance_m", shell_index, candidate_valid)
+    )
+    rows["target_bearing_yaw_deg"].append(
+        np.degrees(_candidate_extra_value(step.candidates.extras, "target_bearing_yaw_rad", shell_index, candidate_valid))
+    )
+
+
 def _append_selected_depth_row(
     rows: dict[str, list[Any]],
     *,
@@ -2143,6 +2368,8 @@ def _write_rollout_tables(groups: dict[str, zarr.Group], tables: _RolloutTables)
         _write_array(groups["steps"], name, values)
     for name, values in tables.candidates.items():
         _write_array(groups["candidates"], name, values)
+    for name, values in tables.candidate_diagnostics.items():
+        _write_array(groups["candidate_diagnostics"], name, values)
 
 
 def _write_selected_depth_group(
@@ -2379,6 +2606,7 @@ def _read_tables_from_root(root: Any) -> _RolloutTables:
         lineage=_read_group_table(root, LINEAGE_TABLE),
         steps=_read_group_table(root, STEP_TABLE),
         candidates=_read_group_table(root, CANDIDATE_TABLE),
+        candidate_diagnostics=_read_group_table(root, CANDIDATE_DIAGNOSTIC_TABLE),
         selected_depth=_read_selected_depth_table(root),
         target_eval_crops=_read_target_eval_crop_table(root),
     )
@@ -2642,6 +2870,34 @@ def _full_shell_value(
     return full[shell_index].detach().cpu().item()
 
 
+def _candidate_extra_value(
+    extras: dict[str, Any],
+    name: str,
+    shell_index: int,
+    candidate_valid: torch.Tensor,
+) -> float:
+    value = extras.get(name)
+    if value is None:
+        return float("nan")
+    tensor = torch.as_tensor(value).detach().cpu()
+    full = _full_shell_or_default(tensor, candidate_valid, fill_value=float("nan"))
+    return float(full[shell_index].item())
+
+
+def _candidate_extra_bool(
+    extras: dict[str, Any],
+    name: str,
+    shell_index: int,
+    candidate_valid: torch.Tensor,
+) -> bool:
+    value = extras.get(name)
+    if value is None:
+        return False
+    tensor = torch.as_tensor(value).detach().cpu().to(dtype=torch.bool)
+    full = _full_shell_or_default(tensor, candidate_valid, fill_value=0)
+    return bool(full[shell_index].item())
+
+
 def _valid_vector_value(
     values: torch.Tensor | None,
     shell_index: int,
@@ -2683,6 +2939,22 @@ def _relative_pose_to_root(*, pose_world_cam: np.ndarray, root_pose_world: torch
 
 def _missing_lineage_token(value: Any) -> bool:
     return value is None or str(value) == ""
+
+
+def _target_identifier_mentions_other_snippet(*, identifier: str, snippet: str) -> bool:
+    """Return true when a structured target id names a different snippet."""
+
+    compact_snippet = compact_ase_atek_sample_id(snippet)
+    raw_snippet = raw_ase_atek_sample_id(compact_snippet)
+    if (
+        not identifier
+        or not snippet
+        or snippet in identifier
+        or compact_snippet in identifier
+        or (raw_snippet is not None and raw_snippet in identifier)
+    ):
+        return False
+    return "AtekDataSample_" in identifier or "AriaSyntheticEnvironment_" in identifier
 
 
 def _encoded_values(root: Any, *, dictionary_name: str, array_path: str) -> list[str]:

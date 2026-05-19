@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 
 from aria_nbv.configs import PathConfig
 from aria_nbv.data_handling.efm_dataset import AseEfmDataset, AseEfmDatasetConfig
+from aria_nbv.data_handling.efm_dataset_utils import compact_ase_atek_sample_id, raw_ase_atek_sample_id
 from aria_nbv.data_handling.efm_views import EfmCameraView, EfmSnippetView
 
 
@@ -126,6 +127,32 @@ class TestAseEfmDataset:
         assert cam.images.shape == (2, 3, 4, 4)
         assert traj.t_world_rig.matrix3x4.shape == (2, 3, 4)
 
+    def test_compacts_ase_atek_key_identifiers(self, tmp_path: Path):
+        paths = _paths(tmp_path)
+        efm = _mock_efm_sample(scene="81286", snippet="shards-0000")
+        efm["__key__"] = "AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+        mock_loader = MagicMock()
+        mock_loader.__iter__.return_value = iter([efm])
+        mock_loader.__len__.return_value = 1
+
+        with patch.object(AseEfmDataset, "_load_atek_wds_dataset_as_efm", return_value=mock_loader):
+            tar = paths.resolve_atek_data_dir("efm") / "81286" / "dummy.tar"
+            tar.parent.mkdir(parents=True, exist_ok=True)
+            tar.write_bytes(b"dummy")
+            config = AseEfmDatasetConfig(
+                paths=paths,
+                scene_ids=["81286"],
+                scene_to_mesh={},
+                load_meshes=False,
+                batch_size=None,
+                mesh_crop_margin_m=None,
+                verbosity=0,
+            )
+            sample = next(iter(AseEfmDataset(config)))
+
+        assert sample.scene_id == "81286"
+        assert sample.snippet_id == "ASE_81286_Atek_000000"
+
     def test_dataloader_collation(self, tmp_path: Path):
         paths = _paths(tmp_path)
         efm1 = _mock_efm_sample(scene="00000", snippet="shards-0000")
@@ -160,7 +187,7 @@ class TestAseEfmDataset:
         efm["__key__"] = "AriaSyntheticEnvironment_82832_AtekDataSample_000056"
         sample = EfmSnippetView.from_cache_efm(efm)
         assert sample.scene_id == "82832"
-        assert sample.snippet_id == "000056"
+        assert sample.snippet_id == "ASE_82832_Atek_000056"
         assert sample.crop_bounds is not None
         bounds_min, bounds_max = sample.crop_bounds
         assert torch.allclose(bounds_min, torch.tensor([0.0, 0.0, 0.0]))
@@ -287,6 +314,16 @@ class TestAseEfmDataset:
         assert samples[1].mesh is not None
         assert samples[0].mesh.faces.shape == samples[1].mesh.faces.shape
         assert samples[0].mesh.vertices.shape == samples[1].mesh.vertices.shape
+
+
+def test_ase_atek_identifier_conversion_round_trip() -> None:
+    raw = "AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+    compact = "ASE_81286_Atek_000000"
+
+    assert compact_ase_atek_sample_id(raw) == compact
+    assert raw_ase_atek_sample_id(compact) == raw
+    assert compact_ase_atek_sample_id("snippet-000") == "snippet-000"
+    assert raw_ase_atek_sample_id("snippet-000") is None
 
 
 class TestGTViewRealData:

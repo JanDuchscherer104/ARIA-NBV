@@ -38,6 +38,7 @@ from ..utils.semantic_names import normalize_semantic_name_map
 from ..vin.types import EvlBackboneOutput
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
 from ._raw import EfmSnippetLoader, EfmSnippetView, VinSnippetView
+from .efm_dataset_utils import compact_ase_atek_sample_id, raw_ase_atek_sample_id
 from .vin_oracle_types import CompactObbBlock, CompactTrajectoryBlock, VinOracleBatch
 
 if TYPE_CHECKING:
@@ -866,7 +867,15 @@ class VinOfflineDataset(Dataset[VinOfflineDatasetItem]):
             Matching offline sample or ``None``.
         """
 
-        record = self._record_by_pair.get((scene_id, snippet_id))
+        candidates = [snippet_id, compact_ase_atek_sample_id(snippet_id)]
+        raw = raw_ase_atek_sample_id(snippet_id)
+        if raw is not None:
+            candidates.append(raw)
+        record = None
+        for candidate in dict.fromkeys(candidates):
+            record = self._record_by_pair.get((scene_id, candidate))
+            if record is not None:
+                break
         if record is None:
             return None
         return self._build_sample(record)

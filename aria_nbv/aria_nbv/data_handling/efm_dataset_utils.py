@@ -2,28 +2,66 @@
 
 from __future__ import annotations
 
+import re
 import tarfile
-import warnings
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any
 
 import torch
-import trimesh
-from atek.data_loaders.atek_wds_dataloader import load_atek_wds_dataset
 from efm3d.aria.aria_constants import (
     ARIA_POINTS_VOL_MAX,
     ARIA_POINTS_VOL_MIN,
     ARIA_POINTS_WORLD,
 )
-from efm3d.dataset.efm_model_adaptor import EfmModelAdaptor, pipelinefilter
-from pydantic import Field, ValidationInfo, field_validator, model_validator
-from torch.utils.data import IterableDataset
 
 from ..configs import PathConfig
-from ..utils import BaseConfig, Console, Verbosity
-from .efm_views import EfmSnippetView
-from .mesh_cache import MeshProcessSpec, load_or_process_mesh
+
+_RAW_ASE_ATEK_SAMPLE_RE = re.compile(r"AriaSyntheticEnvironment_(?P<scene>[^_]+)_AtekDataSample_(?P<sample>[^_:/.\s]+)")
+_COMPACT_ASE_ATEK_SAMPLE_RE = re.compile(r"ASE_(?P<scene>[^_]+)_Atek_(?P<sample>[^_:/.\s]+)")
+
+
+def compact_ase_atek_sample_id(raw: str) -> str:
+    """Return the compact public identifier for one ASE-ATEK sample key."""
+
+    def _replace(match: re.Match[str]) -> str:
+        return f"ASE_{match.group('scene')}_Atek_{match.group('sample')}"
+
+    return _RAW_ASE_ATEK_SAMPLE_RE.sub(_replace, str(raw))
+
+
+def raw_ase_atek_sample_id(compact: str) -> str | None:
+    """Return the raw ATEK key for a compact ASE-ATEK identifier."""
+
+    match = _COMPACT_ASE_ATEK_SAMPLE_RE.fullmatch(str(compact))
+    if match is None:
+        return None
+    return f"AriaSyntheticEnvironment_{match.group('scene')}_AtekDataSample_{match.group('sample')}"
+
+
+def compact_ase_atek_identifiers(value: Any) -> Any:
+    """Recursively compact ASE-ATEK identifiers inside JSON-like objects."""
+
+    if isinstance(value, str):
+        return compact_ase_atek_sample_id(value)
+    if isinstance(value, list):
+        return [compact_ase_atek_identifiers(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(compact_ase_atek_identifiers(item) for item in value)
+    if isinstance(value, dict):
+        return {compact_ase_atek_identifiers(key): compact_ase_atek_identifiers(item) for key, item in value.items()}
+    return value
+
+
+def _ase_atek_identifier_variants(identifier: str) -> set[str]:
+    """Return raw and compact variants for matching one ASE-ATEK identifier."""
+
+    value = str(identifier)
+    variants = {value, compact_ase_atek_sample_id(value)}
+    raw = raw_ase_atek_sample_id(value)
+    if raw is not None:
+        variants.add(raw)
+    return {variant for variant in variants if variant}
 
 
 def _infer_ids(
@@ -34,7 +72,7 @@ def _infer_ids(
     scene_id = str(sequence_name or efm_dict.get("sequence_name", "unknown"))
     snippet_id = efm_dict.get("__key__") or efm_dict.get("__url__")
     if isinstance(snippet_id, str):
-        snippet_id = Path(snippet_id).stem
+        snippet_id = compact_ase_atek_sample_id(Path(snippet_id).stem)
     else:
         snippet_id = "unknown"
     if scene_id == "unknown" and "__url__" in efm_dict:
@@ -51,7 +89,10 @@ def _unique_preserve_order(values: Iterable[str]) -> list[str]:
 
 def _looks_like_sample_key(snippet_id: str) -> bool:
     """Return whether a snippet identifier looks like a per-sample key."""
-    return any(token in snippet_id for token in ("AtekDataSample", "DataSample"))
+    return (
+        any(token in snippet_id for token in ("AtekDataSample", "DataSample"))
+        or raw_ase_atek_sample_id(snippet_id) is not None
+    )
 
 
 def _looks_like_shard_id(snippet_id: str) -> bool:
@@ -70,7 +111,11 @@ def _normalize_shard_stem(snippet_id: str) -> str:
 
 def _matches_snippet_token(prefix: str, token: str) -> bool:
     """Return whether a shard member prefix matches the requested token."""
-    return prefix == token or prefix.endswith(token)
+    prefixes = _ase_atek_identifier_variants(prefix)
+    tokens = _ase_atek_identifier_variants(token)
+    return any(
+        candidate == requested or candidate.endswith(requested) for candidate in prefixes for requested in tokens
+    )
 
 
 def _tar_contains_snippet(tar_path: Path, snippet_token: str) -> bool:
@@ -224,5 +269,8 @@ __all__ = [
     "_tar_contains_snippet",
     "_tensor3",
     "_unique_preserve_order",
+    "compact_ase_atek_identifiers",
+    "compact_ase_atek_sample_id",
     "infer_semidense_bounds",
+    "raw_ase_atek_sample_id",
 ]

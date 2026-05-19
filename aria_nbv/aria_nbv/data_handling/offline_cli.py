@@ -7,33 +7,25 @@ config-as-factory path, and runs `aria_nbv.data_handling.VinOfflineWriter`.
 
 from __future__ import annotations
 
-import argparse
+import sys
 from pathlib import Path
+from typing import Annotated
 
-from ..utils import Console
+import typer
+
+from ..utils.cli_format import cli_console, key_value_panel
 from ..utils.config_paths import resolve_config_toml_path
+from ..utils.typer_cli import run_typer_app
 from ._offline_writer import VinOfflineWriterConfig
 
+_HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-def _build_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser for immutable offline-store creation."""
-
-    parser = argparse.ArgumentParser(
-        prog="nbv-build-offline",
-        description="Build an immutable VIN offline store from raw ASE/EFM snippets and oracle RRI labels.",
-    )
-    parser.add_argument(
-        "--config-path",
-        required=True,
-        type=Path,
-        help="Path to a VinOfflineWriterConfig TOML file.",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate the TOML and print the resolved store path without loading data or writing shards.",
-    )
-    return parser
+app = typer.Typer(
+    add_completion=False,
+    context_settings=_HELP_SETTINGS,
+    help="Build an immutable VIN offline store from raw ASE/EFM snippets and oracle RRI labels.",
+    pretty_exceptions_show_locals=False,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -43,23 +35,53 @@ def main(argv: list[str] | None = None) -> None:
         argv: Optional argument vector. Defaults to ``sys.argv[1:]``.
     """
 
-    args = _build_parser().parse_args(argv)
-    console = Console.with_prefix("nbv-build-offline")
-    config_path = resolve_config_toml_path(args.config_path)
+    run_typer_app(app, list(sys.argv[1:] if argv is None else argv), prog_name="nbv-build-offline")
+
+
+@app.command()
+def build_offline_command(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config-path", help="Path to a VinOfflineWriterConfig TOML file."),
+    ],
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Validate the TOML and print resolved paths without loading data or writing shards.",
+        ),
+    ] = False,
+) -> None:
+    """Run immutable VIN offline-store creation from a TOML config."""
+
+    console = cli_console()
+    config_path = resolve_config_toml_path(config_path)
     cfg = VinOfflineWriterConfig.from_toml(config_path)
-    console.log(f"Loaded writer config: {config_path}")
-    console.log(f"Resolved store dir: {cfg.store.store_dir}")
-    if args.dry_run:
-        console.log("Dry run complete; no dataset, backbone, or writer was instantiated.")
+    console.print(
+        key_value_panel(
+            "VIN Offline Build",
+            [
+                ("config", config_path),
+                ("store", cfg.store.store_dir),
+                ("dry run", dry_run),
+            ],
+        )
+    )
+    if dry_run:
+        console.print("Dry run complete; no dataset, backbone, or writer was instantiated.")
         return
     manifest = cfg.setup_target().run()
-    console.log(
-        "Wrote VIN offline store: "
-        f"samples={manifest.stats.get('num_samples', 0)} "
-        f"shards={manifest.stats.get('num_shards', 0)} "
-        f"train={manifest.stats.get('num_train', 0)} "
-        f"val={manifest.stats.get('num_val', 0)}",
+    console.print(
+        key_value_panel(
+            "Wrote VIN Offline Store",
+            [
+                ("samples", manifest.stats.get("num_samples", 0)),
+                ("shards", manifest.stats.get("num_shards", 0)),
+                ("train", manifest.stats.get("num_train", 0)),
+                ("val", manifest.stats.get("num_val", 0)),
+            ],
+        )
     )
 
 
-__all__ = ["main"]
+__all__ = ["app", "main"]

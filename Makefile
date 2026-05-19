@@ -8,6 +8,8 @@
 .PHONY: memory-mine agents-db glossary kg-up kg-down kg-status kg-capabilities kg-ollama-check kg-search kg-route kg-claim-check kg-consolidate kg-show-paper kg-sync kg-materialize kg-index-code kg-ingest-docs kg-load-bundle kg-mcp-install kg-doctor kg-enrich kg-ingest-papers kg-export-neo4j kg-semantic-enrich kg-refresh-light kg-refresh-code kg-refresh-lit kg-refresh-semantic kg-refresh-full
 .PHONY: lrz-probe lrz-resources lrz-resources-gpu lrz-resources-cpu lrz-jobs lrz-dss-init lrz-container-shell lrz-sbatch-cpu lrz-sbatch-single-gpu lrz-sbatch-multigpu
 .PHONY: mermaid-lint
+.PHONY: offline-info offline-tree offline-samples offline-random-index offline-rerun-random offline-sample-rerun-random
+.PHONY: rollouts-info rollouts-stats rollouts-random-index rollouts-rerun-random
 
 # Color codes
 BLUE := \033[0;34m
@@ -107,6 +109,20 @@ PACKAGE_SMOKE_TESTS := \
 	tests/pose_generation/test_counterfactuals.py \
 	tests/rendering/test_candidate_renderer_cpu_backend.py \
 	tests/lightning/test_vin_batch_collate.py
+
+# Read-only operator inspection defaults.
+OFFLINE_STORE ?= vin_offline
+OFFLINE_SPLIT ?= train
+OFFLINE_MAX_SAMPLES ?= 128
+OFFLINE_SAMPLE_LIMIT ?= 20
+OFFLINE_SEED ?=
+ROLLOUT_STORE ?= rollouts_v1_realistic.zarr
+ROLLOUT_MIN_HORIZON ?= 2
+ROLLOUT_SEED ?=
+RERUN_MODE ?= view
+RERUN_CONFIG ?= ../.configs/rerun_offline.toml
+RERUN_SAVE ?= ../.artifacts/rerun/offline_random.rrd
+ROLLOUT_RERUN_SAVE ?= ../.artifacts/rerun/rollout_random.rrd
 
 #  ══════════════════════════════════════════════════════════════════════
 #  Agent Context helpers
@@ -227,6 +243,77 @@ qmd-frontmatter-check: _check_python ## 📖 Validate taxonomy frontmatter for r
 
 agents-db-validate: _check_python ## Validate the agents DB schema
 	@$(PYTHON_INTERPRETER) scripts/agents_db.py validate
+
+#  ══════════════════════════════════════════════════════════════════════
+#  Offline / rollout inspection
+#  ══════════════════════════════════════════════════════════════════════
+
+offline-info: _check_python ## 🔍 Summarize a VIN offline store
+	@cd $(PKG_DIR) && uv run nbv-offline-info summary --store "$(OFFLINE_STORE)" --max-samples "$(OFFLINE_MAX_SAMPLES)"
+
+offline-tree: _check_python ## 🔍 Show VIN offline store manifest tree
+	@cd $(PKG_DIR) && uv run nbv-offline-info tree --store "$(OFFLINE_STORE)"
+
+offline-samples: _check_python ## 🔍 Sample rows from a VIN offline store split
+	@cd $(PKG_DIR) && uv run nbv-offline-info samples --store "$(OFFLINE_STORE)" --split "$(OFFLINE_SPLIT)" --limit "$(OFFLINE_SAMPLE_LIMIT)"
+
+offline-random-index: _check_python ## 🔍 Print a deterministic random split-local VIN sample index
+	@cd $(PKG_DIR) && bash -lc 'set -euo pipefail; \
+		seed_args=(); \
+		if [[ -n "$(strip $(OFFLINE_SEED))" ]]; then seed_args+=(--seed "$(OFFLINE_SEED)"); fi; \
+		uv run nbv-offline-info random-index --store "$(OFFLINE_STORE)" --split "$(OFFLINE_SPLIT)" "$${seed_args[@]}"'
+
+offline-rerun-random: rollouts-rerun-random ## 🔍 Inspect a random rollout row in Rerun
+
+offline-sample-rerun-random: _check_python ## 🔍 Inspect a random VIN offline sample in Rerun
+	@cd $(PKG_DIR) && bash -lc 'set -euo pipefail; \
+		seed_args=(); \
+		if [[ -n "$(strip $(OFFLINE_SEED))" ]]; then seed_args+=(--seed "$(OFFLINE_SEED)"); fi; \
+		idx="$$(uv run nbv-offline-info random-index --store "$(OFFLINE_STORE)" --split "$(OFFLINE_SPLIT)" "$${seed_args[@]}")"; \
+		offline_store="$(OFFLINE_STORE)"; \
+		if [[ "$$offline_store" != /* && "$$offline_store" != */* ]]; then offline_store="../.data/offline_cache/$$offline_store"; \
+		elif [[ "$$offline_store" != /* ]]; then offline_store="../$$offline_store"; fi; \
+		offline_store="$$(realpath -m "$$offline_store")"; \
+		echo "Inspecting offline split=$(OFFLINE_SPLIT) index=$$idx store=$$offline_store"; \
+		if [[ "$(RERUN_MODE)" == "view" ]]; then \
+			uv run nbv-rerun-inspect --config-path "$(RERUN_CONFIG)" --offline-store "$$offline_store" --split "$(OFFLINE_SPLIT)" --index "$$idx" --view; \
+		elif [[ "$(RERUN_MODE)" == "save" ]]; then \
+			mkdir -p "$$(dirname "$(RERUN_SAVE)")"; \
+			uv run nbv-rerun-inspect --config-path "$(RERUN_CONFIG)" --offline-store "$$offline_store" --split "$(OFFLINE_SPLIT)" --index "$$idx" --save "$(RERUN_SAVE)"; \
+		else \
+			echo "RERUN_MODE must be view or save, got $(RERUN_MODE)" >&2; exit 2; \
+		fi'
+
+rollouts-info: _check_python ## 🔍 Summarize a rollout Zarr store
+	@cd $(PKG_DIR) && uv run nbv-rollouts-info --store "$(ROLLOUT_STORE)"
+
+rollouts-stats: _check_python ## 🔍 Summarize rollout-store validity, policy, and selected-path stats
+	@cd $(PKG_DIR) && uv run nbv-rollouts-info --store "$(ROLLOUT_STORE)" --stats
+
+rollouts-random-index: _check_python ## 🔍 Print a deterministic random rollout row index
+	@cd $(PKG_DIR) && bash -lc 'set -euo pipefail; \
+		seed_args=(); \
+		if [[ -n "$(strip $(ROLLOUT_SEED))" ]]; then seed_args+=(--seed "$(ROLLOUT_SEED)"); fi; \
+		uv run nbv-rollouts-info --store "$(ROLLOUT_STORE)" --random-index --min-horizon "$(ROLLOUT_MIN_HORIZON)" "$${seed_args[@]}"'
+
+rollouts-rerun-random: _check_python ## 🔍 Inspect a random multi-step rollout row in Rerun
+	@cd $(PKG_DIR) && bash -lc 'set -euo pipefail; \
+		seed_args=(); \
+		if [[ -n "$(strip $(ROLLOUT_SEED))" ]]; then seed_args+=(--seed "$(ROLLOUT_SEED)"); fi; \
+		idx="$$(uv run nbv-rollouts-info --store "$(ROLLOUT_STORE)" --random-index --min-horizon "$(ROLLOUT_MIN_HORIZON)" "$${seed_args[@]}")"; \
+		rollout_store="$(ROLLOUT_STORE)"; \
+		if [[ "$$rollout_store" != /* && "$$rollout_store" != */* ]]; then rollout_store="../.data/offline_cache/$$rollout_store"; \
+		elif [[ "$$rollout_store" != /* ]]; then rollout_store="../$$rollout_store"; fi; \
+		rollout_store="$$(realpath -m "$$rollout_store")"; \
+		echo "Inspecting rollout index=$$idx store=$$rollout_store"; \
+		if [[ "$(RERUN_MODE)" == "view" ]]; then \
+			uv run nbv-rerun-inspect --config-path "$(RERUN_CONFIG)" --rollout-store "$$rollout_store" --rollout-index "$$idx" --rollout-context auto --view; \
+		elif [[ "$(RERUN_MODE)" == "save" ]]; then \
+			mkdir -p "$$(dirname "$(ROLLOUT_RERUN_SAVE)")"; \
+			uv run nbv-rerun-inspect --config-path "$(RERUN_CONFIG)" --rollout-store "$$rollout_store" --rollout-index "$$idx" --rollout-context auto --save "$(ROLLOUT_RERUN_SAVE)"; \
+		else \
+			echo "RERUN_MODE must be view or save, got $(RERUN_MODE)" >&2; exit 2; \
+		fi'
 
 memory-mine: _check_python ## 🧠 Mine current repo state (docs, code, history) into repo-local MemPalace
 	@echo "$(BLUE)Mining project into MemPalace...$(NC)"

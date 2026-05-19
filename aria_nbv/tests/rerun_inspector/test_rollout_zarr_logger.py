@@ -54,6 +54,7 @@ class _FakeRerun:
     Pinhole = _Archetype
     DepthImage = _Archetype
     AnyValues = _Archetype
+    Boxes3D = _Archetype
 
     class ViewCoordinates:
         """Fake Rerun view-coordinate constants."""
@@ -141,6 +142,10 @@ def _fixture_rollout_store(tmp_path: Path, *, selected_depth_enabled: bool = Tru
         sibling.source_shard_id = base.source_shard_id
         sibling.source_shard_row = base.source_shard_row
         sibling.target_row_id = base.target_row_id
+        sibling.target_id = base.target_id
+        sibling.target_source_index = base.target_source_index
+        sibling.matched_gt_target_row_id = base.matched_gt_target_row_id
+        sibling.matched_gt_target_id = base.matched_gt_target_id
     for record in records:
         for trajectory in record.result.trajectories:
             for step in trajectory.steps:
@@ -238,6 +243,15 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert ENTITY_WORLD in fake.logged
     assert ENTITY_ROLLOUT_METADATA in fake.logged
     chain_root = f"{ENTITY_ROLLOUT_ROOT}/rollout_{rows.rollout_row_id:06d}/chain_{rows.chain_id:06d}"
+    target_root = f"{chain_root}/target"
+    assert f"{target_root}/actor_visible_obb" in fake.logged
+    assert f"{target_root}/center" in fake.logged
+    assert f"{target_root}/metadata" in fake.logged
+    target_metadata = json.loads(fake.logged[f"{target_root}/metadata"].args[0])
+    assert target_metadata["target_row_id"] == 0
+    assert target_metadata["source_row_id"] == 0
+    assert target_metadata["target_id"] == "fixture-target-0"
+    assert target_metadata["matched_gt_target_id"] == "fixture-gt-target-0"
     assert len(fake.blueprints) == 1
     rollout_contents = _world_view_contents_from_blueprint(fake.blueprints[-1])
     rollout_overrides = _world_view_overrides_from_blueprint(fake.blueprints[-1])
@@ -319,6 +333,13 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert camera_calls[0][2][1].kwargs["rollout_row_id"] == rows.rollout_row_id
     assert camera_calls[0][2][1].kwargs["chain_id"] == rows.chain_id
     assert camera_calls[0][2][1].kwargs["candidate_status"] == "valid"
+    assert camera_calls[0][2][1].kwargs["sampling_strategy_id"] >= 0
+    assert camera_calls[0][2][1].kwargs["sampling_strategy_name"]
+    assert camera_calls[0][2][1].kwargs["mixture_id"] >= 0
+    assert camera_calls[0][2][1].kwargs["sampler_probability"] > 0.0
+    assert camera_calls[0][2][1].kwargs["target_rri_rank"] > 0
+    assert camera_calls[0][2][1].kwargs["target_rri_rank_total"] > 0
+    assert camera_calls[0][2][1].kwargs["target_rri_rank_semantics"] == "valid_finite_target_rri_desc"
 
     metadata = json.loads(fake.logged[ENTITY_ROLLOUT_METADATA].args[0])
     assert metadata["validation"]["ok"]
@@ -326,6 +347,7 @@ def test_rollout_zarr_logger_logs_multistep_candidate_layers(
     assert metadata["manifest"]["source_coverage"]["num_source_rows"] >= 1
     assert metadata["selected"]["rollout_row_id"] == 0
     assert metadata["selected"]["chain_id"] == 0
+    assert metadata["target"]["target_id"] == "fixture-target-0"
     assert metadata["context"]["mode"] == "off"
 
     step_metadata_paths = [

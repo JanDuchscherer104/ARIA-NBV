@@ -151,9 +151,11 @@ class PathCollisionRule(RuleBase):
             pts = origin.view(1, 1, 3) + dirs_norm.unsqueeze(1) * (t_vals.view(1, -1, 1) * dists.view(-1, 1, 1))
             pts_flat = pts.reshape(-1, 3)
             dists_pts = point_mesh_distance(pts_flat, ctx.mesh_verts, ctx.mesh_faces).view(targets.shape[0], steps)
+            min_clearance = dists_pts.min(dim=1).values
             collide = (dists_pts < self.config.step_clearance).any(dim=1)
             if ctx.cfg.collect_debug_stats:
                 ctx.mark_debug("path_collision_mask", collide)
+                ctx.mark_debug("path_min_clearance_m", min_clearance)
             ctx.invalidate(collide)
             return
 
@@ -255,6 +257,22 @@ class FreeSpaceRule(RuleBase):
             & (p[:, 2] >= zmin)
             & (p[:, 2] <= zmax)
         )
+        if ctx.cfg.collect_debug_stats:
+            lower = torch.stack((xmin - p[:, 0], ymin - p[:, 1], zmin - p[:, 2]), dim=1).clamp_min(0.0)
+            upper = torch.stack((p[:, 0] - xmax, p[:, 1] - ymax, p[:, 2] - zmax), dim=1).clamp_min(0.0)
+            outside_distance = torch.linalg.norm(lower + upper, dim=1)
+            inside_margin = torch.stack(
+                (
+                    p[:, 0] - xmin,
+                    xmax - p[:, 0],
+                    p[:, 1] - ymin,
+                    ymax - p[:, 1],
+                    p[:, 2] - zmin,
+                    zmax - p[:, 2],
+                ),
+                dim=1,
+            ).min(dim=1).values
+            ctx.mark_debug("free_space_margin_m", torch.where(in_box, inside_margin, -outside_distance))
         ctx.mask_valid = ctx.mask_valid & in_box
 
 

@@ -49,6 +49,7 @@ from torch import Tensor
 from trimesh import Trimesh  # type: ignore[import-untyped]
 
 from ..utils import summarize
+from .efm_dataset_utils import compact_ase_atek_sample_id
 from .mesh_cache import MeshProcessSpec
 
 _FIELD_DOC_CACHE: dict[type, dict[str, str]] = {}
@@ -533,7 +534,7 @@ class EfmSnippetView(BaseView):
         match = re.match(r"^AriaSyntheticEnvironment_(\d+)_AtekDataSample_(\d+)$", sample_key)
         if not match:
             raise ValueError(f"Unsupported cache key format: {sample_key}")
-        return match.group(1), match.group(2)
+        return match.group(1), compact_ase_atek_sample_id(sample_key)
 
     @staticmethod
     def _infer_cache_bounds(efm: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor] | None:

@@ -78,6 +78,7 @@ dependencies = [
     "msgspec>=0.20.0",
     "zarr>=3.1.5",
     "setuptools<81",
+    "typer>=0.25.1",
 ]
 
     [project.scripts]
@@ -86,6 +87,7 @@ dependencies = [
     nbv-st                 = "aria_nbv.streamlit_app:streamlit_entry"
     nbv-fit-binner         = "aria_nbv.lightning.cli:fit_binner_main"
     nbv-build-offline      = "aria_nbv.data_handling.offline_cli:main"
+    nbv-offline-info       = "aria_nbv.data_handling.offline_info_cli:main"
     nbv-plan-rollout-shards = "aria_nbv.rollouts.cli:plan_main"
     nbv-build-rollouts     = "aria_nbv.rollouts.cli:main"
     nbv-status-rollout-shards = "aria_nbv.rollouts.cli:status_main"

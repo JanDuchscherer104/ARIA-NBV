@@ -53,6 +53,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Initialize EFM3D submodule
+        run: git submodule update --init external/efm3d
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

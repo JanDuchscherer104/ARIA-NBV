@@ -23,6 +23,7 @@ from ..configs import PathConfig
 from ..configs.path_config import PROJECT_ROOT
 from ._offline_format import VinOfflineIndexRecord, VinOfflineShardSpec
 from ._offline_store import VinOfflineStoreConfig, VinOfflineStoreReader
+from .efm_dataset_utils import compact_ase_atek_sample_id
 
 # TODO: what is this shit. Can't we just iterate over the fields of the respective data class?
 RRI_COMPONENT_BLOCKS: tuple[str, ...] = (
@@ -834,9 +835,9 @@ def collect_vin_offline_dataset_stats(
         sample_summaries.append(
             VinOfflineSampleDiagnostic(
                 sample_index=int(record.sample_index),
-                sample_key=record.sample_key,
+                sample_key=compact_ase_atek_sample_id(record.sample_key),
                 scene_id=record.scene_id,
-                snippet_id=record.snippet_id,
+                snippet_id=compact_ase_atek_sample_id(record.snippet_id),
                 split=record.split,
                 shard_id=record.shard_id,
                 row=int(record.row),
@@ -895,7 +896,7 @@ def _pair_from_tar_member(name: str) -> tuple[str, str] | None:
     token = basename.split(".", 1)[0]
     match = _ARIA_SAMPLE_RE.match(token)
     if match:
-        return match.group("scene"), match.group("sample")
+        return match.group("scene"), compact_ase_atek_sample_id(match.group("sample"))
     if len(path.parts) >= 2:
         scene_id = path.parts[-2]
         if scene_id:
@@ -991,7 +992,7 @@ def collect_vin_offline_dataset_coverage(
     dataset_config = dict(reader.manifest.source.get("dataset_config", {}))
     tar_paths = _resolve_coverage_tar_paths(dataset_config, max_tars=max_tars)
     dataset_pairs = _scan_tar_pairs(tar_paths, progress_cb=progress_cb)
-    store_pairs = {(record.scene_id, record.snippet_id) for record in reader.sample_index}
+    store_pairs = {(record.scene_id, compact_ase_atek_sample_id(record.snippet_id)) for record in reader.sample_index}
 
     covered = dataset_pairs & store_pairs
     missing = dataset_pairs - store_pairs

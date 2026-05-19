@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from aria_nbv.data_handling import VinOfflineSample, collect_offline_visual_inventory
+from aria_nbv.data_handling.efm_dataset_utils import compact_ase_atek_identifiers, compact_ase_atek_sample_id
 
 from ._config import RerunOfflineInspectorConfig
 
@@ -236,16 +237,16 @@ def build_sample_metadata_document(
 
     payload = {
         "sample": {
-            "sample_key": sample.sample_key,
+            "sample_key": compact_ase_atek_sample_id(sample.sample_key),
             "scene_id": sample.scene_id,
-            "snippet_id": sample.snippet_id,
+            "snippet_id": compact_ase_atek_sample_id(sample.snippet_id),
         },
         "selection": selection,
         "inventory": asdict(inventory),
         "runtime_warnings": list(runtime_warnings or ()),
         "config": config.model_dump_jsonable(),
     }
-    return json.dumps(payload, indent=2, sort_keys=True)
+    return json.dumps(compact_ase_atek_identifiers(payload), indent=2, sort_keys=True)
 
 
 __all__ = [

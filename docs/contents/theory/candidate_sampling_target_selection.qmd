@@ -34,8 +34,11 @@ GT match audit fields.
 ```
 
 For every actor-visible entity candidate $e$, the selector combines semi-dense
-support and EVL support into an effective support count:
-
+support and EVL support into an effective support count. The coefficient
+$w_{\mathrm{EVL}}$ is the configured `evl_support_weight`, with current default
+`1.0`. It treats each positive EVL support location as one weighted support
+vote. This is an operational ablation/config knob, not a learned value or a
+claim of optimal calibration.
 $$
 n_e^{\mathrm{eff}}
 =
@@ -45,9 +48,9 @@ w_{\mathrm{EVL}} n_e^{\mathrm{EVL}}.
 $$
 
 The support score verifies that the target has enough actor-visible evidence to
-be labelable:
-
-<!-- TODO: -->
+be labelable. The threshold $n_{\min}$ is the configured
+`min_support_points`, with current default `3`, and is also the hard minimum
+effective support required for target eligibility.
 $$
 s_e^{\mathrm{sup}}
 =
@@ -59,7 +62,9 @@ s_e^{\mathrm{sup}}
 $$
 
 The deficit score deliberately favors targets that are supported but not already
-saturated:
+saturated. The threshold $n_{\mathrm{sat}}$ is the configured
+`support_saturation_points`, with current default `128`. It is the soft support
+saturation point at which this deficit term reaches zero.
 
 $$
 s_e^{\mathrm{def}}
@@ -72,14 +77,24 @@ s_e^{\mathrm{def}}
 \right).
 $$
 
-For projected visibility, let $a_e$ be the projected image fraction and
-$a_{\max}$ the full-score saturation fraction:
+For projected visibility, let $A_e$ be the maximum projected 2D OBB area over
+the actor-visible RGB/SLAM camera boxes. Let
+$A_{\mathrm{img}}$ be the configured `projected_area_normalizer_pixels`, with
+current default `240*240`, and define $a_e=A_e/A_{\mathrm{img}}$. The
+full-score fraction $a_{\max}$ is the configured
+`projected_area_full_score_fraction`, with current default `0.05`.
 
 $$
 x_e=\operatorname{clip}(a_e/a_{\max},0,1),
 \qquad
 s_e^{\mathrm{vis}}=x_e^2(3-2x_e).
 $$
+
+The visibility curve is the standard cubic smoothstep. It is used as a smooth
+operational weighting because it maps `[0,1]` to `[0,1]` with zero slope at
+both endpoints. If no projected box exists, visibility is either a hard
+invalidity when `require_projected_visibility=True`, or the configured fallback
+score `missing_projection_visibility_score`, with current default `0.35`.
 
 The final actor-visible target score is:
 
@@ -92,15 +107,18 @@ s_e^{\mathrm{sup}}
 s_e^{\mathrm{def}},
 $$
 
-where $p_e$ is the OBB confidence. The hard mask $m_e$ removes padded,
-nonfinite, too-small, unsupported, or non-visible target rows before top-K
-selection.
+where $p_e$ is the OBB confidence as predicted by the EFM. The hard target
+eligibility mask $m_e \in \{0,1\}$ removes padded, nonfinite, too-small,
+unsupported, or non-visible target rows before top-K selection.
 
 Greedy top-K selection is deterministic:
 
 $$
 E_K=\operatorname{TopK}_{e:m_e=1} S_e.
 $$
+
+The subscript $e:m_e=1$ means that top-K is taken only over eligible target
+rows.
 
 The stochastic target-selection policy samples top-K without replacement:
 
@@ -111,9 +129,10 @@ P(e\mid R)
      {\sum_{j\in R}\exp(S_j/\tau)},
 $$
 
-where $R$ is the remaining eligible target set and $\tau$ is the target
-temperature. This stochastic policy operates over target rows, not candidate
-actions.
+where $R$ is the remaining eligible, not-yet-selected target set at the current
+sampling step and $\tau$ is the target temperature. This local symbol is not a
+global glossary term. This stochastic policy operates over target rows, not
+candidate actions.
 
 After selection, the GT label audit matches the selected actor-visible row to a
 GT OBB:

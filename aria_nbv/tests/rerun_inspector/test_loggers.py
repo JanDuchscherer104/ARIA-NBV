@@ -335,6 +335,26 @@ def test_normalized_inventory_preserves_worker_b_diagnostics() -> None:
     assert details["metadata"]["vin_snippet.valid_semidense_points"] == 42  # noqa: S101
 
 
+def test_metadata_compacts_old_ase_atek_identifiers() -> None:
+    cfg = RerunOfflineInspectorConfig()
+    sample = _sample()
+    sample.sample_key = "81286::AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+    sample.scene_id = "81286"
+    sample.snippet_id = "AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+    fake = _FakeRerun()
+
+    RerunOfflineLogger(cfg, rr_module=fake).log_metadata(
+        sample=sample,
+        inventory=OfflineVisualInventory(),
+        selection="scene_id=81286 snippet_id=AriaSyntheticEnvironment_81286_AtekDataSample_000000",
+    )
+
+    document = json.loads(fake.logged[ENTITY_METADATA_SAMPLE].args[0])
+    assert document["sample"]["sample_key"] == "81286::ASE_81286_Atek_000000"  # noqa: S101
+    assert document["sample"]["snippet_id"] == "ASE_81286_Atek_000000"  # noqa: S101
+    assert "AriaSyntheticEnvironment" not in fake.logged[ENTITY_METADATA_SAMPLE].args[0]  # noqa: S101
+
+
 def test_worker_b_candidate_pcs_semidense_flag_does_not_disable_required_semidense() -> None:
     """Worker-B candidate-pc semidense absence should not reject VIN semidense."""
 

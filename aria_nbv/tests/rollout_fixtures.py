@@ -10,6 +10,7 @@ from efm3d.aria import CameraTW, PoseTW
 
 from aria_nbv.data_handling import TARGET_INVALID_REASON_VERSION
 from aria_nbv.pose_generation.candidate_generation import CandidateViewGeneratorConfig
+from aria_nbv.pose_generation.candidate_mixture import candidate_position_id
 from aria_nbv.pose_generation.counterfactuals import (
     CounterfactualCandidateEvaluation,
     CounterfactualMetricBundle,
@@ -21,6 +22,7 @@ from aria_nbv.pose_generation.counterfactuals import (
 )
 from aria_nbv.pose_generation.target_counterfactuals import TARGET_CROP_POLICY_GT_OBB_ORIENTED_ANY_VERTEX_V1
 from aria_nbv.pose_generation.types import SamplingStrategy
+from aria_nbv.pose_generation.types import CandidatePositionMode
 from aria_nbv.rollouts import INVALID_REASON_VERSION, RolloutLineage, RolloutZarrRecord
 from aria_nbv.utils.fingerprints import stable_config_hash
 
@@ -111,6 +113,28 @@ def build_rollout_records(
                     target_selection_policy="fixture_top_k",
                     target_selection_rank=source_row_id,
                     target_selection_score=1.0 - 0.1 * source_row_id,
+                    target_source="fixture_obbs",
+                    target_source_index=source_row_id,
+                    target_sem_id=source_row_id + 1,
+                    target_inst_id=1000 + source_row_id,
+                    target_class_name="fixture_object",
+                    target_confidence=0.9,
+                    target_center_world=(float(source_row_id), 0.0, 0.5),
+                    target_extents=(0.4, 0.5, 0.6),
+                    target_pose_world_object=(
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        float(source_row_id),
+                        0.0,
+                        0.5,
+                    ),
                     target_invalid_reason_bitset=1,
                     target_primary_invalid_reason=0,
                     target_reason_code_version=TARGET_INVALID_REASON_VERSION,
@@ -131,8 +155,27 @@ def _attach_fixture_candidate_provenance(result: CounterfactualRolloutResult) ->
             mask = step.candidates.mask_valid.detach().cpu().reshape(-1)
             n = int(mask.shape[0])
             step.candidates.strategy_id = torch.arange(n, dtype=torch.int64) % 4
+            step.candidates.position_id = torch.full(
+                (n,),
+                candidate_position_id(CandidatePositionMode.FORWARD_LOCAL),
+                dtype=torch.int64,
+            )
             step.candidates.mixture_id = torch.arange(n, dtype=torch.int64) % 2
             step.candidates.sampler_probability = torch.full((n,), 1.0 / float(max(n, 1)), dtype=torch.float32)
+            step.candidates.extras.update(
+                {
+                    "min_distance_to_mesh": torch.linspace(0.25, 0.25 + 0.01 * max(n - 1, 0), n),
+                    "path_min_clearance_m": torch.linspace(0.15, 0.15 + 0.01 * max(n - 1, 0), n),
+                    "path_collision_mask": torch.zeros(n, dtype=torch.bool),
+                    "free_space_margin_m": torch.full((n,), 1.0, dtype=torch.float32),
+                    "motion_step_length_m": torch.linspace(0.5, 0.5 + 0.01 * max(n - 1, 0), n),
+                    "motion_height_delta_m": torch.zeros(n, dtype=torch.float32),
+                    "motion_backward_step_m": torch.zeros(n, dtype=torch.float32),
+                    "motion_yaw_delta_rad": torch.zeros(n, dtype=torch.float32),
+                    "target_distance_m": torch.linspace(1.0, 1.0 + 0.01 * max(n - 1, 0), n),
+                    "target_bearing_yaw_rad": torch.zeros(n, dtype=torch.float32),
+                }
+            )
             step.selected_depth_m = torch.full((240, 240), 1.0 + float(step.step_index), dtype=torch.float32)
             step.selected_depth_valid_mask = torch.ones((240, 240), dtype=torch.bool)
             step.selected_depth_focal_px = (120.0, 120.0)

@@ -3,16 +3,28 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from aria_nbv.data_handling.efm_dataset_utils import (
+    compact_ase_atek_identifiers,
+    compact_ase_atek_sample_id,
+    raw_ase_atek_sample_id,
+)
 from aria_nbv.rollouts import RolloutZarrStoreReader, validate_rollout_zarr_store
 
 from ._blueprint import log_default_inspector_blueprint
 from ._colors import INVALID_RGBA, step_to_rgba
-from ._loggers import RerunOfflineLogger
+from ._loggers import (
+    RerunOfflineLogger,
+    _compact_or_live_gt_obbs,
+    _gt_obb_semantic_names,
+    _obb_boxes,
+    _snippet_t_world_snippet,
+)
 from ._metadata import collect_visual_inventory, validate_required_inventory
 from ._sample import select_rerun_sample
 from ._session import RerunModule, log_world_coordinates, start_rerun_recording
@@ -46,6 +58,14 @@ _PLOT_PALETTE = (
     (244, 114, 182, 255),
     (249, 115, 22, 255),
 )
+
+_STRATEGY_NAMES = {
+    0: "forward_rig",
+    1: "radial_away",
+    2: "radial_towards",
+    3: "target_point",
+}
+_TARGET_RRI_RANK_SEMANTICS = "valid_finite_target_rri_desc"
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,9 +111,12 @@ class RerunRolloutZarrLogger:
         reader = RolloutZarrStoreReader(store_dir)
         validation = validate_rollout_zarr_store(store_dir)
         rows = _resolve_rollout_rows(reader, rollout_index=rollout_index, rollout_row_id=rollout_row_id)
+        target = _rollout_target_payload(reader, rows=rows)
+        self._context_warnings.extend(target.warnings)
         self._log_rollout_blueprint(reader=reader, rows=rows)
-        self._log_static_context(reader=reader, rows=rows)
-        self._log_static_metadata(reader=reader, rows=rows, validation_errors=validation.errors)
+        self._log_static_context(reader=reader, rows=rows, target=target)
+        self._log_rollout_target(target)
+        self._log_static_metadata(reader=reader, rows=rows, validation_errors=validation.errors, target=target)
         self._log_rollout_plots(reader=reader, selected_rows=rows)
 
         selected_path: list[list[float]] = _rollout_root_path(reader, rows=rows)
@@ -105,6 +128,7 @@ class RerunRolloutZarrLogger:
                 rollout_row_id=rows.rollout_row_id,
                 chain_id=rows.chain_id,
                 rollout_depths=self.config.rollout_depths,
+                target_metadata=target.metadata,
             )
             self._log_step(step)
             if step.selected_center is not None:
@@ -120,7 +144,13 @@ class RerunRolloutZarrLogger:
             hidden_world_paths=_rollout_candidate_group_hidden_paths(reader=reader, rows=rows),
         )
 
-    def _log_static_context(self, *, reader: RolloutZarrStoreReader, rows: SelectedRolloutRows) -> None:
+    def _log_static_context(
+        self,
+        *,
+        reader: RolloutZarrStoreReader,
+        rows: SelectedRolloutRows,
+        target: "_RolloutTargetPayload",
+    ) -> None:
         """Log matching VIN offline sample context before rollout-step layers."""
 
         mode = self.config.selection.rollout_context_mode
@@ -145,10 +175,61 @@ class RerunRolloutZarrLogger:
             )
             logger.log_sample(sample=selected.sample, inventory=inventory, selection=selected.description)
             logger.log_metadata(sample=selected.sample, inventory=inventory, selection=selected.description)
+            self._log_matched_gt_target_obb(sample=selected.sample, target=target)
         except Exception as exc:
             if mode == "required":
                 raise
             self._context_warnings.append(f"VIN context logging skipped: {exc}")
+
+    def _log_matched_gt_target_obb(self, *, sample: Any, target: "_RolloutTargetPayload") -> None:
+        """Log the matched GT OBB overlay when VIN context exposes GT OBBs."""
+
+        matched_gt_id = str(target.metadata.get("matched_gt_target_id") or "")
+        if not matched_gt_id:
+            return
+        try:
+            t_world_snippet = _snippet_t_world_snippet(sample)
+            obbs = _compact_or_live_gt_obbs(sample)
+        except AttributeError:
+            return
+        if t_world_snippet is None or obbs is None:
+            return
+        centers, half_sizes, quaternions, labels, sem_ids, inst_ids = _obb_boxes(
+            obbs,
+            t_world_snippet=t_world_snippet,
+            sem_id_to_name=_gt_obb_semantic_names(sample),
+        )
+        if centers.shape[0] == 0:
+            return
+        sem_id = _structured_target_value(matched_gt_id, key="sem")
+        inst_id = _structured_target_value(matched_gt_id, key="inst")
+        mask = np.ones((centers.shape[0],), dtype=np.bool_)
+        if sem_id is not None:
+            mask &= sem_ids.astype(int) == int(sem_id)
+        if inst_id is not None:
+            mask &= inst_ids.astype(int) == int(inst_id)
+        matches = np.nonzero(mask)[0]
+        if matches.size == 0:
+            return
+        index = int(matches[0])
+        self.rr.log(
+            f"{target.entity_root}/matched_gt_obb",
+            self.rr.Boxes3D(
+                centers=centers[index : index + 1],
+                half_sizes=half_sizes[index : index + 1],
+                quaternions=quaternions[index : index + 1],
+                colors=[[34, 197, 94, 235]],
+                labels=[labels[index]],
+            ),
+            self.rr.AnyValues(
+                matched_gt_target_id=compact_ase_atek_sample_id(matched_gt_id),
+                matched_gt_target_row_id=int(target.metadata.get("matched_gt_target_row_id", -1)),
+                matched_gt_sem_id=int(sem_ids[index]),
+                matched_gt_inst_id=int(inst_ids[index]),
+                matched_gt_label=labels[index],
+            ),
+            static=True,
+        )
 
     def _log_static_metadata(
         self,
@@ -156,6 +237,7 @@ class RerunRolloutZarrLogger:
         reader: RolloutZarrStoreReader,
         rows: SelectedRolloutRows,
         validation_errors: list[str],
+        target: "_RolloutTargetPayload",
     ) -> None:
         attrs = dict(reader.root.attrs)
         manifest_bundle = reader.manifest()
@@ -170,6 +252,7 @@ class RerunRolloutZarrLogger:
                 "step_rows": rows.step_rows.astype(int).tolist(),
             },
             "validation": {"ok": not validation_errors, "errors": validation_errors},
+            "target": target.metadata,
             "context": {
                 "mode": self.config.selection.rollout_context_mode,
                 "warnings": list(self._context_warnings),
@@ -178,7 +261,52 @@ class RerunRolloutZarrLogger:
         }
         self.rr.log(
             ENTITY_ROLLOUT_METADATA,
-            self.rr.TextDocument(json.dumps(document, indent=2, sort_keys=True), media_type="application/json"),
+            self.rr.TextDocument(
+                json.dumps(compact_ase_atek_identifiers(document), indent=2, sort_keys=True),
+                media_type="application/json",
+            ),
+            static=True,
+        )
+
+    def _log_rollout_target(self, target: "_RolloutTargetPayload") -> None:
+        """Log a visible target overlay scoped to the selected rollout chain."""
+
+        if target.center is not None and np.isfinite(target.center).all():
+            self.rr.log(
+                f"{target.entity_root}/center",
+                self.rr.Points3D(
+                    target.center.reshape(1, 3),
+                    radii=self.config.geometry.candidate_center_radius * 1.5,
+                    colors=[[255, 214, 10, 255]],
+                ),
+                static=True,
+            )
+        if (
+            target.center is not None
+            and target.extents is not None
+            and target.pose_world_object is not None
+            and np.isfinite(target.center).all()
+            and np.isfinite(target.extents).all()
+            and np.isfinite(target.pose_world_object).all()
+        ):
+            self.rr.log(
+                f"{target.entity_root}/actor_visible_obb",
+                self.rr.Boxes3D(
+                    centers=target.center.reshape(1, 3),
+                    half_sizes=(0.5 * target.extents).reshape(1, 3),
+                    quaternions=_matrix3x3_to_quat_xyzw(target.pose_world_object[:9].reshape(3, 3)).reshape(1, 4),
+                    colors=[[255, 214, 10, 225]],
+                    labels=[compact_ase_atek_sample_id(str(target.metadata.get("target_id", "rollout_target")))],
+                ),
+                self.rr.AnyValues(**compact_ase_atek_identifiers(target.metadata)),
+                static=True,
+            )
+        self.rr.log(
+            f"{target.entity_root}/metadata",
+            self.rr.TextDocument(
+                json.dumps(compact_ase_atek_identifiers(target.metadata), indent=2, sort_keys=True),
+                media_type="application/json",
+            ),
             static=True,
         )
 
@@ -192,7 +320,10 @@ class RerunRolloutZarrLogger:
         self.rr.log(ENTITY_ROLLOUT_SELECTED_TARGET_RRI, self.rr.Scalars(_finite_or_zero(step.selected_target_rri)))
         self.rr.log(
             step.metadata_entity,
-            self.rr.TextDocument(json.dumps(step.metadata, indent=2, sort_keys=True), media_type="application/json"),
+            self.rr.TextDocument(
+                json.dumps(compact_ase_atek_identifiers(step.metadata), indent=2, sort_keys=True),
+                media_type="application/json",
+            ),
         )
 
     def _log_rollout_plots(self, *, reader: RolloutZarrStoreReader, selected_rows: SelectedRolloutRows) -> None:
@@ -307,9 +438,16 @@ class RerunRolloutZarrLogger:
                 valid_mask=candidate.valid,
                 selected_mask=candidate.selected,
                 target_rri=candidate.target_rri,
+                target_rri_rank=candidate.target_rri_rank,
+                target_rri_rank_total=candidate.target_rri_rank_total,
+                target_rri_rank_semantics=candidate.target_rri_rank_semantics,
                 selection_probability=candidate.probability,
                 selection_logit=candidate.logit,
                 selection_entropy=candidate.entropy,
+                sampling_strategy_id=candidate.sampling_strategy_id,
+                sampling_strategy_name=candidate.sampling_strategy_name,
+                mixture_id=candidate.mixture_id,
+                sampler_probability=candidate.sampler_probability,
                 invalid_reason_bitset=candidate.reason_bitset,
                 primary_invalid_reason=candidate.primary_reason,
                 color_rgba=candidate.color,
@@ -384,9 +522,16 @@ class _RolloutCandidatePayload:
     pose: NDArray[np.float32]
     center: NDArray[np.float32]
     target_rri: float
+    target_rri_rank: int
+    target_rri_rank_total: int
+    target_rri_rank_semantics: str
     probability: float
     logit: float
     entropy: float
+    sampling_strategy_id: int
+    sampling_strategy_name: str
+    mixture_id: int
+    sampler_probability: float
     reason_bitset: int
     primary_reason: int
     color: list[int]
@@ -419,6 +564,16 @@ class _RolloutStepPayload:
     selected_probability: float
     selected_target_rri: float
     metadata: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _RolloutTargetPayload:
+    entity_root: str
+    metadata: dict[str, Any]
+    warnings: list[str]
+    center: NDArray[np.float32] | None
+    extents: NDArray[np.float32] | None
+    pose_world_object: NDArray[np.float32] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -552,6 +707,7 @@ def _step_payload(
     rollout_row_id: int,
     chain_id: int,
     rollout_depths: "RerunInspectorRolloutDepthConfig",
+    target_metadata: dict[str, Any] | None = None,
 ) -> _RolloutStepPayload:
     step_row_id = int(reader.array("steps/step_row_id")[step_row_position])
     step_index = int(reader.array("steps/step_index")[step_row_position])
@@ -567,6 +723,11 @@ def _step_payload(
     poses = reader.array("candidates/pose_world_cam")[row_positions].astype(np.float32).reshape(-1, 12)
     centers = _pose_centers(poses)
     target_rri = reader.array("candidates/target_rri")[row_positions].astype(np.float32).reshape(-1)
+    target_rri_ranks, target_rri_rank_total = _target_rri_ranks(
+        target_rri=target_rri,
+        valid_mask=valid,
+        shell_indices=shell_indices,
+    )
     probabilities = reader.array("candidates/selection_probabilities")[row_positions].astype(np.float32).reshape(-1)
     log_probabilities = (
         reader.array("candidates/selection_log_probabilities")[row_positions].astype(np.float32).reshape(-1)
@@ -577,6 +738,9 @@ def _step_payload(
     primary_reasons = reader.array("candidates/primary_invalid_reason")[row_positions].astype(np.uint16).reshape(-1)
     compact_valid = reader.array("candidates/compact_valid_index")[row_positions].astype(np.int64).reshape(-1)
     candidate_row_ids = reader.array("candidates/candidate_row_id")[row_positions].astype(np.int64).reshape(-1)
+    strategy_ids = reader.array("candidates/strategy_id")[row_positions].astype(np.int32).reshape(-1)
+    mixture_ids = reader.array("candidates/mixture_id")[row_positions].astype(np.int32).reshape(-1)
+    sampler_probabilities = reader.array("candidates/sampler_probability")[row_positions].astype(np.float32).reshape(-1)
 
     selected_local = int(np.nonzero(selected)[0][0]) if selected.any() else -1
     selected_depth, selected_depth_warnings = _selected_depth_payload(
@@ -598,9 +762,14 @@ def _step_payload(
         poses=poses,
         centers=centers,
         target_rri=target_rri,
+        target_rri_ranks=target_rri_ranks,
+        target_rri_rank_total=target_rri_rank_total,
         probabilities=probabilities,
         logits=logits,
         entropy=entropy,
+        strategy_ids=strategy_ids,
+        mixture_ids=mixture_ids,
+        sampler_probabilities=sampler_probabilities,
         reason_bitsets=reason_bitsets,
         primary_reasons=primary_reasons,
         selected_depth=selected_depth,
@@ -618,8 +787,12 @@ def _step_payload(
         "selected_probability": float(probabilities[selected_local]) if selected_local >= 0 else None,
         "selected_target_rri": float(target_rri[selected_local]) if selected_local >= 0 else None,
         "selection_entropy": float(entropy) if selected_local >= 0 else None,
+        "target_rri_rank": int(target_rri_ranks[selected_local]) if selected_local >= 0 else -1,
+        "target_rri_rank_total": int(target_rri_rank_total),
+        "target_rri_rank_semantics": _TARGET_RRI_RANK_SEMANTICS,
         "invalid_candidate_count": int((~valid).sum()),
         "pose_frame": "stored_pose_world_cam",
+        "target": target_metadata or {},
         "selected_depth": {
             "enabled": bool(rollout_depths.enabled),
             "available": selected_depth is not None,
@@ -991,6 +1164,10 @@ def _rollout_step_metadata_entity(*, rollout_row_id: int, chain_id: int, step_in
     )
 
 
+def _rollout_target_entity(*, rollout_row_id: int, chain_id: int) -> str:
+    return f"{_rollout_chain_entity(rollout_row_id=rollout_row_id, chain_id=chain_id)}/target"
+
+
 def _rollout_candidate_group_hidden_paths(
     *,
     reader: RolloutZarrStoreReader,
@@ -1010,6 +1187,31 @@ def _rollout_candidate_group_hidden_paths(
     return tuple(hidden_paths)
 
 
+def _target_rri_ranks(
+    *,
+    target_rri: NDArray[Any],
+    valid_mask: NDArray[Any],
+    shell_indices: NDArray[Any],
+) -> tuple[NDArray[np.int32], int]:
+    """Rank valid finite target-RRI candidates, descending with shell-index tie-breaks."""
+
+    values = np.asarray(target_rri, dtype=np.float32).reshape(-1)
+    valid = np.asarray(valid_mask, dtype=bool).reshape(-1)
+    shells = np.asarray(shell_indices, dtype=np.int64).reshape(-1)
+    ranks = np.full(values.shape, -1, dtype=np.int32)
+    eligible = np.nonzero(valid & np.isfinite(values))[0]
+    if eligible.size == 0:
+        return ranks, 0
+    order = sorted(eligible.tolist(), key=lambda index: (-float(values[index]), int(shells[index])))
+    for rank, index in enumerate(order, start=1):
+        ranks[index] = int(rank)
+    return ranks, int(eligible.size)
+
+
+def _strategy_name(strategy_id: int) -> str:
+    return _STRATEGY_NAMES.get(int(strategy_id), f"unknown_{int(strategy_id)}")
+
+
 def _candidate_payloads(
     *,
     candidate_row_ids: NDArray[Any],
@@ -1024,9 +1226,14 @@ def _candidate_payloads(
     poses: NDArray[np.float32],
     centers: NDArray[np.float32],
     target_rri: NDArray[Any],
+    target_rri_ranks: NDArray[Any],
+    target_rri_rank_total: int,
     probabilities: NDArray[Any],
     logits: NDArray[Any],
     entropy: float,
+    strategy_ids: NDArray[Any],
+    mixture_ids: NDArray[Any],
+    sampler_probabilities: NDArray[Any],
     reason_bitsets: NDArray[Any],
     primary_reasons: NDArray[Any],
     selected_depth: _SelectedDepthPayload | None,
@@ -1041,8 +1248,12 @@ def _candidate_payloads(
         poses,
         centers,
         target_rri,
+        target_rri_ranks,
         probabilities,
         logits,
+        strategy_ids,
+        mixture_ids,
+        sampler_probabilities,
         reason_bitsets,
         primary_reasons,
         strict=False,
@@ -1056,8 +1267,12 @@ def _candidate_payloads(
             pose,
             center,
             rri,
+            rri_rank,
             prob,
             logit,
+            strategy_id,
+            mixture_id,
+            sampler_probability,
             reason,
             primary,
         ) = values
@@ -1090,9 +1305,16 @@ def _candidate_payloads(
                 pose=np.asarray(pose, dtype=np.float32).reshape(12),
                 center=np.asarray(center, dtype=np.float32).reshape(3),
                 target_rri=float(rri),
+                target_rri_rank=int(rri_rank),
+                target_rri_rank_total=int(target_rri_rank_total),
+                target_rri_rank_semantics=_TARGET_RRI_RANK_SEMANTICS,
                 probability=float(prob),
                 logit=float(logit),
                 entropy=float(entropy),
+                sampling_strategy_id=int(strategy_id),
+                sampling_strategy_name=_strategy_name(int(strategy_id)),
+                mixture_id=int(mixture_id),
+                sampler_probability=float(sampler_probability),
                 reason_bitset=int(reason),
                 primary_reason=int(primary),
                 color=color,
@@ -1139,7 +1361,8 @@ def _rollout_context_selection(
     )
     if scene_id and snippet_id:
         return fallback.model_copy(
-            deep=True, update={"scene_id": scene_id, "snippet_id": snippet_id, "sample_key": None}
+            deep=True,
+            update={"scene_id": scene_id, "snippet_id": compact_ase_atek_sample_id(snippet_id), "sample_key": None},
         )
     if fallback.rollout_context_mode == "required":
         return fallback.model_copy(deep=True)
@@ -1162,10 +1385,114 @@ def _rollout_dictionary_value(
 
 
 def _dictionary_preview(reader: RolloutZarrStoreReader) -> dict[str, list[str]]:
-    return {
-        name: _read_string_dictionary(reader, f"dictionaries/{name}")[:20]
-        for name in ("scene", "snippet", "rollout", "target", "policy", "termination_reason")
+    return compact_ase_atek_identifiers(
+        {
+            name: _read_string_dictionary(reader, f"dictionaries/{name}")[:20]
+            for name in ("scene", "snippet", "rollout", "target", "policy", "termination_reason")
+        }
+    )
+
+
+def _rollout_target_payload(reader: RolloutZarrStoreReader, *, rows: SelectedRolloutRows) -> _RolloutTargetPayload:
+    """Build the visible rollout-target overlay payload from factual target tables."""
+
+    target_row_id = int(reader.array("rollouts/target_row_id")[rows.rollout_index])
+    target_row_ids = reader.array("targets/target_row_id").astype(np.int64).reshape(-1)
+    matches = np.nonzero(target_row_ids == target_row_id)[0]
+    target_index = int(matches[0]) if matches.size == 1 else -1
+    entity_root = _rollout_target_entity(rollout_row_id=rows.rollout_row_id, chain_id=rows.chain_id)
+
+    scene_id = _rollout_dictionary_value(reader, group="scene", array_path="rollouts/scene_id", row=rows.rollout_index)
+    snippet_id = _rollout_dictionary_value(
+        reader,
+        group="snippet",
+        array_path="rollouts/snippet_id",
+        row=rows.rollout_index,
+    )
+    source_row_id = int(reader.array("rollouts/source_row_id")[rows.rollout_index])
+    target_ids = _encoded_values(reader.root, dictionary_name="target", array_path="targets/target_id")
+    matched_gt_ids = _encoded_values(reader.root, dictionary_name="target", array_path="targets/matched_gt_target_id")
+    target_sources = _encoded_values(
+        reader.root, dictionary_name="target_source", array_path="targets/target_source_id"
+    )
+    class_names = _encoded_values(reader.root, dictionary_name="class_name", array_path="targets/target_class_name_id")
+    match_statuses = _encoded_values(
+        reader.root,
+        dictionary_name="target_match_status",
+        array_path="targets/gt_match_status_id",
+    )
+
+    warnings: list[str] = []
+    if target_index < 0:
+        warnings.append(f"rollout target_row_id={target_row_id} does not resolve to exactly one targets/ row.")
+        return _RolloutTargetPayload(
+            entity_root=entity_root,
+            metadata={
+                "rollout_row_id": rows.rollout_row_id,
+                "chain_id": rows.chain_id,
+                "source_row_id": source_row_id,
+                "scene_id": scene_id,
+                "snippet_id": compact_ase_atek_sample_id(snippet_id) if snippet_id is not None else None,
+                "target_row_id": target_row_id,
+                "warnings": warnings,
+            },
+            warnings=warnings,
+            center=None,
+            extents=None,
+            pose_world_object=None,
+        )
+
+    target_id = _value_at(target_ids, target_index)
+    matched_gt_target_id = _value_at(matched_gt_ids, target_index)
+    for array_name, identifier in (("target_id", target_id), ("matched_gt_target_id", matched_gt_target_id)):
+        if _target_identifier_mentions_other_snippet(identifier=identifier, snippet=snippet_id or ""):
+            warnings.append(
+                f"targets/{array_name}={compact_ase_atek_sample_id(identifier)!r} "
+                f"does not match rollout snippet_id={compact_ase_atek_sample_id(snippet_id or '')!r}; "
+                "the store is stale or target rows collided."
+            )
+
+    center = reader.array("targets/target_center_world")[target_index].astype(np.float32).reshape(3)
+    extents = reader.array("targets/target_extents")[target_index].astype(np.float32).reshape(3)
+    pose = reader.array("targets/target_pose_world_object")[target_index].astype(np.float32).reshape(12)
+    metadata = {
+        "rollout_row_id": rows.rollout_row_id,
+        "chain_id": rows.chain_id,
+        "source_row_id": source_row_id,
+        "scene_id": scene_id,
+        "snippet_id": compact_ase_atek_sample_id(snippet_id) if snippet_id is not None else None,
+        "target_row_id": target_row_id,
+        "target_id": target_id,
+        "target_source": _value_at(target_sources, target_index),
+        "target_source_index": int(reader.array("targets/target_source_index")[target_index]),
+        "target_sem_id": int(reader.array("targets/target_sem_id")[target_index]),
+        "target_inst_id": int(reader.array("targets/target_inst_id")[target_index]),
+        "target_class_name": _value_at(class_names, target_index),
+        "target_confidence": float(reader.array("targets/target_confidence")[target_index]),
+        "target_center_world": center.astype(float).tolist(),
+        "target_extents": extents.astype(float).tolist(),
+        "matched_gt_target_row_id": int(reader.array("targets/matched_gt_target_row_id")[target_index]),
+        "matched_gt_target_id": matched_gt_target_id,
+        "gt_match_status": _value_at(match_statuses, target_index),
+        "gt_match_iou": float(reader.array("targets/gt_match_iou")[target_index]),
+        "gt_match_score": float(reader.array("targets/gt_match_score")[target_index]),
+        "target_selection_rank": int(reader.array("targets/target_selection_rank")[target_index]),
+        "target_selection_score": float(reader.array("targets/target_selection_score")[target_index]),
+        "target_selection_probability": float(reader.array("targets/target_selection_probability")[target_index]),
+        "matched_gt_obb": {
+            "dedicated_overlay": "logged_when_vin_context_available",
+            "source": "VIN context GT OBBs; matched GT geometry is not persisted in rollouts.zarr.",
+        },
+        "warnings": warnings,
     }
+    return _RolloutTargetPayload(
+        entity_root=entity_root,
+        metadata=metadata,
+        warnings=warnings,
+        center=center,
+        extents=extents,
+        pose_world_object=pose,
+    )
 
 
 def _rollout_target_hint(reader: RolloutZarrStoreReader, *, rows: SelectedRolloutRows) -> str | None:
@@ -1194,6 +1521,81 @@ def _read_string_dictionary(reader: RolloutZarrStoreReader, path: str) -> list[s
     if not isinstance(values, list):
         return []
     return [str(value) for value in values]
+
+
+def _encoded_values(root: Any, *, dictionary_name: str, array_path: str) -> list[str]:
+    try:
+        encoded = np.asarray(root[array_path]).reshape(-1)
+        dictionary = json.loads(np.asarray(root[f"dictionaries/{dictionary_name}"], dtype=np.uint8).tobytes())
+    except (KeyError, json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    if not isinstance(dictionary, list):
+        return []
+    values: list[str] = []
+    for index in encoded:
+        index_int = int(index)
+        values.append(str(dictionary[index_int]) if 0 <= index_int < len(dictionary) else "")
+    return values
+
+
+def _value_at(values: list[str], index: int) -> str:
+    return values[index] if 0 <= int(index) < len(values) else ""
+
+
+def _target_identifier_mentions_other_snippet(*, identifier: str, snippet: str) -> bool:
+    compact_snippet = compact_ase_atek_sample_id(snippet)
+    raw_snippet = raw_ase_atek_sample_id(compact_snippet)
+    if (
+        not identifier
+        or not snippet
+        or snippet in identifier
+        or compact_snippet in identifier
+        or (raw_snippet is not None and raw_snippet in identifier)
+    ):
+        return False
+    return "AtekDataSample_" in identifier or "AriaSyntheticEnvironment_" in identifier
+
+
+def _structured_target_value(target_id: str, *, key: str) -> int | None:
+    match = re.search(rf"(?:^|[:/_-]){key}(?:_id)?[=:](\d+)(?:$|[:/_-])", str(target_id).lower())
+    return None if match is None else int(match.group(1))
+
+
+def _matrix3x3_to_quat_xyzw(matrix: NDArray[np.float32]) -> NDArray[np.float32]:
+    """Convert a rotation matrix to an xyzw quaternion for Rerun Boxes3D."""
+
+    rot = np.asarray(matrix, dtype=np.float64).reshape(3, 3)
+    trace = float(np.trace(rot))
+    if trace > 0.0:
+        scale = np.sqrt(trace + 1.0) * 2.0
+        qw = 0.25 * scale
+        qx = (rot[2, 1] - rot[1, 2]) / scale
+        qy = (rot[0, 2] - rot[2, 0]) / scale
+        qz = (rot[1, 0] - rot[0, 1]) / scale
+    else:
+        diagonal = np.diagonal(rot)
+        axis = int(np.argmax(diagonal))
+        if axis == 0:
+            scale = np.sqrt(1.0 + rot[0, 0] - rot[1, 1] - rot[2, 2]) * 2.0
+            qw = (rot[2, 1] - rot[1, 2]) / scale
+            qx = 0.25 * scale
+            qy = (rot[0, 1] + rot[1, 0]) / scale
+            qz = (rot[0, 2] + rot[2, 0]) / scale
+        elif axis == 1:
+            scale = np.sqrt(1.0 + rot[1, 1] - rot[0, 0] - rot[2, 2]) * 2.0
+            qw = (rot[0, 2] - rot[2, 0]) / scale
+            qx = (rot[0, 1] + rot[1, 0]) / scale
+            qy = 0.25 * scale
+            qz = (rot[1, 2] + rot[2, 1]) / scale
+        else:
+            scale = np.sqrt(1.0 + rot[2, 2] - rot[0, 0] - rot[1, 1]) * 2.0
+            qw = (rot[1, 0] - rot[0, 1]) / scale
+            qx = (rot[0, 2] + rot[2, 0]) / scale
+            qy = (rot[1, 2] + rot[2, 1]) / scale
+            qz = 0.25 * scale
+    quat = np.asarray([qx, qy, qz, qw], dtype=np.float32)
+    norm = float(np.linalg.norm(quat))
+    return quat if norm == 0.0 else (quat / norm).astype(np.float32)
 
 
 def _safe_entity_token(value: str) -> str:

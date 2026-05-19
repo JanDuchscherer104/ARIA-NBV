@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from typer.testing import CliRunner
 
 from aria_nbv.rerun_inspector import _cli, _rollout_zarr
 from aria_nbv.rerun_inspector._config import RerunOfflineInspectorConfig
@@ -13,6 +14,8 @@ from aria_nbv.rerun_inspector._metadata import OfflineVisualInventory
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+runner = CliRunner()
 
 
 def test_cli_applies_selection_and_save_overrides(
@@ -72,6 +75,7 @@ def test_cli_applies_selection_and_save_overrides(
     ("args", "mode", "addr"),
     [
         (["--spawn"], "spawn", None),
+        (["--connect"], "connect", None),
         (["--connect", "rerun+http://127.0.0.1:9876/proxy"], "connect", "rerun+http://127.0.0.1:9876/proxy"),
     ],
 )
@@ -98,6 +102,30 @@ def test_cli_applies_output_mode_overrides(
     cfg = captured["config"]
     assert cfg.output.mode == mode  # noqa: S101
     assert cfg.output.connect_addr == addr  # noqa: S101
+
+
+def test_cli_save_without_path_preserves_configured_save_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bare --save should switch to save mode without requiring a path value."""
+
+    config_path = tmp_path / "rerun.toml"
+    base_cfg = RerunOfflineInspectorConfig()
+    base_cfg.output.save_path = tmp_path / "configured.rrd"
+    base_cfg.save_toml(config_path)
+    captured: dict[str, RerunOfflineInspectorConfig] = {}
+    monkeypatch.setattr(
+        _cli,
+        "run_inspector",
+        lambda config, *, rr_module=None: captured.setdefault("config", config),
+    )
+
+    _cli.main(["--config-path", str(config_path), "--save"])
+
+    cfg = captured["config"]
+    assert cfg.output.mode == "save"  # noqa: S101
+    assert cfg.output.save_path == tmp_path / "configured.rrd"  # noqa: S101
 
 
 def test_cli_routes_rollout_store_to_multistep_inspector(
@@ -313,3 +341,10 @@ def test_missing_required_inventory_fails_before_rerun_logging(monkeypatch: pyte
         _cli.run_inspector(cfg, rr_module=object())
 
     assert calls == []  # noqa: S101
+
+
+def test_rerun_cli_help_exits_cleanly() -> None:
+    result = runner.invoke(_cli.app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--config-path" in result.output

@@ -47,6 +47,7 @@ from ._offline_store import (
     VinOfflineStoreConfig,
 )
 from ._raw import AseEfmDatasetConfig, EfmSnippetView, VinSnippetView
+from .efm_dataset_utils import compact_ase_atek_sample_id
 from .vin_adapter import DEFAULT_VIN_SNIPPET_PAD_POINTS, build_vin_snippet_view
 
 if TYPE_CHECKING:
@@ -129,8 +130,11 @@ def _default_sample_key(scene_id: str, snippet_id: str) -> str:
         Stable sample key.
     """
 
+    compact_snippet = compact_ase_atek_sample_id(snippet_id)
+    if compact_snippet != snippet_id or compact_snippet.startswith("ASE_"):
+        return compact_snippet
     scene = re.sub(r"[^0-9a-zA-Z._-]+", "_", scene_id).strip("_")
-    snippet = re.sub(r"[^0-9a-zA-Z._-]+", "_", snippet_id).strip("_")
+    snippet = re.sub(r"[^0-9a-zA-Z._-]+", "_", compact_snippet).strip("_")
     return f"{scene}::{snippet}"
 
 
@@ -679,9 +683,11 @@ def prepare_vin_offline_sample(
         record_blocks["detected.obb_sem_id_to_name"] = _semantic_names_payload(backbone_out.obb_pred_sem_id_to_name)
 
     return PreparedVinOfflineSample(
-        sample_key=sample_key or _default_sample_key(scene_id, snippet_id),
+        sample_key=compact_ase_atek_sample_id(sample_key)
+        if sample_key is not None
+        else _default_sample_key(scene_id, snippet_id),
         scene_id=scene_id,
-        snippet_id=snippet_id,
+        snippet_id=compact_ase_atek_sample_id(snippet_id),
         numeric_blocks=numeric_blocks,
         record_blocks=record_blocks,
     )

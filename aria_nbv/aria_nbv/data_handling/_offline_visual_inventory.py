@@ -16,6 +16,7 @@ import torch
 from torch import Tensor
 
 from ._offline_dataset import VinOfflineSample
+from .efm_dataset_utils import compact_ase_atek_sample_id
 
 
 class OfflineVisualInventoryError(ValueError):
@@ -489,7 +490,13 @@ def _sample_metadata(
     snippet_id = snippet_id_value if isinstance(snippet_id_value, str) and snippet_id_value else None
     if snippet_id_value is not None and snippet_id is None:
         _invalid("sample.snippet_id", "expected a non-empty string", errors)
-    return sample_key, sample_index, split, scene_id, snippet_id
+    return (
+        compact_ase_atek_sample_id(sample_key) if sample_key is not None else None,
+        sample_index,
+        split,
+        scene_id,
+        compact_ase_atek_sample_id(snippet_id) if snippet_id is not None else None,
+    )
 
 
 def collect_offline_visual_inventory(sample: VinOfflineSample, *, strict: bool = True) -> OfflineVisualInventory:

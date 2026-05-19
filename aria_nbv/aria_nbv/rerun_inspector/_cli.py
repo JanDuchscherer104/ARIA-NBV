@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-import argparse
 import socket
 import subprocess
+import sys
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
+import click
+import typer
+
+from aria_nbv.data_handling.efm_dataset_utils import compact_ase_atek_sample_id
 from aria_nbv.utils import Console
 from aria_nbv.utils.config_paths import resolve_config_toml_path
+from aria_nbv.utils.typer_cli import run_typer_app
 
 from ._config import RerunOfflineInspectorConfig
 from ._loggers import RerunOfflineLogger
@@ -17,147 +25,260 @@ from ._sample import select_rerun_sample
 from ._session import RerunModule
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser for ``nbv-rerun-inspect``."""
+class Split(StrEnum):
+    """VIN offline store splits accepted by the Rerun CLI."""
 
-    parser = argparse.ArgumentParser(
-        prog="nbv-rerun-inspect",
-        description="Inspect one immutable VIN offline sample in Rerun.",
-    )
-    parser.add_argument(
-        "--config-path",
-        required=True,
-        type=Path,
-        help="Path to a RerunOfflineInspectorConfig TOML file.",
-    )
-    parser.add_argument("--split", choices=("all", "train", "val"), help="Override selection.split.")
-    parser.add_argument("--index", type=int, help="Override selection.index.")
-    parser.add_argument("--sample-id", help="Override selection.sample_key.")
-    parser.add_argument("--scene-id", help="Override selection.scene_id.")
-    parser.add_argument("--snippet-id", help="Override selection.snippet_id.")
-    parser.add_argument("--candidate-index", type=int, help="Override candidate.selected_index for detail layers.")
-    parser.add_argument("--offline-store", type=Path, help="Override dataset.offline.store.store_dir.")
-    parser.add_argument(
-        "--rollout-store",
-        type=Path,
-        help="Inspect a standalone rollouts.zarr replay store instead of a VIN offline sample.",
-    )
-    parser.add_argument(
-        "--rollout-index",
-        type=int,
-        default=0,
-        help="Zero-based rollout row position to inspect when --rollout-store is set.",
-    )
-    parser.add_argument(
-        "--rollout-row-id",
-        type=int,
-        help="Explicit rollouts/rollout_row_id to inspect when --rollout-store is set.",
-    )
-    parser.add_argument(
-        "--rollout-context",
-        choices=("auto", "required", "off"),
-        help="VIN context policy for --rollout-store: auto, required, or off.",
-    )
-    parser.add_argument(
-        "--save",
-        nargs="?",
-        const="",
-        metavar="PATH",
-        help="Override output mode to save. Optionally provide an .rrd path.",
-    )
-    parser.add_argument("--spawn", action="store_true", help="Override output mode to spawn a local viewer.")
-    parser.add_argument(
-        "--connect",
-        nargs="?",
-        const="",
-        metavar="ADDR",
-        help="Override output mode to connect over Rerun gRPC. Optionally provide an address.",
-    )
-    parser.add_argument(
-        "--view",
-        action="store_true",
-        help="Save the .rrd and open it in the native Rerun viewer in the foreground.",
-    )
-    parser.add_argument(
-        "--serve-web",
-        action="store_true",
-        help="Save the .rrd and serve it with Rerun's web viewer in the foreground.",
-    )
-    parser.add_argument(
-        "--web-viewer-port",
-        type=int,
-        default=0,
-        help="Rerun web viewer HTTP port for --serve-web. Use 0 to let Rerun choose.",
-    )
-    parser.add_argument(
-        "--ws-server-port",
-        type=int,
-        default=0,
-        help="Rerun websocket port for --serve-web. Use 0 to let Rerun choose.",
-    )
-    parser.add_argument(
-        "--lan",
-        action="store_true",
-        help="With --serve-web, bind to 0.0.0.0 and print a LAN URL hint.",
-    )
-    return parser
+    all = "all"
+    train = "train"
+    val = "val"
 
 
-def _validate_viewer_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+class RolloutContextMode(StrEnum):
+    """VIN context policies for rollout-store inspection."""
+
+    auto = "auto"
+    required = "required"
+    off = "off"
+
+
+@dataclass(frozen=True)
+class RerunCliOptions:
+    """Typed CLI override payload used after Typer parsing."""
+
+    config_path: Path
+    split: Split | None
+    index: int | None
+    sample_id: str | None
+    scene_id: str | None
+    snippet_id: str | None
+    candidate_index: int | None
+    offline_store: Path | None
+    rollout_store: Path | None
+    rollout_index: int
+    rollout_row_id: int | None
+    rollout_context: RolloutContextMode | None
+    save_path: Path | None
+    save_requested: bool
+    spawn: bool
+    connect_addr: str | None
+    connect_requested: bool
+    view: bool
+    serve_web: bool
+    web_viewer_port: int
+    ws_server_port: int
+    lan: bool
+
+
+_HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
+app = typer.Typer(
+    add_completion=False,
+    context_settings=_HELP_SETTINGS,
+    help="Inspect one immutable VIN offline sample or rollout Zarr row in Rerun.",
+    pretty_exceptions_show_locals=False,
+)
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Run ``nbv-rerun-inspect`` from a TOML config and CLI overrides."""
+
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    run_typer_app(app, _normalize_optional_value_flags(raw_argv), prog_name="nbv-rerun-inspect")
+
+
+@app.command()
+def rerun_inspect_command(
+    config_path: Annotated[
+        Path,
+        typer.Option("--config-path", help="Path to a RerunOfflineInspectorConfig TOML file."),
+    ],
+    split: Annotated[Split | None, typer.Option("--split", help="Override selection.split.")] = None,
+    index: Annotated[int | None, typer.Option("--index", min=0, help="Override selection.index.")] = None,
+    sample_id: Annotated[str | None, typer.Option("--sample-id", help="Override selection.sample_key.")] = None,
+    scene_id: Annotated[str | None, typer.Option("--scene-id", help="Override selection.scene_id.")] = None,
+    snippet_id: Annotated[str | None, typer.Option("--snippet-id", help="Override selection.snippet_id.")] = None,
+    candidate_index: Annotated[
+        int | None,
+        typer.Option("--candidate-index", min=0, help="Override candidate.selected_index for detail layers."),
+    ] = None,
+    offline_store: Annotated[
+        Path | None,
+        typer.Option("--offline-store", help="Override dataset.offline.store.store_dir."),
+    ] = None,
+    rollout_store: Annotated[
+        Path | None,
+        typer.Option("--rollout-store", help="Inspect a standalone rollouts.zarr replay store."),
+    ] = None,
+    rollout_index: Annotated[
+        int,
+        typer.Option("--rollout-index", min=0, help="Zero-based rollout row position for --rollout-store."),
+    ] = 0,
+    rollout_row_id: Annotated[
+        int | None,
+        typer.Option("--rollout-row-id", min=0, help="Explicit rollouts/rollout_row_id for --rollout-store."),
+    ] = None,
+    rollout_context: Annotated[
+        RolloutContextMode | None,
+        typer.Option("--rollout-context", help="VIN context policy for --rollout-store."),
+    ] = None,
+    save_path: Annotated[
+        Path | None,
+        typer.Option("--save", help="Override output mode to save and optionally set an .rrd path."),
+    ] = None,
+    save_mode: Annotated[
+        bool,
+        typer.Option("--save-mode", hidden=True),
+    ] = False,
+    spawn: Annotated[bool, typer.Option("--spawn", help="Override output mode to spawn a local viewer.")] = False,
+    connect_addr: Annotated[
+        str | None,
+        typer.Option("--connect", help="Override output mode to connect over Rerun gRPC."),
+    ] = None,
+    connect_mode: Annotated[
+        bool,
+        typer.Option("--connect-mode", hidden=True),
+    ] = False,
+    view: Annotated[
+        bool,
+        typer.Option("--view", help="Save the .rrd and open it in the native Rerun viewer in the foreground."),
+    ] = False,
+    serve_web: Annotated[
+        bool,
+        typer.Option("--serve-web", help="Save the .rrd and serve it with Rerun's web viewer in the foreground."),
+    ] = False,
+    web_viewer_port: Annotated[
+        int,
+        typer.Option("--web-viewer-port", min=0, max=65535, help="Rerun web viewer HTTP port for --serve-web."),
+    ] = 0,
+    ws_server_port: Annotated[
+        int,
+        typer.Option("--ws-server-port", min=0, max=65535, help="Rerun websocket port for --serve-web."),
+    ] = 0,
+    lan: Annotated[
+        bool,
+        typer.Option("--lan", help="With --serve-web, bind to 0.0.0.0 and print a LAN URL hint."),
+    ] = False,
+) -> None:
+    """Inspect a configured VIN offline sample or rollout-store row in Rerun."""
+
+    options = RerunCliOptions(
+        config_path=config_path,
+        split=split,
+        index=index,
+        sample_id=sample_id,
+        scene_id=scene_id,
+        snippet_id=snippet_id,
+        candidate_index=candidate_index,
+        offline_store=offline_store,
+        rollout_store=rollout_store,
+        rollout_index=rollout_index,
+        rollout_row_id=rollout_row_id,
+        rollout_context=rollout_context,
+        save_path=save_path,
+        save_requested=save_mode or save_path is not None,
+        spawn=spawn,
+        connect_addr=connect_addr,
+        connect_requested=connect_mode or connect_addr is not None,
+        view=view,
+        serve_web=serve_web,
+        web_viewer_port=web_viewer_port,
+        ws_server_port=ws_server_port,
+        lan=lan,
+    )
+    _validate_viewer_args(options)
+    config_path = resolve_config_toml_path(options.config_path)
+    cfg = RerunOfflineInspectorConfig.from_toml(config_path)
+    cfg = _apply_overrides(cfg, options)
+    if options.rollout_store is not None:
+        from ._rollout_zarr import run_rollout_zarr_inspector
+
+        run_rollout_zarr_inspector(
+            cfg,
+            store_dir=options.rollout_store,
+            rollout_index=options.rollout_index,
+            rollout_row_id=options.rollout_row_id,
+        )
+    else:
+        run_inspector(cfg)
+    if options.view or options.serve_web:
+        _run_viewer_command(
+            _viewer_command(
+                save_path=cfg.output.save_path,
+                serve_web=options.serve_web,
+                lan=options.lan,
+                web_viewer_port=options.web_viewer_port,
+                ws_server_port=options.ws_server_port,
+            ),
+            lan=options.lan,
+            web_viewer_port=options.web_viewer_port,
+        )
+
+
+def _normalize_optional_value_flags(argv: list[str]) -> list[str]:
+    """Map optional-value flags to hidden boolean flags when no value is supplied."""
+
+    replacements = {"--save": "--save-mode", "--connect": "--connect-mode"}
+    normalized: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token in replacements and (index + 1 >= len(argv) or argv[index + 1].startswith("-")):
+            normalized.append(replacements[token])
+            index += 1
+            continue
+        normalized.append(token)
+        index += 1
+    return normalized
+
+
+def _validate_viewer_args(options: RerunCliOptions) -> None:
     """Reject incompatible CLI viewer and SDK-sink combinations."""
 
-    if args.view and args.serve_web:
-        parser.error("--view and --serve-web are mutually exclusive.")
-    if (args.view or args.serve_web) and (args.spawn or args.connect is not None):
-        parser.error("--view/--serve-web are post-save viewer modes and cannot be combined with --spawn/--connect.")
-    if args.lan and not args.serve_web:
-        parser.error("--lan requires --serve-web.")
-    if args.rollout_index is not None and int(args.rollout_index) < 0:
-        parser.error("--rollout-index must be >= 0.")
-    if args.rollout_row_id is not None and int(args.rollout_row_id) < 0:
-        parser.error("--rollout-row-id must be >= 0.")
-    for name in ("web_viewer_port", "ws_server_port"):
-        port = int(getattr(args, name))
-        if port < 0 or port > 65535:
-            parser.error(f"--{name.replace('_', '-')} must be in [0, 65535].")
+    if options.view and options.serve_web:
+        raise click.UsageError("--view and --serve-web are mutually exclusive.")
+    if (options.view or options.serve_web) and (options.spawn or options.connect_requested):
+        raise click.UsageError(
+            "--view/--serve-web are post-save viewer modes and cannot be combined with --spawn/--connect."
+        )
+    if options.lan and not options.serve_web:
+        raise click.UsageError("--lan requires --serve-web.")
 
 
-def _apply_overrides(config: RerunOfflineInspectorConfig, args: argparse.Namespace) -> RerunOfflineInspectorConfig:
+def _apply_overrides(config: RerunOfflineInspectorConfig, options: RerunCliOptions) -> RerunOfflineInspectorConfig:
     """Apply CLI overrides while preserving TOML defaults."""
 
     cfg = config.model_copy(deep=True)
     selection_updates: dict[str, object] = {}
-    if args.split is not None:
-        selection_updates["split"] = args.split
-    if args.index is not None:
-        selection_updates["index"] = args.index
-    if args.sample_id is not None:
-        selection_updates["sample_key"] = args.sample_id
-    if args.scene_id is not None:
-        selection_updates["scene_id"] = args.scene_id
-    if args.snippet_id is not None:
-        selection_updates["snippet_id"] = args.snippet_id
-    if args.rollout_context is not None:
-        selection_updates["rollout_context_mode"] = args.rollout_context
+    if options.split is not None:
+        selection_updates["split"] = options.split.value
+    if options.index is not None:
+        selection_updates["index"] = options.index
+    if options.sample_id is not None:
+        selection_updates["sample_key"] = options.sample_id
+    if options.scene_id is not None:
+        selection_updates["scene_id"] = options.scene_id
+    if options.snippet_id is not None:
+        selection_updates["snippet_id"] = options.snippet_id
+    if options.rollout_context is not None:
+        selection_updates["rollout_context_mode"] = options.rollout_context.value
     if selection_updates:
         cfg.selection = type(cfg.selection).model_validate({**cfg.selection.model_dump(), **selection_updates})
-    if args.offline_store is not None:
-        store = cfg.dataset.offline.store.model_copy(update={"store_dir": args.offline_store.expanduser()})
+    if options.offline_store is not None:
+        store = cfg.dataset.offline.store.model_copy(update={"store_dir": options.offline_store.expanduser()})
         offline = cfg.dataset.offline.model_copy(update={"store": store})
         cfg.dataset = cfg.dataset.model_copy(update={"offline": offline})
-    if args.candidate_index is not None:
-        cfg.candidate.selected_index = args.candidate_index
-    if args.save is not None:
+    if options.candidate_index is not None:
+        cfg.candidate.selected_index = options.candidate_index
+    if options.save_requested:
         cfg.output.mode = "save"
-        if args.save:
-            cfg.output.save_path = Path(args.save).expanduser()
-    if args.spawn:
+        if options.save_path is not None:
+            cfg.output.save_path = options.save_path.expanduser()
+    if options.spawn:
         cfg.output.mode = "spawn"
-    if args.connect is not None:
+    if options.connect_requested:
         cfg.output.mode = "connect"
-        if args.connect:
-            cfg.output.connect_addr = args.connect
-    if args.view or args.serve_web:
+        if options.connect_addr is not None:
+            cfg.output.connect_addr = options.connect_addr
+    if options.view or options.serve_web:
         cfg.output.mode = "save"
     return RerunOfflineInspectorConfig.model_validate(cfg.model_dump())
 
@@ -247,7 +368,7 @@ class RerunOfflineInspector:
         logger.log_sample(sample=selected.sample, inventory=inventory, selection=selected.description)
         logger.log_metadata(sample=selected.sample, inventory=inventory, selection=selected.description)
         self.console.log(
-            f"Logged Rerun offline sample: {selected.sample.sample_key} ({selected.description})",
+            f"Logged Rerun offline sample: {compact_ase_atek_sample_id(selected.sample.sample_key)} ({selected.description})",
         )
 
 
@@ -257,38 +378,4 @@ def run_inspector(config: RerunOfflineInspectorConfig, *, rr_module: RerunModule
     RerunOfflineInspector(config, rr_module=rr_module).run()
 
 
-def main(argv: list[str] | None = None) -> None:
-    """Run ``nbv-rerun-inspect`` from a TOML config and CLI overrides."""
-
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-    _validate_viewer_args(parser, args)
-    config_path = resolve_config_toml_path(args.config_path)
-    cfg = RerunOfflineInspectorConfig.from_toml(config_path)
-    cfg = _apply_overrides(cfg, args)
-    if args.rollout_store is not None:
-        from ._rollout_zarr import run_rollout_zarr_inspector
-
-        run_rollout_zarr_inspector(
-            cfg,
-            store_dir=args.rollout_store,
-            rollout_index=int(args.rollout_index),
-            rollout_row_id=args.rollout_row_id,
-        )
-    else:
-        run_inspector(cfg)
-    if args.view or args.serve_web:
-        _run_viewer_command(
-            _viewer_command(
-                save_path=cfg.output.save_path,
-                serve_web=bool(args.serve_web),
-                lan=bool(args.lan),
-                web_viewer_port=int(args.web_viewer_port),
-                ws_server_port=int(args.ws_server_port),
-            ),
-            lan=bool(args.lan),
-            web_viewer_port=int(args.web_viewer_port),
-        )
-
-
-__all__ = ["RerunOfflineInspector", "main", "run_inspector"]
+__all__ = ["RerunOfflineInspector", "app", "main", "run_inspector"]

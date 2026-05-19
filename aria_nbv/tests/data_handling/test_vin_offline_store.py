@@ -322,6 +322,27 @@ def test_prepare_vin_offline_sample_filters_backbone_blocks_and_payload() -> Non
     assert "feat2d_upsampled" not in payload  # noqa: S101
 
 
+def test_prepare_vin_offline_sample_uses_compact_ase_atek_default_key() -> None:
+    row = prepare_vin_offline_sample(
+        scene_id="81286",
+        snippet_id="AriaSyntheticEnvironment_81286_AtekDataSample_000000",
+        vin_snippet=_make_vin_snippet(offset=0.0),
+        candidates=None,
+        depths=_make_stub_depths(2, offset=0.0),
+        rri=_make_stub_rri(2),
+        candidate_pcs=None,
+        backbone_out=None,
+        max_candidates=4,
+        include_depths=True,
+        include_candidate_pcs=False,
+        include_backbone=False,
+        include_diagnostic_payloads=False,
+    )
+
+    assert row.sample_key == "ASE_81286_Atek_000000"  # noqa: S101
+    assert row.snippet_id == "ASE_81286_Atek_000000"  # noqa: S101
+
+
 def test_prepare_vin_offline_sample_preserves_candidate_label_order_in_payloads(tmp_path: Path) -> None:
     """Numeric blocks and rich payloads should share one candidate ordering."""
 
@@ -917,6 +938,7 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert stored_manifest.version == OFFLINE_DATASET_VERSION  # noqa: S101
     assert stored_manifest.materialized_blocks.gt_obbs is True  # noqa: S101
     assert stored_manifest.materialized_blocks.detected_obbs is False  # noqa: S101
+
     assert stored_manifest.materialized_blocks.trajectory is True  # noqa: S101
     assert stored_manifest.shards[0].shard_id == "shard-000000"  # noqa: S101
     assert stored_manifest.shards[0].blocks["vin.points_world"].kind == "zarr_array"  # noqa: S101
@@ -947,6 +969,26 @@ def test_vin_offline_dataset_round_trip(tmp_path: Path) -> None:
     assert batch.gt_obbs.obbs.shape == (2, 2, 34)  # noqa: S101
     assert batch.trajectory is not None  # noqa: S101
     assert torch.equal(batch.trajectory.time_ns, torch.tensor([100, 200], dtype=torch.int64))  # noqa: S101
+
+
+def test_vin_offline_dataset_get_by_scene_snippet_accepts_compact_ase_atek_ids(tmp_path: Path) -> None:
+    store_cfg = _write_test_store(tmp_path)
+    records = VinOfflineIndexRecord.read_many(store_cfg.sample_index_path)
+    records[0].sample_key = "81286::AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+    records[0].scene_id = "81286"
+    records[0].snippet_id = "AriaSyntheticEnvironment_81286_AtekDataSample_000000"
+    _write_sample_index(store_cfg.sample_index_path, records)
+
+    dataset = VinOfflineDatasetConfig(
+        store=store_cfg,
+        return_format="sample",
+        split="all",
+    ).setup_target()
+
+    found = dataset.get_by_scene_snippet(scene_id="81286", snippet_id="ASE_81286_Atek_000000")
+
+    assert found is not None  # noqa: S101
+    assert found.scene_id == "81286"  # noqa: S101
 
 
 def test_vin_offline_store_persists_detected_obbs_for_training(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from aria_nbv.data_handling import VinOfflineDataset, VinOfflineDatasetConfig, VinOfflineSample
+from aria_nbv.data_handling.efm_dataset_utils import compact_ase_atek_sample_id
 
 from ._config import RerunInspectorSelectionConfig
 
@@ -48,11 +49,13 @@ def _select_by_sample_key(dataset: VinOfflineDataset, sample_key: str) -> Select
         sample = dataset[index]
         if not isinstance(sample, VinOfflineSample):
             raise TypeError("Rerun sample selection requires VinOfflineDatasetConfig.return_format='sample'.")
-        if sample.sample_key == sample_key:
+        if sample.sample_key == sample_key or compact_ase_atek_sample_id(
+            sample.sample_key
+        ) == compact_ase_atek_sample_id(sample_key):
             return SelectedRerunSample(
                 sample=sample,
                 index=index,
-                description=f"sample_key={sample_key}",
+                description=f"sample_key={compact_ase_atek_sample_id(sample_key)}",
             )
     raise LookupError(f"No offline sample found for sample_key={sample_key!r}.")
 
@@ -65,18 +68,20 @@ def _select_by_scene_snippet(dataset: VinOfflineDataset, *, scene_id: str, snipp
         return SelectedRerunSample(
             sample=found,
             index=None,
-            description=f"scene_id={scene_id} snippet_id={snippet_id}",
+            description=f"scene_id={scene_id} snippet_id={compact_ase_atek_sample_id(snippet_id)}",
         )
 
     for index in range(len(dataset)):
         sample = dataset[index]
         if not isinstance(sample, VinOfflineSample):
             raise TypeError("Rerun sample selection requires VinOfflineDatasetConfig.return_format='sample'.")
-        if sample.scene_id == scene_id and sample.snippet_id == snippet_id:
+        if sample.scene_id == scene_id and compact_ase_atek_sample_id(sample.snippet_id) == compact_ase_atek_sample_id(
+            snippet_id
+        ):
             return SelectedRerunSample(
                 sample=sample,
                 index=index,
-                description=f"scene_id={scene_id} snippet_id={snippet_id}",
+                description=f"scene_id={scene_id} snippet_id={compact_ase_atek_sample_id(snippet_id)}",
             )
     raise LookupError(f"No offline sample found for scene_id={scene_id!r}, snippet_id={snippet_id!r}.")
 

@@ -41,6 +41,12 @@ def _steps(record):
     return record.result.trajectories[0].steps
 
 
+def _mask_target_eval_candidate_rows(step) -> None:
+    valid_count = int(step.candidates.mask_valid.detach().cpu().to(dtype=torch.bool).sum().item())
+    step.target_eval_candidate_points_world = torch.zeros((valid_count, 2, 3), dtype=torch.float32)
+    step.target_eval_candidate_point_lengths = torch.full((valid_count,), 2, dtype=torch.long)
+
+
 def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None:
     records = build_rollout_records(horizon=2, num_samples=8, seed=7)
     result = write_rollout_zarr_store(
@@ -74,6 +80,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert manifest["counts"]["rollouts"] == result.num_rollouts
     assert manifest["counts"]["steps"] == result.num_steps
     assert manifest["counts"]["candidates"] == result.num_candidates
+    assert manifest["counts"]["candidate_diagnostics"] == result.num_candidates
     assert manifest["counts"]["target_eval_crops"] >= result.num_steps
     assert manifest["counts"]["q_h_states"] == result.num_steps
     assert manifest["generation"]["invocation"]["mode"] == "programmatic"
@@ -83,6 +90,7 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     assert "sources" in reader.root
     assert "q_h" in reader.root
     assert "selected_depth" in reader.root
+    assert "candidate_diagnostics" in reader.root
     assert reader.root.attrs["q_h_view_persisted"] is True
     assert reader.root.attrs["q_h_view_role"] == "training_core_derived_cache"
     assert reader.root.attrs["q_h_chunk_states"] == 64
@@ -110,6 +118,27 @@ def test_rollout_zarr_store_writes_reads_and_validates_records(tmp_path) -> None
     selection_probabilities = reader.array("candidates/selection_probabilities")
     assert np.all(selection_probabilities[~candidate_valid] == 0.0)
     assert np.all(reader.array("candidates/selected_mask") <= candidate_valid)
+    diagnostics = reader.root["candidate_diagnostics"]
+    assert np.array_equal(
+        reader.array("candidate_diagnostics/candidate_row_id"),
+        reader.array("candidates/candidate_row_id"),
+    )
+    assert reader.array("candidate_diagnostics/position_id").shape == (result.num_candidates,)
+    assert reader.array("candidate_diagnostics/path_collision_mask").dtype == np.dtype(np.bool_)
+    for diagnostic_name in (
+        "mesh_distance_m",
+        "path_min_clearance_m",
+        "free_space_margin_m",
+        "motion_step_length_m",
+        "motion_height_delta_m",
+        "motion_backward_step_m",
+        "motion_yaw_delta_deg",
+        "target_distance_m",
+        "target_bearing_yaw_deg",
+    ):
+        values = reader.array(f"candidate_diagnostics/{diagnostic_name}")
+        assert values.dtype == np.dtype(np.float32)
+        assert values.shape == (result.num_candidates,)
     selected_depth = reader.root["selected_depth"]
     assert selected_depth.attrs["enabled"] is True
     assert selected_depth.attrs["codec"] == "blosc:zstd:clevel=5:bitshuffle"
@@ -188,11 +217,67 @@ def test_rollout_zarr_rejects_stale_schema_version(tmp_path) -> None:
     result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
 
     root = zarr.open_group(result.store_dir, mode="a")
-    root.attrs["schema_version"] = "0.5-selected-depth"
+    root.attrs["schema_version"] = "0.8-global-target-rows"
 
     validation = validate_rollout_zarr_store(result.store_dir)
     assert not validation.ok
-    assert any("0.5-selected-depth" in error and ROLLOUT_ZARR_SCHEMA_VERSION in error for error in validation.errors)
+    assert any("0.8-global-target-rows" in error and ROLLOUT_ZARR_SCHEMA_VERSION in error for error in validation.errors)
+
+
+def test_rollout_zarr_candidate_diagnostics_fallback_to_nan_when_unavailable(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=31)[:1]
+    for step in _steps(records[0]):
+        step.candidates.position_id = None
+        step.candidates.extras.clear()
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    reader = RolloutZarrStoreReader(result.store_dir)
+
+    assert np.array_equal(
+        reader.array("candidate_diagnostics/candidate_row_id"),
+        reader.array("candidates/candidate_row_id"),
+    )
+    assert np.all(reader.array("candidate_diagnostics/position_id") == -1)
+    assert not reader.array("candidate_diagnostics/path_collision_mask").any()
+    for name in (
+        "mesh_distance_m",
+        "path_min_clearance_m",
+        "free_space_margin_m",
+        "motion_step_length_m",
+        "motion_height_delta_m",
+        "motion_backward_step_m",
+        "motion_yaw_delta_deg",
+        "target_distance_m",
+        "target_bearing_yaw_deg",
+    ):
+        assert np.isnan(reader.array(f"candidate_diagnostics/{name}")).all()
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert validation.ok, validation.errors
+
+
+def test_rollout_zarr_validates_path_collision_diagnostics_against_invalidity(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=32)[:1]
+    step = _steps(records[0])[0]
+    collision_shell_index = 0 if int(step.selected_shell_index) != 0 else 1
+    candidate_valid = step.candidates.mask_valid.clone()
+    candidate_valid[collision_shell_index] = False
+    step.candidates.mask_valid = candidate_valid
+    path_mask = torch.zeros_like(candidate_valid, dtype=torch.bool)
+    path_mask[collision_shell_index] = True
+    step.candidates.masks["PathCollisionRule"] = ~path_mask
+    step.candidates.extras["path_collision_mask"] = path_mask
+    _mask_target_eval_candidate_rows(step)
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert validation.ok, validation.errors
+
+    root = zarr.open_group(result.store_dir, mode="a")
+    root["candidates/invalid_reason_bitset"][collision_shell_index] = np.asarray(1, dtype=np.uint32)
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("PATH_SEGMENT_COLLISION" in error for error in validation.errors)
 
 
 def test_rollout_zarr_validation_requires_selected_depth_when_enabled(tmp_path) -> None:
@@ -314,6 +399,7 @@ def test_rollout_zarr_masks_invalid_candidate_oracle_labels(tmp_path) -> None:
 def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> None:
     records = build_rollout_records(horizon=1, num_samples=6, seed=13)[:2]
     records[0].lineage.target_row_id = 7
+    records[0].lineage.target_source_index = None
     records[0].lineage.target_id = "target-a"
     records[0].lineage.target_selection_policy = "greedy_top_k"
     records[0].lineage.target_selection_rank = 0
@@ -327,6 +413,7 @@ def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> No
     records[0].lineage.gt_match_score = 0.8
     records[0].lineage.gt_match_status = "matched"
     records[1].lineage.target_row_id = 9
+    records[1].lineage.target_source_index = None
     records[1].lineage.target_id = "target-b"
     records[1].lineage.target_selection_policy = "greedy_top_k"
     records[1].lineage.target_selection_rank = 1
@@ -346,10 +433,11 @@ def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> No
     target_names = _json_list(reader, "dictionaries/target")
     target_name_ids = reader.array("targets/target_id")
 
-    assert set(target_rows.tolist()) == {7, 9}
+    assert set(target_rows.tolist()) == {0, 1}
     assert {target_names[int(index)] for index in target_name_ids.tolist()} == {"target-a", "target-b"}
-    assert set(reader.array("rollouts/target_row_id").tolist()) == {7, 9}
-    assert set(q_h["target_row_id"].tolist()) == {7, 9}
+    assert set(reader.array("rollouts/target_row_id").tolist()) == {0, 1}
+    assert set(q_h["target_row_id"].tolist()) == {0, 1}
+    assert reader.array("targets/target_source_index").tolist() == [7, 9]
     assert reader.array("targets/target_selection_rank").tolist() == [0, 1]
     assert np.allclose(reader.array("targets/target_selection_score"), np.asarray([0.75, 0.5], dtype=np.float32))
     assert reader.array("targets/matched_gt_target_row_id").tolist() == [70, -1]
@@ -360,6 +448,47 @@ def test_rollout_zarr_preserves_multi_target_identity_in_qh_view(tmp_path) -> No
     match_status = _json_list(reader, "dictionaries/target_match_status")
     status_ids = reader.array("targets/gt_match_status_id")
     assert [match_status[int(index)] for index in status_ids.tolist()] == ["matched", "unmatched_gt"]
+
+
+def test_rollout_zarr_globalizes_selector_local_target_rows(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=14)[:2]
+    for source_row_id, record in enumerate(records):
+        record.lineage.source_row_id = source_row_id
+        record.lineage.source_sample_index = source_row_id
+        record.lineage.snippet_id = f"snippet-{source_row_id}"
+        record.lineage.target_row_id = 0
+        record.lineage.target_source_index = 0
+        record.lineage.target_id = f"scene:snippet-{source_row_id}:target-local-0"
+        record.lineage.matched_gt_target_id = f"scene:snippet-{source_row_id}:gt-local-0"
+        record.lineage.matched_gt_target_row_id = 0
+
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+    reader = RolloutZarrStoreReader(result.store_dir)
+
+    assert reader.array("targets/target_row_id").tolist() == [0, 1]
+    assert reader.array("targets/target_source_index").tolist() == [0, 0]
+    assert reader.array("rollouts/target_row_id").tolist() == [0, 1]
+    target_names = _json_list(reader, "dictionaries/target")
+    target_name_ids = reader.array("targets/target_id")
+    assert [target_names[int(index)] for index in target_name_ids.tolist()] == [
+        "scene:snippet-0:target-local-0",
+        "scene:snippet-1:target-local-0",
+    ]
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert validation.ok, validation.errors
+
+
+def test_rollout_zarr_validation_rejects_target_rows_shared_across_sources(tmp_path) -> None:
+    records = build_rollout_records(horizon=1, num_samples=6, seed=15)[:2]
+    result = write_rollout_zarr_store(tmp_path / "rollouts.zarr", records)
+
+    root = zarr.open_group(result.store_dir, mode="a")
+    root["rollouts/target_row_id"][...] = np.asarray([0, 0], dtype=np.int64)
+
+    validation = validate_rollout_zarr_store(result.store_dir)
+    assert not validation.ok
+    assert any("multiple source_row_id" in error for error in validation.errors)
 
 
 def test_rollout_zarr_relative_pose_root_is_pose_transform(tmp_path) -> None:

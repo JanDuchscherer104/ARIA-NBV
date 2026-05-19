@@ -19,6 +19,7 @@ from aria_nbv.pose_generation import (
 from aria_nbv.pose_generation.candidate_generation_rules import (
     FreeSpaceRule,
     MinDistanceToMeshRule,
+    MotionRealismRule,
     PathCollisionRule,
 )
 from aria_nbv.pose_generation.types import CandidateContext
@@ -134,6 +135,7 @@ def test_min_distance_rule_rejects_near_mesh(monkeypatch):
         max_radius=0.1,
         ensure_collision_free=False,
         ensure_free_space=False,
+        collect_debug_stats=True,
         verbosity=0,
         is_debug=True,
     )
@@ -165,6 +167,48 @@ def test_min_distance_rule_rejects_near_mesh(monkeypatch):
     )
     rule(ctx)
     assert torch.equal(ctx.mask_valid, torch.tensor([False, True]))
+    assert torch.allclose(ctx.debug["min_distance_to_mesh"], torch.tensor([0.1, 0.5]))
+
+
+def test_path_collision_rule_records_p3d_min_clearance(monkeypatch):
+    cfg = CandidateViewGeneratorConfig(
+        ensure_free_space=False,
+        min_distance_to_mesh=0.0,
+        collision_backend=CollisionBackend.P3D,
+        ray_subsample=3,
+        step_clearance=0.1,
+        collect_debug_stats=True,
+        verbosity=0,
+        is_debug=True,
+    )
+    monkeypatch.setattr(
+        "aria_nbv.pose_generation.candidate_generation_rules.point_mesh_distance",
+        lambda pts, verts, faces: torch.tensor([0.2, 0.05, 0.3, 0.4, 0.3, 0.2], dtype=torch.float32),
+    )
+    rule = PathCollisionRule(cfg)
+    mesh, verts, faces = _mesh_triplet()
+    poses = PoseTW.from_Rt(
+        torch.eye(3).repeat(2, 1, 1),
+        torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+    )
+    ctx = CandidateContext(
+        cfg=cfg,
+        reference_pose=_identity_pose(),
+        sampling_pose=_identity_pose(),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        occupancy_extent=_default_extent(),
+        camera_calib_template=_dummy_camera(),
+        shell_poses=poses,
+        centers_world=poses.t,
+        shell_offsets_ref=poses.t,
+        mask_valid=torch.ones(2, dtype=torch.bool),
+    )
+    rule(ctx)
+    assert torch.equal(ctx.mask_valid, torch.tensor([False, True]))
+    assert torch.equal(ctx.debug["path_collision_mask"], torch.tensor([True, False]))
+    assert torch.allclose(ctx.debug["path_min_clearance_m"], torch.tensor([0.05, 0.2]))
 
 
 def test_path_collision_rule_blocks_intersecting_ray():
@@ -174,6 +218,7 @@ def test_path_collision_rule_blocks_intersecting_ray():
         ensure_free_space=False,
         min_distance_to_mesh=0.0,
         collision_backend=CollisionBackend.TRIMESH,
+        collect_debug_stats=True,
         verbosity=0,
         is_debug=True,
     )
@@ -198,6 +243,7 @@ def test_path_collision_rule_blocks_intersecting_ray():
     )
     rule(ctx)
     assert torch.equal(ctx.mask_valid, torch.tensor([False, True]))
+    assert torch.equal(ctx.debug["path_collision_mask"], torch.tensor([True, False]))
 
 
 def test_free_space_rule_bounds_candidates():
@@ -205,6 +251,7 @@ def test_free_space_rule_bounds_candidates():
         ensure_collision_free=False,
         min_distance_to_mesh=0.0,
         ensure_free_space=True,
+        collect_debug_stats=True,
         verbosity=0,
         is_debug=True,
     )
@@ -231,6 +278,49 @@ def test_free_space_rule_bounds_candidates():
     )
     rule(ctx)
     assert torch.equal(ctx.mask_valid, torch.tensor([True, False, False]))
+    assert torch.allclose(ctx.debug["free_space_margin_m"], torch.tensor([0.5, -0.5, -0.1]), atol=1e-6)
+
+
+def test_motion_realism_rule_records_diagnostics():
+    cfg = CandidateViewGeneratorConfig(
+        ensure_collision_free=False,
+        min_distance_to_mesh=0.0,
+        enforce_motion_realism=True,
+        max_step_distance_m=2.0,
+        max_height_delta_m=1.0,
+        max_backward_step_m=1.0,
+        max_yaw_delta_deg=90.0,
+        collect_debug_stats=True,
+        verbosity=0,
+        is_debug=True,
+    )
+    rule = MotionRealismRule(cfg)
+    mesh, verts, faces = _mesh_triplet()
+    poses = PoseTW.from_Rt(
+        torch.eye(3).repeat(2, 1, 1),
+        torch.tensor([[0.3, 0.0, 0.0], [0.0, 0.2, -0.4]]),
+    )
+    ctx = CandidateContext(
+        cfg=cfg,
+        reference_pose=_identity_pose(),
+        sampling_pose=_identity_pose(),
+        gt_mesh=mesh,
+        mesh_verts=verts,
+        mesh_faces=faces,
+        occupancy_extent=_default_extent(),
+        camera_calib_template=_dummy_camera(),
+        shell_poses=poses,
+        centers_world=poses.t,
+        shell_offsets_ref=poses.t,
+        mask_valid=torch.ones(2, dtype=torch.bool),
+    )
+    rule(ctx)
+    assert torch.equal(ctx.mask_valid, torch.tensor([True, True]))
+    assert torch.allclose(ctx.debug["motion_step_length_m"], torch.linalg.norm(poses.t, dim=1))
+    assert torch.allclose(ctx.debug["motion_height_delta_m"], torch.tensor([0.0, 0.2]))
+    assert torch.allclose(ctx.debug["motion_backward_step_m"], torch.tensor([0.0, 0.4]))
+    assert torch.allclose(ctx.debug["motion_yaw_delta_rad"], torch.zeros(2))
+    assert torch.equal(ctx.debug["motion_realism_reject_mask"], torch.tensor([False, False]))
 
 
 def test_candidate_generator_pipeline_synthetic():
