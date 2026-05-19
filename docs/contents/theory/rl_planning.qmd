@@ -11,7 +11,10 @@ format: html
 
 This page owns ARIA-NBV's formal finite-candidate rollout and $Q_H$ contract.
 The source-backed RL rationale lives in
-[RL Sources For Rollout And Q_H](../literature/rl_planning.qmd).
+[RL Sources For Rollout And Q_H](../literature/rl_planning.qmd). The target
+selection, finite candidate sampler, candidate mixture, and rollout branch
+sampling details are specified in
+[Candidate Sampling And Target Selection](candidate_sampling_target_selection.qmd).
 
 ARIA-NBV should formulate its first non-myopic experiment as finite-horizon planning over discrete candidate views, not as full continuous reinforcement learning. At time $t$, the {{< gls rollout-state >}} contains actor-visible reconstruction state, target descriptor, candidate table, validity masks, selected-view history, and budget state. Oracle labels, GT meshes, all-candidate GT renders, and GT OBB crops define supervision and evaluation; they are not actor-visible inputs.
 

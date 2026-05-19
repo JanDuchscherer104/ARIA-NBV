@@ -53,7 +53,12 @@ class SamplingStrategy(StrEnum):
 
 
 class ViewDirectionMode(StrEnum):
-    """How to derive the base camera orientation for candidates."""
+    """Base orientation family applied after candidate centers are sampled.
+
+    These modes decide where the camera optical axis points before local jitter:
+    reuse the reference rig, look along the reference-candidate ray, look back
+    toward the reference, or look at an actor-visible target point.
+    """
 
     FORWARD_RIG = "forward_rig"
     RADIAL_AWAY = "radial_away"
@@ -62,7 +67,12 @@ class ViewDirectionMode(StrEnum):
 
 
 class CandidatePositionMode(StrEnum):
-    """How to sample candidate camera centers before orientation is assigned."""
+    """Spatial prior used to turn raw sphere samples into candidate centers.
+
+    `UPPER_BOUND_FREE_SHELL` is the broad ablation prior. The remaining modes
+    bias the finite candidate set toward local continuity, target bearing,
+    lateral bypass, short refinement, or controlled backtracking.
+    """
 
     UPPER_BOUND_FREE_SHELL = "upper_bound_free_shell"
     FORWARD_LOCAL = "forward_local"
@@ -171,9 +181,9 @@ class CandidateSamplingResult:
     """
 
     views: CameraTW
-    """views.T_camera_rig are candidate_camera <- reference_pose (camera pose in reference frame; intrinsics as per CandidateGenerationConfig :: camera_label)."""
+    """Compact valid candidate cameras; ``views.T_camera_rig`` is camera <- reference."""
     reference_pose: PoseTW
-    """World <- physical reference pose (rig) used to express candidate extrinsics. FIXME: pose is not gravity-aligned; This pose is used downstream!"""
+    """World <- physical reference rig pose used to express candidate extrinsics."""
     mask_valid: torch.Tensor
     masks: dict[str, torch.Tensor]
     shell_poses: PoseTW
@@ -181,7 +191,7 @@ class CandidateSamplingResult:
     shell_offsets_ref: torch.Tensor | None = None
     """Sampled offsets in the sampling frame for the full shell (pre-pruning)."""
     sampling_pose: PoseTW | None = None
-    """World <- sampling pose (gravity-aligned when enabled) used to generate candidate centers. FIXME: Previously we only provided reference_pose, which was *not* gravity-aligned."""
+    """World <- sampling pose used to draw centers, gravity-aligned when enabled."""
     strategy_id: torch.Tensor | None = None
     """Full-shell candidate strategy ids aligned with ``mask_valid``."""
     position_id: torch.Tensor | None = None

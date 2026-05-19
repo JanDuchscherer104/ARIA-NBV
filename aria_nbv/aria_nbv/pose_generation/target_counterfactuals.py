@@ -1,4 +1,4 @@
-"""Target-aware oracle RRI scoring for counterfactual rollouts.
+r"""Target-aware oracle RRI scoring for counterfactual rollouts.
 
 This module scores valid candidate rows with target-specific point-mesh RRI.
 The actor selects an observed/predicted target record upstream; this scorer then
@@ -8,6 +8,15 @@ are expected invalidity cases and surface as `TargetRriInvalidError`.
 
 Scene RRI may be emitted as a diagnostic from the same candidate point clouds,
 but it must not replace target RRI labels in thesis-core rollout stores.
+
+Theory:
+    Target-conditioned rollout scoring joins two intentionally separate
+    contracts. The actor-visible selector provides a target row and optional
+    target center for candidate sampling; the scorer uses the post-selection GT
+    match only to crop oracle/eval geometry and compute target-RRI labels.
+    Candidate scores therefore measure improvement for the selected target
+    without making GT OBBs, GT mesh crops, or all-candidate renders visible to
+    V1 actor policies.
 """
 
 from __future__ import annotations

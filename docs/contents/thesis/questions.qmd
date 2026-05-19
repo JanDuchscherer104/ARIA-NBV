@@ -21,6 +21,7 @@ This page states the research questions for the master's thesis phase of
 The questions are tied to the dated [roadmap](roadmap.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd), the
+[candidate sampling and target-selection theory page](../theory/candidate_sampling_target_selection.qmd), the
 [RRI metric API](../../reference/rri_metrics.qmd), the
 [VIN model API](../../reference/vin.model_v3.qmd), and the current ASE/EVL stack
 [@ProjectAria-ASE-2025; @EFM3D-straub2024]. The thesis builds on VIN-NBV's

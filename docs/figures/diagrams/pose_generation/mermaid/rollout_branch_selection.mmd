@@ -1,0 +1,33 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 16
+    rankSpacing: 26
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .node span.nodeLabel { color: #1F2937 !important; fill: #1F2937 !important; stroke: none !important; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 19px; font-weight: 700; }
+---
+flowchart LR
+  Cand["candidate table<br/>valid mask m_i"]:::input
+  Scores["policy scores<br/>heuristic or oracle evaluator"]:::compute
+  Policy["selection policy<br/>greedy, random, softmax"]:::compute
+  Diversity["diversity guards<br/>distance, yaw, target bearing, strategy"]:::compute
+  Branches["selected sibling branches"]:::output
+  Store["rollout / Q_H store<br/>action lineage + rewards"]:::data
+  Next["next counterfactual state<br/>selected history updated"]:::output
+
+  Cand --> Scores --> Policy --> Diversity --> Branches
+  Branches --> Store
+  Branches --> Next
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;

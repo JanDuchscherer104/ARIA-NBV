@@ -1,0 +1,360 @@
+---
+title: "Candidate Sampling And Target Selection"
+phase: thesis
+audience: public
+status: current
+owner: jan
+format: html
+---
+
+# Candidate Sampling And Target Selection {#candidate-sampling-target-selection}
+
+This page owns the reader-facing theory contract for target-conditioned
+sampling in ARIA-NBV. It explains how actor-visible targets are selected, how a
+finite candidate table is sampled, how mixed candidate families are combined,
+and how rollout branch selection connects those candidates to target-RRI and
+$Q_H$.
+
+The finite-horizon value-learning contract is maintained in
+[Finite-Candidate Rollout And Q_H Contract](rl_planning.qmd). The metric
+contract is maintained in [RRI Theory](rri_theory.qmd). Generated API details
+come from the `pose_generation` and `data_handling._target_selection`
+docstrings.
+
+## Actor-Visible Target Selection {#actor-visible-target-selection}
+
+The V1 target source order is actor-visible by construction. The selector first
+uses detected OBB records when present, then falls back to EVL/backbone
+predicted OBB records. Ground-truth OBBs are forbidden as V1 actor input. They
+may appear only in explicit V0 sanity mode or after V1 selection as oracle-only
+GT match audit fields.
+
+```{mermaid}
+%%| file: ../../figures/diagrams/pose_generation/mermaid/target_selection_contract.mmd
+```
+
+For every actor-visible entity candidate $e$, the selector combines semi-dense
+support and EVL support into an effective support count:
+
+$$
+n_e^{\mathrm{eff}}
+=
+n_e^{\mathrm{semi}}
++
+w_{\mathrm{EVL}} n_e^{\mathrm{EVL}}.
+$$
+
+The support score verifies that the target has enough actor-visible evidence to
+be labelable:
+
+<!-- TODO: -->
+$$
+s_e^{\mathrm{sup}}
+=
+\operatorname{clip}
+\left(
+  \frac{n_e^{\mathrm{eff}}}{n_{\min}},
+  0,1
+\right).
+$$
+
+The deficit score deliberately favors targets that are supported but not already
+saturated:
+
+$$
+s_e^{\mathrm{def}}
+=
+1-
+\operatorname{clip}
+\left(
+  \frac{n_e^{\mathrm{eff}}}{n_{\mathrm{sat}}},
+  0,1
+\right).
+$$
+
+For projected visibility, let $a_e$ be the projected image fraction and
+$a_{\max}$ the full-score saturation fraction:
+
+$$
+x_e=\operatorname{clip}(a_e/a_{\max},0,1),
+\qquad
+s_e^{\mathrm{vis}}=x_e^2(3-2x_e).
+$$
+
+The final actor-visible target score is:
+
+$$
+S_e
+=
+p_e
+s_e^{\mathrm{vis}}
+s_e^{\mathrm{sup}}
+s_e^{\mathrm{def}},
+$$
+
+where $p_e$ is the OBB confidence. The hard mask $m_e$ removes padded,
+nonfinite, too-small, unsupported, or non-visible target rows before top-K
+selection.
+
+Greedy top-K selection is deterministic:
+
+$$
+E_K=\operatorname{TopK}_{e:m_e=1} S_e.
+$$
+
+The stochastic target-selection policy samples top-K without replacement:
+
+$$
+P(e\mid R)
+=
+\frac{\exp(S_e/\tau)}
+     {\sum_{j\in R}\exp(S_j/\tau)},
+$$
+
+where $R$ is the remaining eligible target set and $\tau$ is the target
+temperature. This stochastic policy operates over target rows, not candidate
+actions.
+
+After selection, the GT label audit matches the selected actor-visible row to a
+GT OBB:
+
+$$
+G(e,g)
+=
+\operatorname{IoU}(\mathrm{OBB}_e,\mathrm{OBB}_g)
+\operatorname{clip}
+(s_e^{\mathrm{sup}}s_e^{\mathrm{vis}},0,1).
+$$
+
+The match is accepted only if semantic class, IoU, match score, and ambiguity
+thresholds pass. The selected target row therefore contains actor-visible
+fields for the model plus oracle-only GT match fields for label validity and
+debugging.
+
+## Candidate Center Sampling {#candidate-center-sampling}
+
+Candidate generation produces a full sampled shell and a compact valid table.
+The full shell retains invalid candidates, masks, reason codes, and provenance.
+The compact table exposes only valid candidates to rendering, rollout policies,
+and $Q_H$ candidate tokens.
+
+```{mermaid}
+%%| file: ../../figures/diagrams/pose_generation/mermaid/candidate_sampling_pipeline.mmd
+```
+
+Candidate centers are sampled in a gravity-aligned reference frame, then
+transformed to the world frame. A raw direction can be uniform on the sphere:
+
+$$
+u\sim \mathrm{Unif}(\mathbb{S}^2),
+$$
+
+or forward-biased:
+
+$$
+u\sim \mathrm{PowerSpherical}(\mu=e_z,\kappa),
+\qquad
+p(u)\propto (1+\mu^\top u)^\kappa.
+$$
+
+Angular caps map the sampled direction into the configured yaw and elevation
+limits without rejection:
+
+$$
+\psi=\operatorname{atan2}(u_x,u_z),
+\qquad
+\psi'=\psi\frac{\Delta\psi}{2\pi},
+$$
+
+$$
+y'=\sin\theta_{\min}
++
+\frac{u_y+1}{2}
+\left(\sin\theta_{\max}-\sin\theta_{\min}\right).
+$$
+
+The candidate radius is then drawn uniformly:
+
+$$
+r\sim \mathcal{U}(r_{\min},r_{\max}),
+\qquad
+o_r=r\,d_r,
+\qquad
+c_w=T^w_r o_r.
+$$
+
+The position family transforms the capped direction $d_r$ into a concrete
+spatial prior:
+
+| Position family | Role |
+|---|---|
+| `upper_bound_free_shell` | Ablation shell using the capped sampled direction directly. |
+| `forward_local` | Local continuity around the device forward axis with spread `0.45`. |
+| `local_refinement` | Tighter local continuity around forward with spread `0.25`. |
+| `revisit_backtrack` | Backtracking family around the local backward direction with spread `0.35`. |
+| `target_bearing_local` | Actor-visible target-centric family around the selected target bearing with spread `0.4`. |
+| `lateral_target_bypass` | Side-step family that combines target bearing, signed lateral bypass, and bounded vertical offset. |
+
+For lateral target bypass, the direction is:
+
+$$
+d'
+=
+\operatorname{norm}
+\left(
+  0.55\,b_e
+  +
+  0.85\,\operatorname{sign}(u_x)\ell_e
+  +
+  \operatorname{clip}(u_y,-0.35,0.35)u_{\mathrm{up}}
+\right),
+$$
+
+where $b_e$ is the actor-visible target bearing, $\ell_e$ is the horizontal
+lateral direction around that bearing, and $u_{\mathrm{up}}$ is world up in the
+sampling frame.
+
+## Layer 3: Candidate Orientation And Pruning {#candidate-orientation-pruning}
+
+Candidate orientation is built after center sampling. The orientation mode
+controls the base camera frame:
+
+| Orientation mode | Meaning |
+|---|---|
+| `forward_rig` | Reuse the reference rig rotation at each candidate center. |
+| `radial_away` | Look along the reference-to-candidate ray. |
+| `radial_towards` | Look back along the candidate-to-reference ray. |
+| `target_point` | Look at the selected actor-visible target center. |
+
+For a target look-at frame at candidate center $c_w$ and target center $p_e$:
+
+$$
+z_w=\operatorname{norm}(p_e-c_w),
+$$
+
+$$
+y_w=\operatorname{norm}(u_{\mathrm{up}}-(u_{\mathrm{up}}^\top z_w)z_w),
+\qquad
+x_w=y_w\times z_w.
+$$
+
+Optional view jitter samples yaw and pitch deltas in camera coordinates:
+
+$$
+\delta\psi\sim \mathcal{U}(-\psi_{\max},\psi_{\max}),
+\qquad
+\delta\theta\sim \mathcal{U}(-\theta_{\max},\theta_{\max}),
+$$
+
+$$
+z_c'
+=
+\begin{bmatrix}
+\cos\delta\theta\sin\delta\psi\\
+\sin\delta\theta\\
+\cos\delta\theta\cos\delta\psi
+\end{bmatrix}.
+$$
+
+Pruning keeps invalidity as an explicit mask contract. A candidate is valid
+only if its center lies in the occupancy support,
+
+$$
+c_i\in B_{\mathrm{occ}},
+$$
+
+it satisfies GT-mesh clearance,
+
+$$
+d_i=\min_{x\in\mathcal{M}_{GT}}\lVert c_i-x\rVert_2
+>
+d_{\min},
+$$
+
+and it respects egocentric motion bounds,
+
+$$
+\lVert o_i\rVert_2\le d_{\max},
+\quad
+|\Delta h_i|\le h_{\max},
+\quad
+\max(0,-o_{i,z})\le b_{\max}.
+$$
+
+Additional guards may reject path collisions, excessive yaw changes, or missing
+candidate depths. These invalid candidates remain in the full shell with reason
+codes and NaN labels; they are not low-quality valid actions.
+
+## Layer 4: Mixture And Rollout Branch Selection {#mixture-rollout-branch-selection}
+
+The default target-conditioned sampler is a 60-row mixed candidate table:
+
+```{mermaid}
+%%| file: ../../figures/diagrams/pose_generation/mermaid/candidate_mixture_families.mmd
+```
+
+| Component | Count | Position family | Orientation family |
+|---|---:|---|---|
+| `target_bearing_local` | 18 | `target_bearing_local` | `target_point` |
+| `forward_local` | 18 | `forward_local` | `forward_rig` |
+| `lateral_target_bypass` | 12 | `lateral_target_bypass` | `target_point` |
+| `local_refinement` | 6 | `local_refinement` | `radial_towards` |
+| `revisit_backtrack` | 6 | `revisit_backtrack` | `forward_rig` |
+
+Every full-shell row stores stable `position_id`, `strategy_id`,
+`mixture_id`, component name, and `sampler_probability = 1/N`. The explicit
+upper-bound ablation remains `upper_bound_free_shell`.
+
+Rollout branch selection acts on valid candidate rows, not on target rows:
+
+```{mermaid}
+%%| file: ../../figures/diagrams/pose_generation/mermaid/rollout_branch_selection.mmd
+```
+
+Available rollout policies include:
+
+| Policy | Score or sampling rule |
+|---|---|
+| `farthest_from_history` | Distance to the nearest previously selected pose. |
+| `farthest_from_reference` | Distance from the current reference pose. |
+| `random` / `random_valid` | Uniform sampling over eligible valid rows. |
+| `oracle_greedy` | Greedy argmax over oracle/evaluator score. |
+| `temperature_softmax` | Stochastic branch sampling over finite evaluator scores. |
+
+Temperature-softmax candidate selection uses robust logits:
+
+$$
+\ell_i
+=
+\frac{s_i-\operatorname{median}(s)}
+     {\operatorname{IQR}(s)\tau},
+$$
+
+with a standard-deviation fallback for tiny candidate sets. The selected
+candidate distribution is:
+
+$$
+P(i\mid M)=
+\frac{\exp(\ell_i)}
+     {\sum_{j:m_j=1}\exp(\ell_j)}.
+$$
+
+Diversity guards can require minimum sibling distance, yaw separation,
+target-bearing separation, and strategy diversity. These guards operate after
+the score policy and before branch expansion so rollout data does not collapse
+to near-duplicate sibling branches.
+
+## Connection To Target-RRI And Q_H {#target-rri-qh-connection}
+
+Target selection and candidate sampling are actor-visible. Oracle target-RRI is
+computed only after an actor-visible target row has been selected and matched to
+GT for evaluation. The selected target conditions the finite candidate set, and
+the scorer evaluates valid candidate rows with target-specific point-mesh
+improvement. The default rollout and $Q_H$ reward is root-normalized target
+gain from the finite-horizon contract, while state-relative target RRI remains a
+diagnostic label.
+
+This separation protects the thesis result: actor policies see observed and
+predicted target evidence, valid candidate tokens, history, and budget state;
+labelers see GT mesh/OBB assets only to create trusted supervision and endpoint
+metrics.

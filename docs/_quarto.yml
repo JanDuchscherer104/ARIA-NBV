@@ -129,6 +129,7 @@ website:
             - contents/theory/nbv_background.qmd
             - contents/theory/rri_theory.qmd
             - contents/theory/rl_planning.qmd
+            - contents/theory/candidate_sampling_target_selection.qmd
             - contents/theory/surface_metrics.qmd
             - contents/theory/semi-dense-pc.qmd
         - section: "Architecture Diagrams"

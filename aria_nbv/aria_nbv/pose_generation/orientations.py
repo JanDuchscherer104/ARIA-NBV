@@ -1,4 +1,26 @@
-"""Orientation builder for candidate poses."""
+r"""Orientation builder for finite candidate camera poses.
+
+This module assigns camera frames after candidate centers have been sampled.
+It does not decide whether a candidate is valid; it only constructs base
+orientations and optional local jitter.
+
+Theory:
+    `forward_rig` copies the reference rig rotation, while `radial_away` and
+    `radial_towards` align the camera with the reference-candidate ray. In
+    `target_point` mode, an actor-visible target center $p_e$ defines a look-at
+    frame for candidate center $c_w$:
+
+    $$
+    z_w=\operatorname{norm}(p_e-c_w),\quad
+    y_w=\operatorname{norm}(u_{\mathrm{up}}-(u_{\mathrm{up}}^\top z_w)z_w),
+    \quad x_w=y_w\times z_w.
+    $$
+
+    View jitter samples yaw and pitch in the local camera frame,
+    $\delta\psi\sim\mathcal{U}(-\psi_{\max},\psi_{\max})$ and
+    $\delta\theta\sim\mathcal{U}(-\theta_{\max},\theta_{\max})$, then builds a
+    roll-free local forward axis before optional roll jitter is applied.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +39,6 @@ if TYPE_CHECKING:
     from .candidate_generation import CandidateViewGeneratorConfig
 
 
-# TODO: if cfg.
 class OrientationBuilder:
     """Construct candidate camera orientations from centers and view settings."""
 

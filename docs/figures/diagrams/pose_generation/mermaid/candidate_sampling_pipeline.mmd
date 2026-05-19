@@ -1,0 +1,35 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 16
+    rankSpacing: 26
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .node span.nodeLabel { color: #1F2937 !important; fill: #1F2937 !important; stroke: none !important; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 19px; font-weight: 700; }
+---
+flowchart LR
+  Ref["reference pose<br/>world <- rig"]:::input
+  Grav["gravity-aligned<br/>sampling frame"]:::compute
+  Dir["direction draw<br/>uniform or PowerSpherical"]:::compute
+  Caps["azimuth/elevation caps<br/>radius sample"]:::compute
+  Pos["position family<br/>forward, target, bypass"]:::compute
+  Orient["orientation builder<br/>rig, radial, target look-at"]:::compute
+  Prune["pruning rules<br/>bounds, mesh, path, motion"]:::compute
+  Shell["full shell<br/>masks + provenance"]:::data
+  Valid["compact valid table<br/>finite actions"]:::output
+
+  Ref --> Grav --> Dir --> Caps --> Pos --> Orient --> Prune
+  Prune --> Shell
+  Shell --> Valid
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;

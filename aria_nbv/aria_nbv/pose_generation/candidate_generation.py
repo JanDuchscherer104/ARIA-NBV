@@ -1,4 +1,4 @@
-"""Candidate pose generation with modular sampling and pruning rules.
+r"""Candidate pose generation with modular sampling and pruning rules.
 
 This module implements a clear three-stage pipeline:
 
@@ -16,6 +16,28 @@ frame (LUF camera convention: x=left, y=up, z=forward).
 `CandidateViewGenerator` returns compact valid views for rendering and keeps the
 full sampled shell as masks/diagnostics. Mixture generation should wrap this
 single-family generator rather than changing its ordering semantics.
+
+Theory:
+    Sampling uses a physical reference pose and, by default, a gravity-aligned
+    sampling pose. Center samples are transformed into world-frame candidate
+    poses, then pruned without compacting the full shell. Feasibility is a hard
+    mask contract:
+
+    $$
+    c_i\in B_{\mathrm{occ}},\qquad
+    \min_{x\in\mathcal{M}_{GT}}\lVert c_i-x\rVert_2>d_{\min},
+    $$
+
+    with optional motion bounds
+
+    $$
+    \lVert o_i\rVert_2\le d_{\max},\quad
+    |\Delta h_i|\le h_{\max},\quad
+    \max(0,-o_{i,z})\le b_{\max}.
+    $$
+
+    Collision, bounds, and motion failures stay in masks and reason codes.
+    Invalid candidates are not converted into low-RRI labels.
 """
 
 from __future__ import annotations

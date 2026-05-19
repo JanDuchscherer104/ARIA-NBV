@@ -1,4 +1,4 @@
-"""Bounded counterfactual pose rollout utilities.
+r"""Bounded counterfactual pose rollout utilities.
 
 Rollouts regenerate finite candidate tables at each step from the updated pose,
 history, and remaining budget. The candidate generator may be single-family or
@@ -9,6 +9,25 @@ masks, candidate provenance, and selected-action lineage.
 The first thesis-core use is deterministic oracle lookahead and replay data for
 finite-candidate value learning. Online simulator training and continuous action
 control are outside this module's current contract.
+
+Theory:
+    Rollout policies operate over valid finite candidate rows. Heuristic
+    policies score distance from history or the current reference; random
+    policies sample uniformly over eligible valid rows; oracle policies consume
+    evaluator scores such as target root gain. Temperature-softmax selection
+    uses robust logits
+
+    $$
+    \ell_i =
+    \frac{s_i-\operatorname{median}(s)}
+         {\operatorname{IQR}(s)\tau},
+    $$
+
+    with a standard-deviation fallback for tiny candidate sets, followed by a
+    masked softmax over valid candidates. Diversity guards may require sibling
+    distance, yaw separation, target-bearing separation, and strategy diversity
+    before branches are admitted into the rollout tree. Branch schedules control
+    how many sibling transitions are retained per rollout depth.
 """
 
 from __future__ import annotations

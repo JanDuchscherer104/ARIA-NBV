@@ -1,4 +1,4 @@
-"""Mixed finite-candidate view generation with full-shell provenance.
+r"""Mixed finite-candidate view generation with full-shell provenance.
 
 The mixture wrapper keeps `CandidateViewGeneratorConfig` backward-compatible by
 instantiating one normal generator per component, overriding only the component
@@ -12,6 +12,16 @@ through `CandidateSamplingResult.candidate_shell_indices()`. Target-point
 components require `CandidateGenerationRuntimeContext.target_center_world`
 because the thesis V1 actor may condition on observed/predicted target records
 but not on GT target geometry.
+
+Theory:
+    The default target-conditioned mixture has 60 full-shell rows:
+    `target_bearing_local` 18, `forward_local` 18,
+    `lateral_target_bypass` 12, `local_refinement` 6, and
+    `revisit_backtrack` 6. Each row records stable `position_id`,
+    `strategy_id`, `mixture_id`, component name, and
+    `sampler_probability = 1/N`. These provenance arrays let rollout/Q_H
+    stores audit which finite-action family produced each candidate without
+    changing the compact valid-action contract.
 """
 
 from __future__ import annotations

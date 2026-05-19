@@ -1,0 +1,52 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 16
+    rankSpacing: 24
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .node span.nodeLabel { color: #1F2937 !important; fill: #1F2937 !important; stroke: none !important; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 19px; font-weight: 700; }
+---
+flowchart TB
+  Target["selected actor-visible target"]:::input
+  Ref["current reference pose"]:::input
+
+  subgraph Mix["60-row default candidate mixture"]
+    direction LR
+    Targ["target_bearing_local<br/>18 rows"]:::compute
+    Fwd["forward_local<br/>18 rows"]:::compute
+    Lat["lateral_target_bypass<br/>12 rows"]:::compute
+    Refine["local_refinement<br/>6 rows"]:::compute
+    Back["revisit_backtrack<br/>6 rows"]:::compute
+  end
+
+  Prov["stable provenance<br/>position_id + strategy_id + mixture_id"]:::data
+  Table["full shell<br/>sampler_probability = 1/N"]:::output
+
+  Target --> Targ
+  Target --> Lat
+  Ref --> Targ
+  Ref --> Fwd
+  Ref --> Lat
+  Ref --> Refine
+  Ref --> Back
+  Targ --> Prov
+  Fwd --> Prov
+  Lat --> Prov
+  Refine --> Prov
+  Back --> Prov
+  Prov --> Table
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  style Mix fill:#f0fbff,stroke:#8fd0ff,stroke-width:2px,rx:12,ry:12

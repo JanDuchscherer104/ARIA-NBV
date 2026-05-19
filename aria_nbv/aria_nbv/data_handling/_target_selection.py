@@ -1,4 +1,4 @@
-"""Actor-visible target selection for target-conditioned ARIA-NBV.
+r"""Actor-visible target selection for target-conditioned ARIA-NBV.
 
 This module implements the V1 `OBS-SEL / PRED-Q / GT-EVAL` target contract.
 V1 ranks observed or predicted OBB records by actor-visible evidence only: OBB
@@ -11,6 +11,24 @@ Target matching is accepted only when the best GT match passes configured IoU
 or score thresholds and the top-1/top-2 gap is unambiguous. Unmatched,
 ambiguous, empty-crop, or no-source cases are target-invalid states, not low
 target-RRI examples.
+
+Theory:
+    The actor-visible support count is
+    $n_e^{\mathrm{eff}}=n_e^{\mathrm{semi}}+
+    w_{\mathrm{EVL}}n_e^{\mathrm{EVL}}$. The selector forms support,
+    deficit, and projected-visibility factors,
+    $s_e^{\mathrm{sup}}$, $s_e^{\mathrm{def}}$, and
+    $s_e^{\mathrm{vis}}$, then scores rows as
+    $S_e=p_e s_e^{\mathrm{vis}}s_e^{\mathrm{sup}}s_e^{\mathrm{def}}$.
+    Greedy top-K sorts eligible rows by this score. Temperature-softmax top-K
+    samples without replacement using $\exp(S_e/\tau)$ over the remaining
+    eligible set.
+
+    After actor-visible selection, GT matching computes
+    $G(e,g)=\operatorname{IoU}(\mathrm{OBB}_e,\mathrm{OBB}_g)
+    \operatorname{clip}(s_e^{\mathrm{sup}}s_e^{\mathrm{vis}},0,1)$ and
+    accepts only semantic, IoU, score, and ambiguity-consistent matches. These
+    match fields are oracle/evaluation audit fields, not V1 actor inputs.
 """
 
 from __future__ import annotations

@@ -1,4 +1,28 @@
-"""Direction and position sampling utilities for candidate generation."""
+r"""Direction and position sampling utilities for finite candidate generation.
+
+This module samples candidate camera centers in the reference rig frame before
+they are transformed into world coordinates. It owns only the center prior:
+orientation, feasibility pruning, and candidate-table compaction are handled by
+neighboring `pose_generation` modules.
+
+Theory:
+    Raw directions are sampled either uniformly on the sphere,
+    $u \sim \mathrm{Unif}(\mathbb{S}^2)$, or from a forward-biased
+    PowerSpherical distribution,
+    $p(u) \propto (1 + e_z^\top u)^\kappa$. Azimuth caps scale
+    $\psi=\operatorname{atan2}(u_x,u_z)$ into the configured field
+    $\Delta\psi$, while elevation caps map $u_y=\sin\theta$ into
+    $[\sin\theta_{\min},\sin\theta_{\max}]$ without rejection. A radius
+    $r\sim\mathcal{U}(r_{\min},r_{\max})$ then produces the reference-frame
+    offset $o_r=r d_r$ and world center $c_w=T^w_r o_r$.
+
+    Position modes reinterpret the capped direction before the radius is
+    applied. `forward_local`, `local_refinement`, and `revisit_backtrack` blend
+    toward continuity priors; `target_bearing_local` blends toward the selected
+    actor-visible target bearing; `lateral_target_bypass` combines target
+    bearing, signed lateral bypass, and bounded vertical offset. These target
+    modes may use actor-visible target centers only, never GT target geometry.
+"""
 
 from __future__ import annotations
 

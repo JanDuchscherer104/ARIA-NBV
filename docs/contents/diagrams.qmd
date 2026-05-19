@@ -8,6 +8,30 @@ owner: jan
 
 This page contains the architecture diagrams for the VIN NBV system.
 
+## Target Selection Contract
+
+```{mermaid}
+%%| file: ../figures/diagrams/pose_generation/mermaid/target_selection_contract.mmd
+```
+
+## Candidate Sampling Pipeline
+
+```{mermaid}
+%%| file: ../figures/diagrams/pose_generation/mermaid/candidate_sampling_pipeline.mmd
+```
+
+## Candidate Mixture Families
+
+```{mermaid}
+%%| file: ../figures/diagrams/pose_generation/mermaid/candidate_mixture_families.mmd
+```
+
+## Rollout Branch Selection
+
+```{mermaid}
+%%| file: ../figures/diagrams/pose_generation/mermaid/rollout_branch_selection.mmd
+```
+
 ## Overall Architecture
 
 ```{mermaid}

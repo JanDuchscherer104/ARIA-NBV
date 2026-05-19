@@ -35,6 +35,7 @@ See the
 [research questions](questions.qmd), the
 [RRI theory page](../theory/rri_theory.qmd), the
 [finite-candidate rollout and Q_H contract](../theory/rl_planning.qmd), the
+[candidate sampling and target-selection theory page](../theory/candidate_sampling_target_selection.qmd), the
 [VIN model API](../../reference/vin.model_v3.qmd), the
 [generated implementation contracts](../../reference/index.qmd), and the
 [M1 contract report](m1_contract_report.qmd) for the main connected nodes. The

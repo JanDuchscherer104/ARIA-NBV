@@ -1,0 +1,45 @@
+---
+config:
+  htmlLabels: true
+  flowchart:
+    htmlLabels: true
+    nodeSpacing: 16
+    rankSpacing: 26
+  layout: elk
+  themeVariables:
+    fontSize: "18px"
+  themeCSS: |
+    .nodeLabel { font-size: 18px; }
+    .node span.nodeLabel { color: #1F2937 !important; fill: #1F2937 !important; stroke: none !important; }
+    .edgeLabel { font-size: 16px; }
+    .cluster-label { font-size: 19px; font-weight: 700; }
+---
+flowchart TB
+  subgraph Actor["Actor-visible selection"]
+    direction TB
+    Obs["detected OBBs<br/>else predicted OBBs"]:::input
+    Rows["target rows<br/>confidence + support + projection"]:::compute
+    Mask["hard mask m_e<br/>finite, visible, supported"]:::compute
+    Score["score S_e<br/>p_e s_vis s_sup s_def"]:::compute
+    Policy["greedy top-K<br/>or target softmax"]:::compute
+    Selected["selected target rows z_e"]:::output
+  end
+
+  subgraph Oracle["Oracle audit after selection"]
+    direction TB
+    Gt["GT OBB table<br/>evaluation only"]:::data
+    Match["semantic IoU match<br/>G(e,g) threshold"]:::compute
+    Audit["gt_label_valid<br/>match status + reason bits"]:::data
+  end
+
+  Obs --> Rows --> Mask --> Score --> Policy --> Selected
+  Selected --> Match
+  Gt --> Match --> Audit
+
+  classDef input fill:#D5E8D4,stroke:#82B366,stroke-width:1.5px,rx:0,ry:0;
+  classDef output fill:#F8CECC,stroke:#B85450,stroke-width:1.5px,rx:0,ry:0;
+  classDef compute fill:#E1D5E7,stroke:#9673A6,stroke-width:1.5px,rx:8,ry:8;
+  classDef data fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.2px,rx:0,ry:0;
+
+  style Actor fill:#f1fff6,stroke:#97ddb5,stroke-width:2px,rx:12,ry:12
+  style Oracle fill:#fff8e8,stroke:#e0b66a,stroke-width:2px,rx:12,ry:12
